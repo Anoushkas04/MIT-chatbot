@@ -61,26 +61,25 @@ def classify_intent(query: str) -> str:
 
 
 def search_community_posts(user_query: str, db) -> list:
-    """Searches student community posts with strict keyword overlap & category matching."""
+    """Searches student community posts with flexible keyword overlap & category matching."""
     words = [w.lower() for w in re.findall(r'\b\w+\b', user_query) if len(w) >= 3 and w.lower() not in COMMON_STOPWORDS]
 
     if not words:
         return []
 
     results = []
-    posts = db.query(models.StudentPost).order_by(models.StudentPost.id.desc()).limit(50).all()
+    posts = db.query(models.StudentPost).order_by(models.StudentPost.id.desc()).limit(100).all()
 
     for p in posts:
-        post_text = f"{p.title} {p.content} {p.sub_community}".lower()
+        post_text = f"{p.title} {p.content} {p.sub_community} {p.tag}".lower()
         comments_text = " ".join([c.content.lower() for c in p.comments]) if p.comments else ""
         full_text = f"{post_text} {comments_text}"
 
-        matched_words = [w for w in words if re.search(r'\b' + re.escape(w) + r'\b', full_text)]
+        matched_words = [w for w in words if w in full_text]
         matches_count = len(matched_words)
 
-        # Require at least 2 word matches OR 1 explicit community keyword match
-        if matches_count >= 2 or (matches_count >= 1 and any(w in COMMUNITY_KEYWORDS for w in matched_words)):
-            score = round(min(0.95, 0.65 + (matches_count * 0.10)), 2)
+        if matches_count >= 1:
+            score = round(min(0.98, 0.75 + (matches_count * 0.08)), 2)
 
             comment_str = ""
             if p.comments:
@@ -217,12 +216,7 @@ def chat_query(req: ChatRequest):
 
         # 2. Database Search for Community Discussions
         community_matches = search_community_posts(req.message, db)
-        relevant_community_matches = []
-        for cm in community_matches:
-            if intent == "community_experience" and cm["score"] >= 0.65:
-                relevant_community_matches.append(cm)
-            elif intent == "academic_official" and cm["score"] >= 0.85:
-                relevant_community_matches.append(cm)
+        relevant_community_matches = [cm for cm in community_matches if cm["score"] >= 0.50]
 
         # Calculate live community counts dynamically from DB
         question_count = len(relevant_community_matches)
@@ -237,7 +231,10 @@ def chat_query(req: ChatRequest):
         sample_size = response_count
 
         # 3. Intent-Aware Source Prioritization
-        if intent == "academic_official":
+        has_community_query_signal = any(w in req.message.lower() for w in ["student", "students", "reddit", "say", "saying", "opinion", "review", "recommend", "advice", "peer", "experience", "best", "quietest", "fastest", "review"])
+        if relevant_community_matches and (has_community_query_signal or intent == "community_experience"):
+            all_matches = relevant_community_matches + relevant_official_matches
+        elif intent == "academic_official":
             all_matches = relevant_official_matches + relevant_community_matches
         else:
             all_matches = relevant_community_matches + relevant_official_matches

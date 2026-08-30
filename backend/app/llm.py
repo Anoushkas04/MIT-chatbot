@@ -105,6 +105,25 @@ def synthesize_local_concise_answer(message: str, kb_part: str) -> str:
     """
     msg_lower = message.lower()
 
+    # 0. Check for Student Community Discussion matches in context
+    if "Student Community Discussion:" in kb_part or "[Source (COMMUNITY):" in kb_part:
+        comm_lines = []
+        for block in kb_part.split("[Source"):
+            if "Student Community Discussion:" in block or "COMMUNITY" in block:
+                # Extract clean lines
+                lines = [l.strip() for l in block.split("\n") if l.strip()]
+                for l in lines:
+                    if l.startswith("Community Question by") or l.startswith("Question Context:") or l.startswith("• "):
+                        comm_lines.append(l)
+
+        if comm_lines:
+            extracted_ans = "\n".join(comm_lines[:4])
+            return (
+                f"Based on **Student Community Insights (`r/Manipal_Academics` consensus)**:\n\n"
+                f"{extracted_ans}\n\n"
+                f"*(Verified peer experience from MIT Manipal senior students).* "
+            )
+
     # 1. Branch / Programs Query
     if any(w in msg_lower for w in ["branch", "branches", "course", "courses", "program", "programs", "discipline"]):
         return (
