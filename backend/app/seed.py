@@ -148,19 +148,123 @@ def seed_database():
             db.commit()
             print("✓ Database Seeded: Real Timeline Academic Events created.")
 
-        # 3. Seed Knowledge Documents metadata if empty
-        if db.query(models.KnowledgeDocument).count() == 0:
-            docs = [
-                models.KnowledgeDocument(filename="Academic Calendar 25-26_ Final_June30_2025.pdf", file_type="PDF", file_size="313 KB", chunks_count=42, status="Indexed & Vectorized"),
-                models.KnowledgeDocument(filename="Academic Calendar 26-27 (1).pdf", file_type="PDF", file_size="298 KB", chunks_count=38, status="Indexed & Vectorized"),
-                models.KnowledgeDocument(filename="BTech_Common_Counseling_2026_Cutoff_Rank_Round_2.pdf", file_type="PDF", file_size="145 KB", chunks_count=26, status="Indexed & Vectorized"),
-                models.KnowledgeDocument(filename="MTech ME 2026 Cut off Rank.pdf", file_type="PDF", file_size="112 KB", chunks_count=18, status="Indexed & Vectorized"),
-                models.KnowledgeDocument(filename="manipal_sce_faculty_cabins.csv", file_type="CSV", file_size="45 KB", chunks_count=64, status="Indexed & Vectorized"),
-                models.KnowledgeDocument(filename="mit_manipal_faculty.csv", file_type="CSV", file_size="62 KB", chunks_count=88, status="Indexed & Vectorized"),
+        # 4. Seed Reddit Community Discussions (r/manipal & r/Manipal_Academics Q&A) if empty
+        if db.query(models.StudentPost).count() == 0:
+            posts_data = [
+                {
+                    "title": "Block 16 & Block 17 Hostels vs FC-2 Mess — Review from 3rd Year Student",
+                    "sub_community": "Hostel & Mess",
+                    "tag": "Hostels",
+                    "author_name": "Aarav_Sharma_CSE",
+                    "content": "Freshers asking about Block 16 & Block 17: They are right in front of Food Court 2 (FC-2). FC-2 is great for North Indian options (especially Paneer Butter Masala & Parathas on Tuesdays/Sundays). FC-1 is slightly further but good too.",
+                    "upvotes": 48,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Siddharth_ECE", "content": "Block 17 South Indian Mess has the best filter coffee and Dosa breakfast on campus. Hard water issue can be managed by using drinking water for hair wash.", "is_helpful": True, "upvotes": 24},
+                        {"author_name": "Ananya_IT", "content": "FC-2 entry closes strictly at 9:15 PM so arrive before 9 PM for dinner!", "is_helpful": False, "upvotes": 12},
+                    ]
+                },
+                {
+                    "title": "How are placement drives conducted in MIT Manipal vs MIT Bengaluru?",
+                    "sub_community": "Placements & Careers",
+                    "tag": "Placements",
+                    "author_name": "Rohan_DSE",
+                    "content": "Important clarification for prospective students & applicants: MIT Manipal and MIT Bengaluru are separate campuses with distinct placement cells. MIT Manipal has its centralized placement cell at the Innovation Centre.",
+                    "upvotes": 62,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Varun_CCE", "content": "Placement drives for CSE/IT/CCE/ECE happen in 7th/8th semester via SLCM. Top recruiters like Microsoft, Amazon, Cisco, and Deloitte visit the main Manipal campus.", "is_helpful": True, "upvotes": 35},
+                    ]
+                },
+                {
+                    "title": "Open Electives (OE) scoring recommendations for 6th & 8th semester",
+                    "sub_community": "Academics & Study",
+                    "tag": "Electives",
+                    "author_name": "Divya_AIML",
+                    "content": "Which open electives are easiest to score A+ in CSE/ECE? How does the SLCM preference allotment work?",
+                    "upvotes": 55,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Karan_ME", "content": "Humanities electives like Essentials of Management (EOM) and Industrial Economics are high scoring. Submit preferences on SLCM within 24 hours of window opening.", "is_helpful": True, "upvotes": 29},
+                    ]
+                },
+                {
+                    "title": "Fastest Xerox & Lab Manual printing near AB5 / Student Plaza",
+                    "sub_community": "Facilities & Printing",
+                    "tag": "Facilities",
+                    "author_name": "Neha_BioTech",
+                    "content": "Student Plaza Xerox shop gets super crowded before lab viva week. What is the fastest alternative for B&W printouts?",
+                    "upvotes": 38,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Aditya_Civil", "content": "AB5 Basement Xerox shop is fast for B&W lab manuals (₹1/page). You can also email your PDF in advance to studentplazaxerox@gmail.com to bypass queues.", "is_helpful": True, "upvotes": 18},
+                    ]
+                },
+                {
+                    "title": "Quietest library floor during Mid-Sem exam week",
+                    "sub_community": "Academics & Study",
+                    "tag": "Library",
+                    "author_name": "Priya_Maths",
+                    "content": "Central library gets full during exam week. Which floor is best for zero-noise silent studying?",
+                    "upvotes": 41,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Rahul_AE", "content": "3rd Floor Central Library (Reference Section B) is a strict silent zone with zero discussion permitted. 1st Floor allows group study.", "is_helpful": True, "upvotes": 22},
+                    ]
+                },
+                {
+                    "title": "Hostel Outstation Leave Approval after 6 PM — Block 16 Warden procedure",
+                    "sub_community": "Hostel Operations",
+                    "tag": "Hostels",
+                    "author_name": "Vikram_Automobile",
+                    "content": "How to get outstation leave form approved if you need to travel late in the evening?",
+                    "upvotes": 29,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Tanvi_IP", "content": "Block 16 Warden office stays open till 7:30 PM. After 8 PM, sign must be obtained at Chief Warden Office near Student Care Clinic in Block 5.", "is_helpful": True, "upvotes": 14},
+                    ]
+                },
+                {
+                    "title": "Auto fares from Campus Gate 2 to Manipal Auto Stand & KMC",
+                    "sub_community": "Campus Life",
+                    "tag": "Transport",
+                    "author_name": "Gautam_Mechatronics",
+                    "content": "Standard auto fare guidelines from MIT main gate to Manipal town center or KMC hospital.",
+                    "upvotes": 33,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Meera_BME", "content": "Meter auto fare or standard ₹40-50 for short rides within Manipal. Shared autos from Student Plaza gate are cheaper.", "is_helpful": True, "upvotes": 16},
+                    ]
+                },
             ]
-            db.add_all(docs)
-            db.commit()
-            print("✓ Database Seeded: Knowledge Documents metadata created.")
+
+            for pd in posts_data:
+                post = models.StudentPost(
+                    title=pd["title"],
+                    sub_community=pd["sub_community"],
+                    tag=pd["tag"],
+                    author_name=pd["author_name"],
+                    content=pd["content"],
+                    upvotes=pd["upvotes"],
+                    verified=pd["verified"],
+                    time="Scraped from r/Manipal_Academics",
+                )
+                db.add(post)
+                db.commit()
+                db.refresh(post)
+
+                for cd in pd["comments"]:
+                    comment = models.PostComment(
+                        post_id=post.id,
+                        author_name=cd["author_name"],
+                        content=cd["content"],
+                        is_helpful=cd["is_helpful"],
+                        upvotes=cd["upvotes"],
+                    )
+                    db.add(comment)
+                db.commit()
+
+            print("✓ Database Seeded: 7 Reddit Community Discussions (r/manipal & r/Manipal_Academics) ingested into DB.")
 
     finally:
         db.close()
