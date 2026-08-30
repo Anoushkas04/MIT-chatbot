@@ -36,6 +36,20 @@ COMMUNITY_CATEGORIES = [
 ]
 
 
+CATEGORY_ALIASES = {
+    "hostels": ["hostel", "block", "room", "warden", "hostel & mess", "hostel operations"],
+    "mess": ["mess", "food", "canteen", "dinner", "lunch", "breakfast", "fc-1", "fc-2", "hostel & mess"],
+    "academics": ["academic", "elective", "exam", "library", "regulation", "syllabus", "attendance", "study"],
+    "placements": ["placement", "career", "interview", "company", "internship"],
+    "facilities": ["facility", "printing", "resource", "xerox", "marena", "gym", "lab"],
+    "clubs": ["club", "organization", "techtatva", "formula manipal"],
+    "admissions": ["admission", "cutoff", "rank", "counseling", "met"],
+    "faculty": ["faculty", "cabin", "professor", "hod"],
+    "events": ["event", "fest", "revels", "pro-show"],
+    "transportation": ["transport", "auto", "fare", "bus"],
+}
+
+
 @router.get("", summary="Get student community posts filtered by category")
 def get_posts(category: Optional[str] = None):
     db = SessionLocal()
@@ -43,13 +57,20 @@ def get_posts(category: Optional[str] = None):
         query = db.query(models.StudentPost).order_by(models.StudentPost.id.desc())
         
         if category and category.lower() != "all":
-            cat_lower = category.lower()
+            cat_lower = category.lower().strip()
             db_posts = query.all()
-            filtered = [
-                p for p in db_posts
-                if (p.sub_community and cat_lower in p.sub_community.lower())
-                or (p.tag and cat_lower in p.tag.lower())
-            ]
+
+            # Find matching alias keywords for category
+            matching_keywords = [cat_lower]
+            for key, aliases in CATEGORY_ALIASES.items():
+                if key in cat_lower or cat_lower in key:
+                    matching_keywords.extend(aliases)
+
+            filtered = []
+            for p in db_posts:
+                text_to_search = f"{p.sub_community or ''} {p.tag or ''} {p.title or ''} {p.content or ''}".lower()
+                if any(kw in text_to_search for kw in matching_keywords):
+                    filtered.append(p)
         else:
             filtered = query.all()
 
