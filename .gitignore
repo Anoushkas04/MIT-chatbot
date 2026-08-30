@@ -1,0 +1,46 @@
+# Python Virtual Environments & Bytecode
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Frontend Node Dependencies
+node_modules/
+dist/
+dist-ssr/
+build/
+*.local
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Databases
+*.db
+backend/*.db
+
+# Precomputed RAG Vector Embeddings & Chunks
+backend/data/embeddings.npy
+backend/data/chunks.json
+
+# Operating System & Editor Metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
