@@ -151,6 +151,7 @@ def seed_database():
         # 4. Seed Reddit Community Discussions (r/manipal & r/Manipal_Academics Q&A) if empty
         if db.query(models.StudentPost).count() == 0:
             posts_data = [
+                # 1. Hostel & Mess
                 {
                     "title": "Block 16 & Block 17 Hostels vs FC-2 Mess — Review from 3rd Year Student",
                     "sub_community": "Hostel & Mess",
@@ -165,6 +166,19 @@ def seed_database():
                     ]
                 },
                 {
+                    "title": "Hard water hair fall precautions in Blocks 18, 19, 20",
+                    "sub_community": "Hostel & Mess",
+                    "tag": "Hostels",
+                    "author_name": "Ishita_Biotech",
+                    "content": "Water in Block 18-20 hostels is hard water. What precautions do seniors recommend to avoid hair damage?",
+                    "upvotes": 52,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Riya_CHE", "content": "Use RO drinking water from hostel floor water cooler for final hair rinse or install a tap filter attachment from Student Plaza hardware store.", "is_helpful": True, "upvotes": 31},
+                    ]
+                },
+                # 2. Placements & Careers
+                {
                     "title": "How are placement drives conducted in MIT Manipal vs MIT Bengaluru?",
                     "sub_community": "Placements & Careers",
                     "tag": "Placements",
@@ -176,6 +190,19 @@ def seed_database():
                         {"author_name": "Varun_CCE", "content": "Placement drives for CSE/IT/CCE/ECE happen in 7th/8th semester via SLCM. Top recruiters like Microsoft, Amazon, Cisco, and Deloitte visit the main Manipal campus.", "is_helpful": True, "upvotes": 35},
                     ]
                 },
+                {
+                    "title": "DSA & System Design Prep for Tier-1 Placement Drives (Microsoft / Amazon)",
+                    "sub_community": "Placements & Careers",
+                    "tag": "Placements",
+                    "author_name": "Dev_CSE",
+                    "content": "What topics carry maximum weightage during Innovation Centre coding tests for CSE & IT students?",
+                    "upvotes": 74,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Aman_IT", "content": "Focus on Graphs (BFS/DFS), Dynamic Programming, Trees, and SQL query optimizations. 80% of online assessment questions in Round 1 are DP & Trees.", "is_helpful": True, "upvotes": 42},
+                    ]
+                },
+                # 3. Academics & Study
                 {
                     "title": "Open Electives (OE) scoring recommendations for 6th & 8th semester",
                     "sub_community": "Academics & Study",
@@ -189,15 +216,15 @@ def seed_database():
                     ]
                 },
                 {
-                    "title": "Fastest Xerox & Lab Manual printing near AB5 / Student Plaza",
-                    "sub_community": "Facilities & Printing",
-                    "tag": "Facilities",
-                    "author_name": "Neha_BioTech",
-                    "content": "Student Plaza Xerox shop gets super crowded before lab viva week. What is the fastest alternative for B&W printouts?",
-                    "upvotes": 38,
+                    "title": "75% Attendance Rule & MLC (Mandatory Learning Courses) Completion",
+                    "sub_community": "Academics & Study",
+                    "tag": "Regulations",
+                    "author_name": "Aditya_EEE",
+                    "content": "Is the 75% attendance rule strictly enforced for theory and lab courses? What happens if attendance drops below 75%?",
+                    "upvotes": 49,
                     "verified": True,
                     "comments": [
-                        {"author_name": "Aditya_Civil", "content": "AB5 Basement Xerox shop is fast for B&W lab manuals (₹1/page). You can also email your PDF in advance to studentplazaxerox@gmail.com to bypass queues.", "is_helpful": True, "upvotes": 18},
+                        {"author_name": "Dr_Sharma_Faculty", "content": "Attendance below 75% leads to grade drop or exam hall ticket withholding (DT grade). Mandatory Learning Courses like Environmental Studies & UHV must be completed before 6th sem.", "is_helpful": True, "upvotes": 38},
                     ]
                 },
                 {
@@ -212,18 +239,71 @@ def seed_database():
                         {"author_name": "Rahul_AE", "content": "3rd Floor Central Library (Reference Section B) is a strict silent zone with zero discussion permitted. 1st Floor allows group study.", "is_helpful": True, "upvotes": 22},
                     ]
                 },
+                # 4. Facilities & Printing
                 {
-                    "title": "Hostel Outstation Leave Approval after 6 PM — Block 16 Warden procedure",
-                    "sub_community": "Hostel Operations",
-                    "tag": "Hostels",
-                    "author_name": "Vikram_Automobile",
-                    "content": "How to get outstation leave form approved if you need to travel late in the evening?",
-                    "upvotes": 29,
+                    "title": "Fastest Xerox & Lab Manual printing near AB5 / Student Plaza",
+                    "sub_community": "Facilities & Printing",
+                    "tag": "Facilities",
+                    "author_name": "Neha_BioTech",
+                    "content": "Student Plaza Xerox shop gets super crowded before lab viva week. What is the fastest alternative for B&W printouts?",
+                    "upvotes": 38,
                     "verified": True,
                     "comments": [
-                        {"author_name": "Tanvi_IP", "content": "Block 16 Warden office stays open till 7:30 PM. After 8 PM, sign must be obtained at Chief Warden Office near Student Care Clinic in Block 5.", "is_helpful": True, "upvotes": 14},
+                        {"author_name": "Aditya_Civil", "content": "AB5 Basement Xerox shop is fast for B&W lab manuals (₹1/page). You can also email your PDF in advance to studentplazaxerox@gmail.com to bypass queues.", "is_helpful": True, "upvotes": 18},
                     ]
                 },
+                {
+                    "title": "Marena Sports Complex membership & Gym booking details",
+                    "sub_community": "Facilities & Printing",
+                    "tag": "Facilities",
+                    "author_name": "Kabir_MTE",
+                    "content": "How to register for Marena sports complex and indoor badminton court slots?",
+                    "upvotes": 45,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Yash_Civil", "content": "Marena membership pass can be created at the front desk with college ID card. Badminton court slots open 24 hours prior via student portal.", "is_helpful": True, "upvotes": 26},
+                    ]
+                },
+                # 5. Clubs & Organizations
+                {
+                    "title": "Formula Manipal & ThrustMIT recruitment preparation tips",
+                    "sub_community": "Clubs & Organizations",
+                    "tag": "Clubs",
+                    "author_name": "Tushar_ME",
+                    "content": "How competitive is the Formula Manipal & ThrustMIT recruitment process for 1st and 2nd year mechanical/ECE students?",
+                    "upvotes": 58,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Kunal_MTE", "content": "Recruitment involves a written CAD/aptitude test followed by 2 technical rounds. Brush up on SolidWorks, statics, and basic microcontroller programming.", "is_helpful": True, "upvotes": 33},
+                    ]
+                },
+                # 6. Admissions & Cutoffs
+                {
+                    "title": "MET Score vs Rank Cutoffs for CSE, AIML & IT (Round 1 to Round 3)",
+                    "sub_community": "Admissions & Cutoffs",
+                    "tag": "Admissions",
+                    "author_name": "Prospective_Student_2026",
+                    "content": "What was the closing cutoff rank for CSE and AIML in main campus counseling last year?",
+                    "upvotes": 81,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Senior_CSE_Mod", "content": "CSE Round 2 closing rank was ~1,050. AIML was ~1,600 and IT was ~2,400. Intra-sliding round after 1st sem offers upgrade opportunities based on 1st sem CGPA.", "is_helpful": True, "upvotes": 51},
+                    ]
+                },
+                # 7. Faculty & Cabins
+                {
+                    "title": "Approaching SCE professors in AB5 for Undergraduate Research LORs",
+                    "sub_community": "Faculty & Cabins",
+                    "tag": "Faculty",
+                    "author_name": "Sanya_CSE",
+                    "content": "How to approach Dr. Radhika Pai or AB5 faculty members for capstone project research guidance?",
+                    "upvotes": 36,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Nikhil_DSE", "content": "Dr. Radhika Pai's cabin is on AB5 3rd Floor (Room 304). Visit during official faculty office hours (2 PM – 4 PM Tuesdays/Thursdays) with a printed research proposal.", "is_helpful": True, "upvotes": 20},
+                    ]
+                },
+                # 8. Campus Life & Transport
                 {
                     "title": "Auto fares from Campus Gate 2 to Manipal Auto Stand & KMC",
                     "sub_community": "Campus Life",
@@ -234,6 +314,44 @@ def seed_database():
                     "verified": True,
                     "comments": [
                         {"author_name": "Meera_BME", "content": "Meter auto fare or standard ₹40-50 for short rides within Manipal. Shared autos from Student Plaza gate are cheaper.", "is_helpful": True, "upvotes": 16},
+                    ]
+                },
+                {
+                    "title": "Monsoon preparation in Manipal — Umbrellas & Footwear recommendations",
+                    "sub_community": "Campus Life",
+                    "tag": "Campus Life",
+                    "author_name": "Pranav_ECE",
+                    "content": "Heavy monsoon rains start in June/July. What gear is essential for walking between AB1 and AB5?",
+                    "upvotes": 67,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Swati_IT", "content": "Buy a sturdy windproof 3-fold umbrella from Student Plaza stationery shop. Crocs or quick-dry waterproof sandals are mandatory due to waterlogging.", "is_helpful": True, "upvotes": 40},
+                    ]
+                },
+                # 9. Events & Fests
+                {
+                    "title": "Revels '26 Pro-Show passes & Delegate Card registration procedure",
+                    "sub_community": "Events & Fests",
+                    "tag": "Revels",
+                    "author_name": "Rishi_CCE",
+                    "content": "How do MIT students get Pro-Show concert passes during Revels fest week?",
+                    "upvotes": 72,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Cultural_Council_Lead", "content": "Delegate cards are issued via Student Plaza counters or online portal using your learner ID. Entry to main Quadrangle Pro-Show requires active delegate card pass.", "is_helpful": True, "upvotes": 37},
+                    ]
+                },
+                # 10. Hostel Operations
+                {
+                    "title": "Hostel Outstation Leave Approval after 6 PM — Block 16 Warden procedure",
+                    "sub_community": "Hostel Operations",
+                    "tag": "Hostels",
+                    "author_name": "Vikram_Automobile",
+                    "content": "How to get outstation leave form approved if you need to travel late in the evening?",
+                    "upvotes": 29,
+                    "verified": True,
+                    "comments": [
+                        {"author_name": "Tanvi_IP", "content": "Block 16 Warden office stays open till 7:30 PM. After 8 PM, sign must be obtained at Chief Warden Office near Student Care Clinic in Block 5.", "is_helpful": True, "upvotes": 14},
                     ]
                 },
             ]
@@ -264,7 +382,7 @@ def seed_database():
                     db.add(comment)
                 db.commit()
 
-            print("✓ Database Seeded: 7 Reddit Community Discussions (r/manipal & r/Manipal_Academics) ingested into DB.")
+            print("✓ Database Seeded: 16 Reddit Community Discussions across ALL 11 categories ingested into DB.")
 
     finally:
         db.close()
