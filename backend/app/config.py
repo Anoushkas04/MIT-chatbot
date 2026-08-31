@@ -25,3 +25,12 @@ TOP_K = int(os.environ.get("TOP_K", "5"))
 HIGH_CONFIDENCE_THRESHOLD = float(os.environ.get("HIGH_CONFIDENCE_THRESHOLD", "0.65"))
 MAX_HISTORY_TURNS = int(os.environ.get("MAX_HISTORY_TURNS", "6"))
 
+# Supabase Auth Configuration
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+# Configurable Allowed Email Domains (comma-separated, default: learner.manipal.edu,manipal.edu)
+_domains_raw = os.environ.get("ALLOWED_EMAIL_DOMAINS", "learner.manipal.edu,manipal.edu")
+ALLOWED_EMAIL_DOMAINS = [d.strip().lower() for d in _domains_raw.split(",") if d.strip()]
+
