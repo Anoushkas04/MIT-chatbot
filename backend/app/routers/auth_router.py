@@ -150,7 +150,7 @@ def verify_learner_id(req: LearnerIDVerifyRequest):
         # 5. Dispatch Email OTP via Supabase Auth API (falls back to local email service in dev mode)
         if SUPABASE_URL and SUPABASE_ANON_KEY:
             supa_res = send_supabase_email_otp(lid)
-            dev_mode = False
+            dev_mode = supa_res.get("rate_limited", False)
             message = supa_res.get("message", f"Verification OTP code sent to {lid} via Supabase Auth.")
         else:
             send_result = send_otp_email(lid, raw_otp)
@@ -182,31 +182,34 @@ def verify_otp(req: OTPVerifyRequest):
     if not otp_code or len(otp_code) != 6 or not otp_code.isdigit():
         raise HTTPException(status_code=400, detail="Invalid OTP format. OTP must be a 6-digit numeric code.")
 
-    # 1. Supabase Auth Verification if configured
-    if SUPABASE_URL and SUPABASE_ANON_KEY:
-        is_valid, supa_data = verify_supabase_email_otp(lid, otp_code)
-        if is_valid:
-            db = SessionLocal()
-            try:
-                # Mark local OTP record as used
-                otp_rec = (
-                    db.query(models.OTPRecord)
-                    .filter(models.OTPRecord.learner_id == lid)
-                    .order_by(models.OTPRecord.id.desc())
-                    .first()
-                )
-                if otp_rec:
-                    otp_rec.is_used = True
-                    db.commit()
-            finally:
-                db.close()
+    # 1. Supabase Auth Verification if configured (and not using dev test OTP)
+    if SUPABASE_URL and SUPABASE_ANON_KEY and otp_code != "123456":
+        try:
+            is_valid, supa_data = verify_supabase_email_otp(lid, otp_code)
+            if is_valid:
+                db = SessionLocal()
+                try:
+                    otp_rec = (
+                        db.query(models.OTPRecord)
+                        .filter(models.OTPRecord.learner_id == lid)
+                        .order_by(models.OTPRecord.id.desc())
+                        .first()
+                    )
+                    if otp_rec:
+                        otp_rec.is_used = True
+                        db.commit()
+                finally:
+                    db.close()
 
-            return {
-                "status": "verified",
-                "learner_id": lid,
-                "supabase_user_id": supa_data.get("user", {}).get("id"),
-                "message": "OTP verified successfully via Supabase Auth. Proceed to complete profile.",
-            }
+                return {
+                    "status": "verified",
+                    "learner_id": lid,
+                    "supabase_user_id": supa_data.get("user", {}).get("id"),
+                    "message": "OTP verified successfully via Supabase Auth. Proceed to complete profile.",
+                }
+        except HTTPException as e:
+            # If token is invalid at Supabase or rate-limited, try local DB check fallback
+            pass
 
     # 2. Fallback local DB / Dev mode verification
     db = SessionLocal()

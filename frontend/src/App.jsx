@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "./supabaseClient";
 import {
   generateAIResponse,
   fetchCurrentUserProfile,
@@ -50,10 +51,11 @@ function App() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTargetTitle, setReportTargetTitle] = useState("Community Post");
 
-  // Sync session on mount if token exists
+  // 1. Restore saved session on mount
   useEffect(() => {
-    if (token) {
-      fetchCurrentUserProfile(token)
+    const savedToken = localStorage.getItem("campus_token");
+    if (savedToken) {
+      fetchCurrentUserProfile(savedToken)
         .then((profile) => {
           if (profile) {
             setUser(profile);
@@ -65,7 +67,35 @@ function App() {
         })
         .catch(() => handleLogout());
     }
-  }, [token]);
+  }, []);
+
+  // 2. Listen for Supabase Auth state changes ONCE
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.access_token) {
+        const profile = await fetchCurrentUserProfile(session.access_token);
+        if (profile) {
+          setUser(profile);
+          setToken(session.access_token);
+          setRole(profile.role || "student");
+          if (profile.department) setDepartment(profile.department);
+          if (profile.academic_year) setAcademicYear(profile.academic_year);
+          if (profile.semester) setSemester(profile.semester);
+          localStorage.setItem("campus_token", session.access_token);
+          localStorage.setItem("campus_user", JSON.stringify(profile));
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem("campus_token");
+        localStorage.removeItem("campus_user");
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

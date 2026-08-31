@@ -138,21 +138,40 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
 
   if (!isOpen) return null;
 
+  const formatAuthError = (msg) => {
+    if (!msg) return "An unexpected error occurred. Please try again.";
+    const m = String(msg).toLowerCase();
+    if (m.includes("rate limit") || m.includes("over_email_send_rate_limit")) {
+      return "Too many verification emails were requested. Please wait a few minutes before trying again.";
+    }
+    if (m.includes("invalid login credentials") || m.includes("invalid credentials")) {
+      return "Incorrect email or password. Please check your credentials.";
+    }
+    if (m.includes("already registered") || m.includes("already exists")) {
+      return "An account with this Learner ID is already registered. Please proceed to sign in.";
+    }
+    if (m.includes("email not confirmed")) {
+      return "Your email address has not been verified yet. Please check your inbox for the verification link/code.";
+    }
+    return msg;
+  };
+
   // Step 1: Validate Learner ID and Send Real OTP
   const handleStep1VerifyLearnerID = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setSuccessMsg("");
     setLoading(true);
     try {
       const data = await verifyLearnerID(learnerId);
       setAdmissionYear(data.admission_year || "2023");
-      setSuccessMsg(`Verification OTP sent to ${learnerId}. Please check your email.`);
+      setSuccessMsg(data.message || `Verification OTP sent to ${learnerId}. Please check your email.`);
       setOtpTimer(600);
       setCooldown(60);
       setStep(2);
     } catch (err) {
-      setError(err.message || "Failed to verify Learner ID.");
+      setError(formatAuthError(err.message || "Failed to verify Learner ID."));
     } finally {
       setLoading(false);
     }
@@ -161,6 +180,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
   // Step 2: Verify OTP
   const handleStep2VerifyOTP = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
     try {
@@ -168,7 +188,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
       setSuccessMsg("OTP verified successfully! Now enter your 9-digit Registration Number.");
       setStep(3);
     } catch (err) {
-      setError(err.message || "OTP verification failed.");
+      setError(formatAuthError(err.message || "OTP verification failed."));
     } finally {
       setLoading(false);
     }
@@ -176,17 +196,17 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
 
   // Resend OTP Handler
   const handleResendOTP = async () => {
-    if (cooldown > 0) return;
+    if (cooldown > 0 || loading) return;
     setError("");
     setLoading(true);
     try {
-      await verifyLearnerID(learnerId);
-      setSuccessMsg(`New OTP sent to ${learnerId}.`);
+      const data = await verifyLearnerID(learnerId);
+      setSuccessMsg(data.message || `New OTP sent to ${learnerId}.`);
       setOtpCode("");
       setOtpTimer(600);
       setCooldown(60);
     } catch (err) {
-      setError(err.message || "Failed to resend OTP.");
+      setError(formatAuthError(err.message || "Failed to resend OTP."));
     } finally {
       setLoading(false);
     }
@@ -195,6 +215,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
   // Step 3: Advance to Step 4 (Academic Info & Terms)
   const handleStep3RegAndPass = (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     if (!/^\d{9}$/.test(regNumber.trim())) {
       setError("Registration Number must be a unique 9-digit numeric identifier (e.g. 230911042).");
@@ -210,6 +231,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
   // Step 4: Final Complete Registration
   const handleStep4CompleteRegistration = async (e) => {
     e.preventDefault();
+    if (loading) return;
     if (!agreedTerms) {
       setError("You must explicitly accept the Terms & Conditions and Community Guidelines to create an account.");
       return;
@@ -233,7 +255,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
       onLoginSuccess(response.user, response.access_token);
       onClose();
     } catch (err) {
-      setError(err.message || "Account creation failed.");
+      setError(formatAuthError(err.message || "Account creation failed."));
     } finally {
       setLoading(false);
     }
@@ -242,6 +264,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
   // Login Handler
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
     try {
@@ -249,7 +272,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
       onLoginSuccess(response.user, response.access_token);
       onClose();
     } catch (err) {
-      setError(err.message || "Login failed.");
+      setError(formatAuthError(err.message || "Login failed."));
     } finally {
       setLoading(false);
     }
