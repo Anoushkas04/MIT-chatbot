@@ -296,8 +296,18 @@ export async function fetchAdminAnalytics() {
   return await res.json();
 }
 
-export async function fetchAdminUsers() {
-  const res = await fetch(`${BASE_URL}/api/admin/users`);
+export async function fetchAdminUsers(token = null) {
+  const res = await fetch(`${BASE_URL}/api/admin/users`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+export async function fetchUserFeedSentiment(token = null) {
+  const res = await fetch(`${BASE_URL}/api/admin/sentiment/user-feed`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) return null;
   return await res.json();
 }

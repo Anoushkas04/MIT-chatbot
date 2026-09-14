@@ -7,6 +7,7 @@ import {
   createAdminEvent,
   deleteAdminEvent,
   toggleAdminEventStatus,
+  fetchUserFeedSentiment,
 } from "../api";
 import { OFFICIAL_MIT_DEPARTMENTS } from "../departments";
 
@@ -31,6 +32,8 @@ export default function AdminPortal({ token }) {
   };
 
   const [users, setUsers] = useState([]);
+  const [sentimentReport, setSentimentReport] = useState(null);
+  const [isLoadingSentiment, setIsLoadingSentiment] = useState(false);
   const [adminEvents, setAdminEvents] = useState([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [showAddEventModal, setShowAddEventModal] = useState(false);
@@ -53,7 +56,7 @@ export default function AdminPortal({ token }) {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (activeTab === "events") {
@@ -62,11 +65,25 @@ export default function AdminPortal({ token }) {
   }, [activeTab]);
 
   const loadUsers = async () => {
-    const data = await fetchAdminUsers();
+    const data = await fetchAdminUsers(token);
     if (data && data.users) {
       setUsers(data.users);
     }
   };
+
+  const loadSentimentReport = async () => {
+    setIsLoadingSentiment(true);
+    try {
+      const data = await fetchUserFeedSentiment(token);
+      setSentimentReport(data);
+    } finally {
+      setIsLoadingSentiment(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "sentiment") loadSentimentReport();
+  }, [activeTab, token]);
 
   const loadAdminEvents = async () => {
     setIsLoadingEvents(true);
@@ -218,6 +235,9 @@ export default function AdminPortal({ token }) {
         <button className={`w-tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>
           👥 User Management ({users.length})
         </button>
+        <button className={`w-tab ${activeTab === "sentiment" ? "active" : ""}`} onClick={() => setActiveTab("sentiment")}>
+          💬 User Feed Sentiment
+        </button>
         <button className={`w-tab ${activeTab === "events" ? "active" : ""}`} onClick={() => setActiveTab("events")}>
           📅 Academic Timeline & Events ({adminEvents.length})
         </button>
@@ -339,6 +359,34 @@ export default function AdminPortal({ token }) {
             <KnowledgeLoopDiagram />
           </div>
         </>
+      )}
+
+      {activeTab === "sentiment" && (
+        <div className="admin-card-section fade-in">
+          <div className="section-header-flex">
+            <div>
+              <h3>💬 Individual User Feed Sentiment</h3>
+              <p style={{ fontSize: "12px", color: "#64748B" }}>Administrator-only aggregate analysis of community posts and replies. No source text is shown here.</p>
+            </div>
+            <button className="reindex-btn" onClick={loadSentimentReport} disabled={isLoadingSentiment}>
+              {isLoadingSentiment ? "Analyzing…" : "↻ Refresh report"}
+            </button>
+          </div>
+          {sentimentReport ? <>
+            <div className="admin-grid-layout" style={{ marginTop: "16px" }}>
+              <div className="stat-metric-card"><span className="metric-icon">📝</span><span className="metric-num">{sentimentReport.summary.feed_items_analyzed}</span><span className="metric-label">Feed Items Analyzed</span></div>
+              <div className="stat-metric-card"><span className="metric-icon">😊</span><span className="metric-num">{sentimentReport.summary.positive}</span><span className="metric-label">Positive Items</span></div>
+              <div className="stat-metric-card"><span className="metric-icon">😐</span><span className="metric-num">{sentimentReport.summary.neutral}</span><span className="metric-label">Neutral Items</span></div>
+              <div className="stat-metric-card"><span className="metric-icon">⚠️</span><span className="metric-num">{sentimentReport.summary.negative}</span><span className="metric-label">Negative Items</span></div>
+            </div>
+            <p style={{ fontSize: "12px", color: "#64748B", margin: "16px 0" }}>{sentimentReport.method}</p>
+            <div className="users-table-wrap">
+              <table className="admin-table"><thead><tr><th>User</th><th>Department</th><th>Items</th><th>Positive</th><th>Neutral</th><th>Negative</th><th>Average</th><th>Overall</th></tr></thead>
+                <tbody>{sentimentReport.users.map((user) => <tr key={user.user_id}><td>{user.name}</td><td>{user.department}</td><td>{user.feed_items_analyzed}</td><td>{user.positive}</td><td>{user.neutral}</td><td>{user.negative}</td><td>{user.average_score.toFixed(2)}</td><td><span className={`pill-tag ${user.overall_sentiment === "negative" ? "red" : user.overall_sentiment === "positive" ? "green" : ""}`}>{user.overall_sentiment}</span></td></tr>)}</tbody>
+              </table>
+            </div>
+          </> : <p style={{ padding: "20px 0" }}>{isLoadingSentiment ? "Preparing sentiment report…" : "No sentiment report is available."}</p>}
+        </div>
       )}
 
       {/* Official RAG Documents Tab */}

@@ -1,4 +1,6 @@
 from typing import Optional
+from collections import Counter, defaultdict
+from datetime import datetime
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends, Header
 from app.database import SessionLocal
@@ -52,6 +54,61 @@ router = APIRouter(
     tags=["8. Admin Console & Operations"],
     dependencies=[Depends(require_admin_user)],
 )
+
+
+@router.get("/sentiment/user-feed", summary="Get per-user community feed sentiment for administrators")
+def get_user_feed_sentiment():
+    """Aggregate community-post and reply sentiment without returning source text."""
+    from app.sentiment_engine import analyze_sentiment
+
+    db = SessionLocal()
+    try:
+        users = db.query(models.User).filter(models.User.role != "admin").all()
+        posts = db.query(models.StudentPost).all()
+        comments = db.query(models.PostComment).all()
+        content_by_author = defaultdict(list)
+
+        for post in posts:
+            content_by_author[(post.author_name or "").strip().casefold()].append(post.content or "")
+        for comment in comments:
+            content_by_author[(comment.author_name or "").strip().casefold()].append(comment.content or "")
+
+        user_rows = []
+        totals = Counter()
+        for user in users:
+            entries = content_by_author.get((user.name or "").strip().casefold(), [])
+            results = [analyze_sentiment(entry) for entry in entries]
+            labels = Counter(result["label"] for result in results)
+            totals.update(labels)
+            average_score = round(sum(result["score"] for result in results) / len(results), 3) if results else 0.0
+            overall = "positive" if average_score >= 0.2 else "negative" if average_score <= -0.2 else "neutral"
+            user_rows.append({
+                "user_id": user.id,
+                "name": user.name,
+                "department": user.department or "Not specified",
+                "feed_items_analyzed": len(results),
+                "positive": labels["positive"],
+                "neutral": labels["neutral"],
+                "negative": labels["negative"],
+                "average_score": average_score,
+                "overall_sentiment": overall,
+            })
+
+        user_rows.sort(key=lambda row: (row["overall_sentiment"] != "negative", row["average_score"], row["name"].casefold()))
+        return {
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "method": "Local explainable lexicon analysis of community posts and replies",
+            "summary": {
+                "registered_users": len(users),
+                "feed_items_analyzed": sum(row["feed_items_analyzed"] for row in user_rows),
+                "positive": totals["positive"],
+                "neutral": totals["neutral"],
+                "negative": totals["negative"],
+            },
+            "users": user_rows,
+        }
+    finally:
+        db.close()
 
 
 @router.get("/analytics", summary="Get enterprise platform query analytics")
