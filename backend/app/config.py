@@ -41,6 +41,11 @@ RAG_TOP_K_TEXT = int(os.environ.get("RAG_TOP_K_TEXT", "12"))
 RAG_FINAL_K = int(os.environ.get("RAG_FINAL_K", "4"))
 RAG_RENDER_DPI = int(os.environ.get("RAG_RENDER_DPI", "144"))
 
+LOCAL_OCR_ENABLED = os.environ.get("LOCAL_OCR_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+OCR_MIN_CONFIDENCE = float(os.environ.get("OCR_MIN_CONFIDENCE", "0.45"))
+OCR_MAX_IMAGE_EDGE = int(os.environ.get("OCR_MAX_IMAGE_EDGE", "2600"))
+OCR_CACHE_DIR = Path(os.environ.get("OCR_CACHE_DIR", str(DATA_DIR / "ocr_cache")))
+
 TOP_K = int(os.environ.get("TOP_K", "5"))
 HIGH_CONFIDENCE_THRESHOLD = float(os.environ.get("HIGH_CONFIDENCE_THRESHOLD", "0.65"))
 MAX_HISTORY_TURNS = int(os.environ.get("MAX_HISTORY_TURNS", "6"))

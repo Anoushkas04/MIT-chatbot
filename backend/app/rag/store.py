@@ -41,7 +41,7 @@ class VectorStore:
             academic_query = any(w in words for w in ["branch", "branches", "program", "programs", "specialization", "specializations", "btech", "course", "courses", "curriculum", "syllabus"])
 
             for cand in candidates:
-                text_lower = cand["text"].lower()
+                text_lower = f"{cand.get('retrieval_text', '')} {cand['text']}".lower()
                 matched_count = sum(1 for w in words if re.search(r'\b' + re.escape(w) + r'\b', text_lower))
                 cand["score"] += matched_count * 0.05
 

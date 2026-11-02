@@ -15,7 +15,10 @@ class KeywordStore:
     def __init__(self, records: list[dict]):
         self.records = records
         self.index = BM25Okapi([
-            _tokens(f"{record.get('source_file') or record.get('source', '')} {record.get('text', '')}")
+            _tokens(
+                f"{record.get('source_file') or record.get('source', '')} "
+                f"{record.get('retrieval_text', '')} {record.get('text', '')}"
+            )
             for record in records
         ])
 

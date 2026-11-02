@@ -9,8 +9,9 @@ clear no-evidence response.
 
 ## Pipeline
 
-1. `app.rag.ingest` extracts PDF pages and CSV rows, chunks text, records source
-   metadata, and builds the local text index.
+1. `app.rag.ingest` extracts PDF pages and CSV rows, runs offline RapidOCR on
+   scanned pages, chunks text, records source metadata, and builds the local
+   text index. OCR results are cached so unchanged pages are not reprocessed.
 2. `app.rag.hybrid` fuses dense and BM25 results. When visual RAG is enabled it
    also searches rendered scanned pages with `vidore/colSmol-500M`.
 3. `app.routers.chat_router` filters irrelevant results and combines official
@@ -40,6 +41,7 @@ GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-flash-lite-latest
 GEMINI_EMBEDDINGS_ENABLED=false
 VISUAL_RAG_ENABLED=false
+LOCAL_OCR_ENABLED=true
 ```
 
 Other supported generation providers are OpenAI and Anthropic:
@@ -67,6 +69,29 @@ python -m app.rag.ingest
 
 The generated files live under `backend/data/` and are intentionally ignored
 by Git. Re-run ingestion after adding or changing source documents.
+
+## Offline OCR and structured metadata
+
+Scanned-page conversion is enabled by default and does not send document data
+to an OCR API:
+
+```dotenv
+LOCAL_OCR_ENABLED=true
+OCR_MIN_CONFIDENCE=0.45
+OCR_MAX_IMAGE_EDGE=2600
+# OCR_CACHE_DIR=./data/ocr_cache
+```
+
+RapidOCR output is cached under `backend/data/ocr_cache/`. Academic-calendar
+pages are split into month-specific text segments so queries can match a month
+and year precisely. Parsed calendar rows are also written to
+`backend/data/calendar_events.json` as an audit artifact; this file does not
+replace or mutate the planner database automatically.
+
+Every indexed record can include department code/name, programme, academic
+year, semester, and semantic document type. The chat request may provide
+`department`, `academic_year`, and `semester`; hybrid retrieval uses those
+values as ranking context instead of guessing what "my department" means.
 
 Answer generation and text embeddings are independent settings. Keep
 `GEMINI_EMBEDDINGS_ENABLED=false` when using the default local index. If you
@@ -115,15 +140,23 @@ Example request body:
   "message": "What is the minimum attendance requirement?",
   "role": "student",
   "language": "en",
-  "session_id": "manual-test-1"
+  "session_id": "manual-test-1",
+  "department": "CSE",
+  "academic_year": "2026-2027",
+  "semester": "Odd"
 }
 ```
 
-Run the fast test suite without downloading visual model weights:
+Run the complete offline chatbot test suite without calling an LLM API or
+downloading model weights:
 
 ```powershell
-python -m pytest tests/test_rag_pipeline.py -q
+python -m pytest tests -q
 ```
+
+The suite covers request validation, grounded API responses, citation safety,
+no-evidence behavior, provider and retriever failures, session isolation,
+confidence thresholds, OCR/metadata handling, and hybrid-retrieval edge cases.
 
 Run the retrieval fixture evaluation after the index is built:
 

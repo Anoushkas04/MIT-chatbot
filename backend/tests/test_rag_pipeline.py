@@ -77,12 +77,111 @@ def test_metadata_tokens_split_camel_case_and_expand_course_aliases():
 
 
 def test_query_expansion_adds_course_filename_aliases():
-    from app.rag.hybrid import _expanded_query
+    from app.rag.hybrid import _expanded_query, _source_title_match_score
 
     assert _expanded_query("machine learning course plan").endswith("ml")
     assert _expanded_query("mechanical engineering cutoff").endswith("me")
     assert _expanded_query("database systems course plan").endswith("dbs")
     assert _expanded_query("operating systems course plan").endswith("os")
+    query = "What topics are in the machine learning course plan?"
+    assert _source_title_match_score(query, "CP_ML.pdf") > _source_title_match_score(
+        query, "BRE - Course Plan.pdf"
+    )
+    assert _source_title_match_score(
+        "What happens when a student has low attendance?",
+        "Impartus Lecture Capture - Student Guide.pdf",
+    ) < 3
+
+
+def test_document_metadata_recognizes_department_and_short_academic_year():
+    from app.rag.metadata import infer_document_metadata
+
+    mechatronics = infer_document_metadata("BTech_MechX_Syllabus_2026.pdf")
+    calendar = infer_document_metadata("Academic Calendar 26-27.pdf")
+    first_year = infer_document_metadata("First year CS 2026 B.Tech.pdf")
+    aeronautical = infer_document_metadata(
+        "BTech_Aero_Syllabus_2022_FY.pdf",
+        "This common first-year table mentions Computer Science and Engineering.",
+    )
+
+    assert mechatronics["department_code"] == "MECHX"
+    assert mechatronics["document_type"] == "syllabus"
+    assert calendar["academic_year"] == "2026-2027"
+    assert calendar["document_type"] == "academic_calendar"
+    assert first_year["department_code"] == "CSE"
+    assert first_year["document_type"] == "curriculum"
+    assert aeronautical["department_code"] == "AERO"
+
+
+def test_calendar_ocr_is_split_into_month_search_segments():
+    from app.rag.local_ocr import _calendar_events, _calendar_segments
+
+    def line(text, left, top, right, bottom, confidence=0.9):
+        return {
+            "text": text,
+            "confidence": confidence,
+            "box": [[left, top], [right, top], [right, bottom], [left, bottom]],
+        }
+
+    lines = [
+        line("July -26", 50, 50, 150, 80),
+        line("Aug -26", 250, 50, 350, 80),
+        line("6 M Makeup Exams Results", 50, 100, 180, 120),
+        line("7 T", 50, 130, 80, 150),
+        line("15 S Independence Day", 250, 100, 380, 120),
+    ]
+    page = {"source": "Academic Calendar 26-27.pdf", "page_number": 1, "document_id": "calendar"}
+    segments = _calendar_segments(lines, (500, 500), page)
+    events = _calendar_events(segments, page)
+
+    assert [segment["title"] for segment in segments] == ["July 2026", "August 2026"]
+    assert "Makeup Exams Results" in segments[0]["text"]
+    assert any(event["date"] == "2026-07-06" and "Makeup Exams" in event["title"] for event in events)
+    assert any(event["date"] == "2026-08-15" and "Independence Day" in event["title"] for event in events)
+
+
+def test_ingestion_turns_local_ocr_segments_into_text_chunks(tmp_path, monkeypatch):
+    import app.rag.ingest as ingest
+
+    image_dir = tmp_path / "page_images"
+    image_dir.mkdir()
+    (image_dir / "page.png").write_bytes(b"not-read-because-ocr-is-mocked")
+    pages = [{
+        "id": "doc-p0001",
+        "page_id": "doc-p0001",
+        "document_id": "doc",
+        "source": "Academic Calendar 26-27.pdf",
+        "page_number": 1,
+        "image_path": "page_images/page.png",
+        "is_scanned": True,
+        "department_code": None,
+        "department": None,
+        "programme": None,
+        "academic_year": "2026-2027",
+        "semester": None,
+        "document_type": "academic_calendar",
+    }]
+    monkeypatch.setattr(ingest, "LOCAL_OCR_ENABLED", True)
+    monkeypatch.setattr(ingest, "extract_page", lambda *args, **kwargs: {
+        "text": "Academic calendar July 2026. Makeup examination results are published on 6 July 2026.",
+        "engine": "rapidocr_onnxruntime",
+        "average_confidence": 0.91,
+        "line_count": 3,
+        "segments": [{
+            "title": "July 2026",
+            "text": "Academic calendar July 2026. Makeup examination results are published on 6 July 2026.",
+            "metadata": {"calendar_year": 2026, "calendar_month": 7},
+        }],
+        "calendar_events": [{"date": "2026-07-06", "title": "Makeup examination results"}],
+    })
+
+    records, events = ingest._ocr_scanned_pages(pages, image_dir, lambda *args: None)
+
+    assert records[0]["record_type"] == "ocr_chunk"
+    assert records[0]["calendar_month"] == 7
+    assert records[0]["academic_year"] == "2026-2027"
+    assert events[0]["date"] == "2026-07-06"
+    assert pages[0]["extraction_method"] == "rapidocr_onnxruntime"
 
 
 def test_evidence_merge_preserves_both_source_partitions():
@@ -122,6 +221,55 @@ def test_hybrid_promotes_stronger_scanned_source_metadata(monkeypatch):
     assert results[0]["source"] == "Academic Calendar 26-27.pdf"
     assert results[0]["promoted_visual"] is True
     assert results[0]["score"] == 1.0
+
+
+def test_hybrid_uses_selected_department_context(monkeypatch):
+    from types import SimpleNamespace
+    import app.rag.hybrid as hybrid
+
+    mechanical = {
+        "id": "mech", "source": "BTech_Mech_Syllabus_2026.pdf", "text": "Programme subjects",
+        "score": 0.9, "department_code": "ME",
+    }
+    computer_science = {
+        "id": "cse", "source": "BTech_CSE_Syllabus_2026.pdf", "text": "Programme subjects",
+        "score": 0.8, "department_code": "CSE",
+    }
+    monkeypatch.setattr(hybrid, "embed_query", lambda query: [0.0])
+    monkeypatch.setattr(
+        hybrid,
+        "get_store",
+        lambda: SimpleNamespace(search=lambda *args, **kwargs: [mechanical, computer_science]),
+    )
+    monkeypatch.setattr(
+        hybrid,
+        "get_keyword_store",
+        lambda: SimpleNamespace(search=lambda *args, **kwargs: [mechanical, computer_science]),
+    )
+    monkeypatch.setattr(hybrid, "VISUAL_RAG_ENABLED", False)
+
+    results = hybrid.hybrid_search("What subjects are in my department?", department="CSE", final_k=2)
+
+    assert results[0]["department_code"] == "CSE"
+
+
+def test_record_query_priority_prefers_calendar_month_year_and_curriculum_overview():
+    from app.rag.hybrid import _key, _record_query_priority
+
+    july_2026 = {"calendar_month": 7, "calendar_year": 2026}
+    july_2027 = {"calendar_month": 7, "calendar_year": 2027}
+    overview = {"page_number": 1, "document_type": "curriculum"}
+    detail = {"page_number": 6, "document_type": "curriculum"}
+
+    assert _record_query_priority(july_2026, "Makeup exam results in July 2026") > _record_query_priority(
+        july_2027, "Makeup exam results in July 2026"
+    )
+    assert _record_query_priority(overview, "What first year subjects are offered?") > _record_query_priority(
+        detail, "What first year subjects are offered?"
+    )
+    assert _key({"id": "page-1-chunk-a", "page_id": "page-1"}) != _key(
+        {"id": "page-1-chunk-b", "page_id": "page-1"}
+    )
 
 
 def test_local_provider_returns_evidence_markers():

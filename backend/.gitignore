@@ -10,3 +10,5 @@ data/page_images/
 data/visual_embeddings.pt
 data/visual_manifest.json
 data/visual_model_ready.json
+data/ocr_cache/
+data/calendar_events.json

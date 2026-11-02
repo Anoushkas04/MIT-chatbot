@@ -5,6 +5,7 @@ import pymupdf as fitz
 
 from app.rag.chunker import chunk_text
 from app.rag.manifest import document_id
+from app.rag.metadata import infer_document_metadata, normalize_department
 
 
 def load_corpus(
@@ -48,6 +49,7 @@ def _load_pdf(
             page_number = page_index + 1
             page_id = f"{doc_id}-p{page_number:04d}"
             text = page.get_text("text").strip()
+            metadata = infer_document_metadata(path.name, text)
             image_rel = None
             should_render = render_images and (visual_scope == "all" or not text)
             if should_render:
@@ -64,8 +66,9 @@ def _load_pdf(
                 "page_number": page_number,
                 "text": text,
                 "image_path": image_rel,
-                "document_type": "pdf_page",
+                "record_type": "pdf_page",
                 "is_scanned": not bool(text),
+                **metadata,
             })
             for chunk_index, value in enumerate(chunk_text(text)):
                 chunk_records.append({
@@ -77,7 +80,8 @@ def _load_pdf(
                     "chunk_index": chunk_index,
                     "text": value,
                     "image_path": image_rel,
-                    "document_type": "pdf",
+                    "record_type": "pdf_chunk",
+                    **metadata,
                 })
     return page_records, chunk_records
 
@@ -100,16 +104,29 @@ def _load_csv(path: Path) -> list[dict]:
         text = row.get("text") or _row_to_sentence(row)
         if not text.strip():
             continue
+        source = row.get("source") or path.name
+        metadata = infer_document_metadata(source, text)
+        department_value = row.get("department") or row.get("Department")
+        department_code, department = normalize_department(department_value)
+        if department_value:
+            metadata["department_code"] = department_code
+            metadata["department"] = department
+        if row.get("document_type"):
+            metadata["document_type"] = row["document_type"]
         records.append({
             "id": f"{doc_id}-r{index + 1:05d}",
             "document_id": doc_id,
-            "source": row.get("source") or path.name,
+            "source": source,
             "source_file": path.name,
             "page_number": None,
             "chunk_index": index,
             "text": text.strip(),
             "image_path": None,
-            "document_type": row.get("document_type") or "csv",
+            "record_type": "csv_row",
+            "designation": row.get("designation") or row.get("Title"),
+            "email": row.get("email") or row.get("Mail ID"),
+            "cabin": row.get("cabin_no") or row.get("Cabin"),
+            **metadata,
         })
     return records
 

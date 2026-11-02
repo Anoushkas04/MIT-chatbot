@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CitationDetail(BaseModel):
@@ -13,13 +13,21 @@ class CitationDetail(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=4000)
     role: str = "student"
     language: str = "en"
-    session_id: str
+    session_id: str = Field(min_length=1, max_length=128)
     department: Optional[str] = None
     academic_year: Optional[str] = None
     semester: Optional[str] = None
+
+    @field_validator("message", "session_id")
+    @classmethod
+    def reject_blank_values(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
 
 
 class ChatResponse(BaseModel):

@@ -13,6 +13,9 @@ rank-bm25>=0.2,<0.3
 sentence-transformers[image]>=6,<7
 peft>=0.17,<1
 
+# Offline OCR for scanned pages; no document data is sent to an API.
+rapidocr-onnxruntime>=1.2,<2
+
 # Interchangeable multimodal generation providers.
 openai>=2,<3
 anthropic>=0.75,<1

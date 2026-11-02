@@ -25,7 +25,12 @@ export function ChatView() {
     setMessages(current => [...current, { id: `user-${current.length}`, from: 'user', text }])
     setDraft(''); setError(''); setLastQuestion(text); setPending(true)
     try {
-      const response = await sendChatMessage({ message: text, session_id: activeSession, role: 'student', language: 'en' })
+      const response = await sendChatMessage({
+        message: text,
+        session_id: activeSession,
+        role: 'student',
+        language: 'en',
+      })
       setMessages(current => [...current, {
         id: `ai-${current.length}`, from: 'ai', text: response.text, citations: response.citations,
         confidence: response.confidence, followups: response.followups, provider: response.provider, model: response.model,

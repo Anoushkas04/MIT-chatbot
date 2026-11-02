@@ -2,8 +2,9 @@ import re
 from urllib.parse import quote
 from fastapi import APIRouter, HTTPException
 from app.answer_verifier import verify_answer
+from app.faculty_directory import lookup_faculty
 from app.prompts import build_system_prompt
-from app.providers import GenerationRequest, generate_answer
+from app.providers import GenerationRequest, GenerationResult, generate_answer
 from app.rag.hybrid import hybrid_search
 from app.schemas import ChatRequest, ChatResponse, CitationDetail
 from app.session_memory import add_turn, get_history
@@ -178,7 +179,14 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
 
     filtered = []
     for m in vector_matches:
-        text = f"{m.get('source', '')} {m.get('text', '')}".lower()
+        text = " ".join(str(value) for value in (
+            m.get("source", ""),
+            m.get("department_code", ""),
+            m.get("department", ""),
+            m.get("academic_year", ""),
+            m.get("retrieval_text", ""),
+            m.get("text", ""),
+        )).lower()
         score = float(m.get("score", 0.0))
 
         # Check keyword/entity match count
@@ -222,19 +230,41 @@ def chat_query(req: ChatRequest):
     try:
         intent = classify_intent(req.message)
         query_type = detect_query_type(req.message)
+        faculty_lookup = lookup_faculty(req.message)
 
         # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
-        try:
-            vector_matches = hybrid_search(req.message)
-        except Exception as e:
-            print("Vector search error:", e)
-            vector_matches = []
+        if faculty_lookup:
+            vector_matches = [faculty_lookup["evidence"]]
+        else:
+            try:
+                vector_matches = hybrid_search(
+                    req.message,
+                    department=req.department,
+                    academic_year=req.academic_year,
+                    semester=req.semester,
+                )
+            except Exception as e:
+                print("Vector search error:", e)
+                vector_matches = []
 
         # Filter & Rerank Vector Matches
-        relevant_official_matches = filter_chunk_relevance(vector_matches, req.message, query_type)
+        relevance_query = " ".join(
+            value for value in (
+                req.message,
+                req.department,
+                req.academic_year,
+                req.semester,
+            )
+            if value
+        )
+        relevant_official_matches = (
+            vector_matches
+            if faculty_lookup
+            else filter_chunk_relevance(vector_matches, relevance_query, query_type)
+        )
 
         # 2. Database Search for Community Discussions
-        community_matches = search_community_posts(req.message, db)
+        community_matches = [] if faculty_lookup else search_community_posts(req.message, db)
         relevant_community_matches = [cm for cm in community_matches if cm["score"] >= 0.50]
 
         # Calculate live community counts dynamically from DB
@@ -328,12 +358,19 @@ def chat_query(req: ChatRequest):
         )
 
         history = get_history(req.session_id)
-        generation = generate_answer(GenerationRequest(
-            question=req.message,
-            system_prompt=system_prompt,
-            evidence=all_matches,
-            history=history,
-        ))
+        if faculty_lookup:
+            generation = GenerationResult(
+                text=faculty_lookup["answer"],
+                provider="local",
+                model="structured-faculty-directory-v1",
+            )
+        else:
+            generation = generate_answer(GenerationRequest(
+                question=req.message,
+                system_prompt=system_prompt,
+                evidence=all_matches,
+                history=history,
+            ))
         reply_text, verification_warnings = verify_answer(generation.text, all_matches)
 
         citations = []

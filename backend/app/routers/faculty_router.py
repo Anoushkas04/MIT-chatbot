@@ -1,54 +1,13 @@
-import csv
-from functools import lru_cache
 from typing import Optional
 
 from fastapi import APIRouter
 
-from app.config import DOCS_DIR
+from app.faculty_directory import load_faculty
 
 router = APIRouter(prefix="/api/faculty", tags=["4. Faculty & Cabin Directory"])
 
 
-@lru_cache
-def _load_faculty() -> list[dict]:
-    by_email: dict[str, dict] = {}
-    general_path = DOCS_DIR / "mit_manipal_faculty.csv"
-    if general_path.is_file():
-        with general_path.open(encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                email = (row.get("Mail ID") or "").strip().lower()
-                if not email:
-                    continue
-                by_email[email] = {
-                    "id": f"faculty-{len(by_email) + 1}",
-                    "name": (row.get("Professor Name") or "").strip(),
-                    "dept": (row.get("Department") or "").strip(),
-                    "designation": (row.get("Title") or "").strip(),
-                    "cabin": None,
-                    "email": email,
-                    "qualification": (row.get("Qualification") or "").strip(),
-                    "source": general_path.name,
-                }
-
-    cabins_path = DOCS_DIR / "manipal_sce_faculty_cabins.csv"
-    if cabins_path.is_file():
-        with cabins_path.open(encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                email = (row.get("email") or "").strip().lower()
-                if not email:
-                    continue
-                existing = by_email.get(email, {})
-                by_email[email] = {
-                    "id": row.get("id") or existing.get("id") or f"faculty-{len(by_email) + 1}",
-                    "name": (row.get("name") or existing.get("name") or "").strip(),
-                    "dept": existing.get("dept") or "School of Computer Engineering",
-                    "designation": (row.get("designation") or existing.get("designation") or "").strip(),
-                    "cabin": (row.get("cabin_no") or "").strip() or None,
-                    "email": email,
-                    "qualification": existing.get("qualification") or "",
-                    "source": cabins_path.name,
-                }
-    return sorted(by_email.values(), key=lambda faculty: faculty["name"].lower())
+_load_faculty = load_faculty
 
 
 @router.get("", summary="Search the source-backed faculty and cabin directory")
