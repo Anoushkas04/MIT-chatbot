@@ -247,3 +247,17 @@ def test_relevance_filter_keeps_visual_source_metadata_match():
         "simple_factual",
     )
     assert result[0]["source"] == "Academic Calendar 26-27.pdf"
+
+
+def test_generation_key_does_not_silently_change_embedding_space(monkeypatch):
+    import app.llm as llm
+
+    monkeypatch.setattr(llm, "GEMINI_API_KEY", "configured-generation-key")
+    monkeypatch.setattr(llm, "GEMINI_EMBEDDINGS_ENABLED", False)
+    monkeypatch.setattr(
+        llm,
+        "get_client",
+        lambda: (_ for _ in ()).throw(AssertionError("remote embeddings should not be called")),
+    )
+    vector = llm.embed_query("minimum attendance requirement")
+    assert len(vector) == 768

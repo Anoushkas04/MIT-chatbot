@@ -6,7 +6,13 @@ import numpy as np
 from google import genai
 from google.genai import errors, types
 
-from app.config import CHAT_MODEL, EMBEDDING_MODEL, GEMINI_API_KEY
+from app.config import (
+    CHAT_MODEL,
+    EMBEDDING_MODEL,
+    GEMINI_API_KEY,
+    GEMINI_EMBEDDINGS_ENABLED,
+    LLM_TIMEOUT_SECONDS,
+)
 
 _client = None
 
@@ -23,7 +29,10 @@ def get_client() -> genai.Client:
     current_key = os.environ.get("GEMINI_API_KEY", "") or GEMINI_API_KEY
     if not is_valid_key(current_key):
         raise RuntimeError("GEMINI_API_KEY is not set (see backend/.env.example)")
-    return genai.Client(api_key=current_key.strip())
+    return genai.Client(
+        api_key=current_key.strip(),
+        http_options=types.HttpOptions(timeout=int(LLM_TIMEOUT_SECONDS * 1000)),
+    )
 
 
 def _hash_embed(text: str, dim: int = 768) -> list[float]:
@@ -61,8 +70,8 @@ def _hash_embed(text: str, dim: int = 768) -> list[float]:
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    if not is_valid_key(GEMINI_API_KEY):
-        print("No GEMINI_API_KEY - using local hash embeddings (add a key for Gemini embeddings).")
+    if not GEMINI_EMBEDDINGS_ENABLED or not is_valid_key(GEMINI_API_KEY):
+        print("Using local hash embeddings. Set GEMINI_EMBEDDINGS_ENABLED=true and rebuild the index to use Gemini embeddings.")
         return [_hash_embed(t) for t in texts]
     try:
         client = get_client()

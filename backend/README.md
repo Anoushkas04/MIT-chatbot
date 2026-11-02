@@ -27,9 +27,10 @@ cp .env.example .env   # then fill in the variables below
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | No | Google Gemini key for generated answers and embeddings. Without it, the backend uses deterministic local embeddings and extractive, evidence-only answers. |
-| `GEMINI_MODEL` / `CHAT_MODEL` | No | Overrides the chat model (default `gemini-flash-latest`). |
-| `EMBEDDING_MODEL` | No | Overrides the embedding model (default `gemini-embedding-001`). |
+| `GEMINI_API_KEY` | No | Google Gemini key for generated answers. Without it, the backend uses extractive, evidence-only answers. |
+| `GEMINI_MODEL` / `CHAT_MODEL` | No | Overrides the chat model (default `gemini-flash-lite-latest`). |
+| `GEMINI_EMBEDDINGS_ENABLED` | No | Opts into Gemini embeddings. Leave `false` for the bundled local index; changing it requires rebuilding the index. |
+| `EMBEDDING_MODEL` | No | Overrides the Gemini embedding model (default `gemini-embedding-001`). |
 | `TOP_K`, `HIGH_CONFIDENCE_THRESHOLD`, `MAX_HISTORY_TURNS` | No | RAG/chat tuning knobs, see `app/config.py`. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | No | Real OTP email delivery. See **Authentication** below for the fallback when these are unset. |
 

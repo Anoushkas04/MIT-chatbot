@@ -17,9 +17,10 @@ DOCS_DIR = Path(os.environ.get("DOCS_DIR", str(_default_docs)))
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(BACKEND_DIR / "data")))
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", os.environ.get("CHAT_MODEL", "gemini-flash-latest"))
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", os.environ.get("CHAT_MODEL", "gemini-flash-lite-latest"))
 CHAT_MODEL = GEMINI_MODEL
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001")
+GEMINI_EMBEDDINGS_ENABLED = os.environ.get("GEMINI_EMBEDDINGS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "auto").strip().lower()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
