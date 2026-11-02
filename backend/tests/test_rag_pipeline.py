@@ -62,6 +62,46 @@ def test_visual_metadata_tokens_handle_years_and_cs_alias():
     assert {"first", "year", "cs", "26"}.issubset(query.intersection(source))
 
 
+def test_metadata_tokens_split_camel_case_and_expand_course_aliases():
+    from app.rag.visual_store import _metadata_tokens
+
+    attachment = _metadata_tokens("AttachmentMIT_INR_compressed.pdf")
+    machine_learning = _metadata_tokens("machine learning course plan")
+    database_systems = _metadata_tokens("database systems course plan")
+    operating_systems = _metadata_tokens("operating systems course plan")
+
+    assert {"attachment", "mit", "inr"}.issubset(attachment)
+    assert "ml" in machine_learning
+    assert "dbs" in database_systems
+    assert "os" in operating_systems
+
+
+def test_query_expansion_adds_course_filename_aliases():
+    from app.rag.hybrid import _expanded_query
+
+    assert _expanded_query("machine learning course plan").endswith("ml")
+    assert _expanded_query("mechanical engineering cutoff").endswith("me")
+    assert _expanded_query("database systems course plan").endswith("dbs")
+    assert _expanded_query("operating systems course plan").endswith("os")
+
+
+def test_evidence_merge_preserves_both_source_partitions():
+    from app.routers.chat_router import merge_evidence
+
+    official = [{"source": f"official-{index}"} for index in range(4)]
+    community = [{"source": f"community-{index}"} for index in range(3)]
+
+    official_first = merge_evidence(official, community, prefer_community=False)
+    community_first = merge_evidence(official, community, prefer_community=True)
+
+    assert [item["source"] for item in official_first] == [
+        "official-0", "official-1", "official-2", "community-0",
+    ]
+    assert [item["source"] for item in community_first] == [
+        "community-0", "community-1", "official-0", "official-1",
+    ]
+
+
 def test_hybrid_promotes_stronger_scanned_source_metadata(monkeypatch):
     from types import SimpleNamespace
     import app.rag.hybrid as hybrid

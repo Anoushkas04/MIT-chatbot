@@ -121,7 +121,9 @@ class VisualStore:
 
 
 def _metadata_tokens(value: str) -> set[str]:
-    tokens = {token for token in re.findall(r"[a-z0-9]+", value.lower()) if len(token) > 1}
+    # Split CamelCase filenames such as AttachmentMIT before lowercasing.
+    expanded = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    tokens = {token for token in re.findall(r"[a-z0-9]+", expanded.lower()) if len(token) > 1}
     for token in tuple(tokens):
         if len(token) == 4 and token.startswith("20"):
             tokens.add(token[2:])
@@ -129,6 +131,22 @@ def _metadata_tokens(value: str) -> set[str]:
         tokens.add("cs")
     if "cs" in tokens:
         tokens.update({"computer", "science"})
+    phrase_aliases = {
+        frozenset({"artificial", "intelligence"}): "ai",
+        frozenset({"compiler", "design"}): "cd",
+        frozenset({"computer", "networks"}): "cn",
+        frozenset({"course", "plan"}): "cp",
+        frozenset({"database", "system"}): "dbs",
+        frozenset({"database", "systems"}): "dbs",
+        frozenset({"deep", "learning"}): "dl",
+        frozenset({"machine", "learning"}): "ml",
+        frozenset({"mechanical", "engineering"}): "me",
+        frozenset({"operating", "system"}): "os",
+        frozenset({"operating", "systems"}): "os",
+    }
+    for phrase, alias in phrase_aliases.items():
+        if phrase.issubset(tokens):
+            tokens.add(alias)
     return tokens
 
 

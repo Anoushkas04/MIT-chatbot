@@ -198,6 +198,24 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
     return filtered[:4]
 
 
+def merge_evidence(
+    official_matches: list[dict],
+    community_matches: list[dict],
+    *,
+    prefer_community: bool,
+    limit: int = 4,
+) -> list[dict]:
+    """Keep both knowledge partitions represented without crowding out sources."""
+    if official_matches and community_matches:
+        if prefer_community:
+            merged = community_matches[:2] + official_matches[:2]
+        else:
+            merged = official_matches[:3] + community_matches[:1]
+    else:
+        merged = official_matches or community_matches
+    return merged[:limit]
+
+
 @router.post("", response_model=ChatResponse, summary="Query the configured AI provider with RAG grounding")
 def chat_query(req: ChatRequest):
     db = SessionLocal()
@@ -233,14 +251,14 @@ def chat_query(req: ChatRequest):
 
         # 3. Intent-Aware Source Prioritization
         has_community_query_signal = any(w in req.message.lower() for w in ["student", "students", "reddit", "say", "saying", "opinion", "review", "recommend", "advice", "peer", "experience", "best", "quietest", "fastest", "review"])
-        if relevant_community_matches and (has_community_query_signal or intent == "community_experience"):
-            all_matches = relevant_community_matches + relevant_official_matches
-        elif intent == "academic_official":
-            all_matches = relevant_official_matches + relevant_community_matches
-        else:
-            all_matches = relevant_community_matches + relevant_official_matches
-
-        all_matches = all_matches[:4]
+        all_matches = merge_evidence(
+            relevant_official_matches,
+            relevant_community_matches,
+            prefer_community=(
+                has_community_query_signal
+                or intent == "community_experience"
+            ),
+        )
 
         # Evaluate Confidence
         from app.hallucination_guard import evaluate_confidence
@@ -321,7 +339,11 @@ def chat_query(req: ChatRequest):
         citations = []
         sources = []
         for m in all_matches:
-            src = m.get("source", "Institutional Knowledge Base")
+            src = (
+                m.get("source_file")
+                or m.get("source")
+                or "Institutional Knowledge Base"
+            )
             if src not in sources:
                 sources.append(src)
             citations.append(
