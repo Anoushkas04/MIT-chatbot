@@ -26,6 +26,11 @@ backend/*.db
 # Precomputed RAG Vector Embeddings & Chunks
 backend/data/embeddings.npy
 backend/data/chunks.json
+backend/data/manifest.json
+backend/data/pages.json
+backend/data/page_images/
+backend/data/visual_embeddings.pt
+backend/data/visual_manifest.json
 
 # Operating System & Editor Metadata
 .DS_Store
@@ -44,3 +49,4 @@ ehthumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log

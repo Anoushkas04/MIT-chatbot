@@ -1,9 +1,10 @@
 import re
+from urllib.parse import quote
 from fastapi import APIRouter, HTTPException
-from app.config import HIGH_CONFIDENCE_THRESHOLD, TOP_K, GEMINI_MODEL
-from app.llm import chat, embed_query
+from app.answer_verifier import verify_answer
 from app.prompts import build_system_prompt
-from app.rag.store import get_store
+from app.providers import GenerationRequest, generate_answer
+from app.rag.hybrid import hybrid_search
 from app.schemas import ChatRequest, ChatResponse, CitationDetail
 from app.session_memory import add_turn, get_history
 from app.database import SessionLocal
@@ -189,7 +190,7 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
 
         if match_count >= 1 or score > 0.35:
             m_copy = dict(m)
-            m_copy["score"] = score + (match_count * 0.05)
+            m_copy["score"] = min(1.0, score + (match_count * 0.05))
             filtered.append(m_copy)
 
     filtered.sort(key=lambda x: x["score"], reverse=True)
@@ -203,10 +204,9 @@ def chat_query(req: ChatRequest):
         intent = classify_intent(req.message)
         query_type = detect_query_type(req.message)
 
-        # 1. Vector Search for Official University Documents
-        query_embedding = embed_query(req.message)
+        # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
         try:
-            vector_matches = get_store().search(query_embedding, raw_query=req.message, k=TOP_K)
+            vector_matches = hybrid_search(req.message)
         except Exception as e:
             print("Vector search error:", e)
             vector_matches = []
@@ -309,8 +309,13 @@ def chat_query(req: ChatRequest):
         )
 
         history = get_history(req.session_id)
-        reply_text = chat(system_prompt, history, req.message)
-        add_turn(req.session_id, req.message, reply_text)
+        generation = generate_answer(GenerationRequest(
+            question=req.message,
+            system_prompt=system_prompt,
+            evidence=all_matches,
+            history=history,
+        ))
+        reply_text, verification_warnings = verify_answer(generation.text, all_matches)
 
         citations = []
         sources = []
@@ -323,6 +328,14 @@ def chat_query(req: ChatRequest):
                     source=src,
                     snippet=m.get("text", "")[:280] + ("..." if len(m.get("text", "")) > 280 else ""),
                     score=round(float(m.get("score", 0.0)), 3),
+                    document_id=m.get("document_id"),
+                    page_number=m.get("page_number"),
+                    retrieval_method=m.get("retrieval_method"),
+                    source_url=(
+                        f"/api/search/page/{quote(str(m['document_id']))}/{int(m['page_number'])}"
+                        if m.get("document_id") and m.get("page_number")
+                        else None
+                    ),
                 )
             )
 
@@ -333,25 +346,10 @@ def chat_query(req: ChatRequest):
         elif fallback_suffix:
             reply_text += fallback_suffix
 
+        # Follow-up suggestions are intentionally empty until they can be generated
+        # and verified against the same evidence set.
         followups = []
-        if req.role == "student":
-            followups = [
-                "When do end-semester exam results get published?",
-                "What is the minimum attendance requirement for theory labs?",
-                "How do I apply for re-evaluation or make-up exams?",
-            ]
-        elif req.role in ["prospective", "parent"]:
-            followups = [
-                "What was the round 2 cutoff rank for CSE and AIML?",
-                "Can you break down the tuition and hostel fees for 1st year?",
-                "What documents are required during physical reporting?",
-            ]
-        elif req.role == "faculty":
-            followups = [
-                "How do I locate Dr. Radhika Pai's cabin?",
-                "What are the upcoming deadlines for seed grant applications?",
-                "Show me the departmental academic calendar schedule.",
-            ]
+        add_turn(req.session_id, req.message, reply_text)
 
         # Save session & message to SQLite DB
         try:
@@ -379,6 +377,15 @@ def chat_query(req: ChatRequest):
                 timestamp="Just now",
             )
             db.add(msg_ai)
+            db.flush()
+            for citation in citations:
+                page_suffix = f"#page={citation.page_number}" if citation.page_number else ""
+                db.add(models.MessageCitation(
+                    message_id=msg_ai.id,
+                    source_name=f"{citation.source}{page_suffix}",
+                    snippet=citation.snippet,
+                    similarity_score=citation.score,
+                ))
             db.commit()
         except Exception as e:
             db.rollback()
@@ -395,6 +402,9 @@ def chat_query(req: ChatRequest):
             response_count=response_count,
             demand_count=demand_count,
             sample_size=sample_size,
+            provider=generation.provider,
+            model=generation.model,
+            verification_warnings=verification_warnings,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

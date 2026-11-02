@@ -78,12 +78,17 @@ def root():
 @app.get("/api/health", tags=["0. System Health"])
 def health():
     rag = get_store_status()
+    from app.providers import get_provider_status
+    from app.rag.visual_store import get_visual_status
+    visual = get_visual_status()
     return {
         "status": "ok",
         "platform": "MIT CampusOS",
         "rag_store_ready": rag["ready"],
         "rag_chunk_count": rag["chunk_count"],
         "rag_error": rag["error"],
+        "visual_rag": visual,
+        "llm": get_provider_status(),
         "docs_url": "http://localhost:8000/docs",
     }
 

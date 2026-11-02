@@ -1,8 +1,22 @@
-fastapi
-uvicorn[standard]
-google-genai
-pypdf
-python-dotenv
-numpy
-sqlalchemy
+fastapi>=0.119,<1
+uvicorn[standard]>=0.37,<1
+google-genai>=1.52,<2
+pypdf>=6.1,<7
+python-dotenv>=1.1,<2
+numpy>=2.2,<3
+sqlalchemy>=2.0,<3
+
+# Page-aware hybrid RAG and ColPali-family visual retrieval.
+PyMuPDF>=1.26,<2
+Pillow>=10,<13
+rank-bm25>=0.2,<0.3
+sentence-transformers[image]>=6,<7
+peft>=0.17,<1
+
+# Interchangeable multimodal generation providers.
+openai>=2,<3
+anthropic>=0.75,<1
+
+# Test runner (fast tests never download model weights).
+pytest>=8,<10
 

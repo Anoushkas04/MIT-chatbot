@@ -5,6 +5,8 @@ from copy import deepcopy
 
 from app.rag.ingest import run_ingestion
 from app.rag.store import clear_store_cache, get_store
+from app.rag.keyword_store import clear_keyword_cache
+from app.rag.visual_store import clear_visual_cache
 
 _lock = threading.Lock()
 _job = {
@@ -32,6 +34,8 @@ def _run(job_id: str) -> None:
     try:
         result = run_ingestion(lambda progress, message: _update(progress=progress, message=message))
         clear_store_cache()
+        clear_keyword_cache()
+        clear_visual_cache()
         get_store()  # Validate the newly replaced files before reporting success.
         _update(
             status="completed", progress=100, message="RAG index replaced and loaded.",

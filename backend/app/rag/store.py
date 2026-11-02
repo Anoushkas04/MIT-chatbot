@@ -26,6 +26,8 @@ class VectorStore:
             raise FileNotFoundError("No ingested data found. Run `python -m app.rag.ingest` first.")
         self.chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
         self.embeddings = np.load(embeddings_path)
+        manifest_path = DATA_DIR / "manifest.json"
+        self.manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else None
         if len(self.chunks) != len(self.embeddings):
             raise ValueError("RAG chunks and embeddings have different lengths.")
 
@@ -70,7 +72,10 @@ def get_store_status() -> dict:
             "ready": True,
             "chunk_count": len(store.chunks),
             "embedding_count": len(store.embeddings),
+            "schema_version": store.manifest.get("schema_version") if store.manifest else 1,
+            "page_count": store.manifest.get("page_count", 0) if store.manifest else 0,
+            "file_count": store.manifest.get("file_count", 0) if store.manifest else 0,
             "error": None,
         }
     except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
-        return {"ready": False, "chunk_count": 0, "embedding_count": 0, "error": str(exc)}
+        return {"ready": False, "chunk_count": 0, "embedding_count": 0, "schema_version": None, "page_count": 0, "file_count": 0, "error": str(exc)}

@@ -4,3 +4,8 @@ __pycache__/
 .env
 data/embeddings.npy
 data/chunks.json
+data/manifest.json
+data/pages.json
+data/page_images/
+data/visual_embeddings.pt
+data/visual_manifest.json

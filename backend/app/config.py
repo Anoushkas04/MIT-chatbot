@@ -21,6 +21,20 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", os.environ.get("CHAT_MODEL", "gemi
 CHAT_MODEL = GEMINI_MODEL
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001")
 
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "auto").strip().lower()
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+
+VISUAL_RAG_ENABLED = os.environ.get("VISUAL_RAG_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+COLVISION_MODEL = os.environ.get("COLVISION_MODEL", "vidore/colSmol-500M")
+COLVISION_DEVICE = os.environ.get("COLVISION_DEVICE", "auto").strip().lower()
+RAG_TOP_K_VISUAL = int(os.environ.get("RAG_TOP_K_VISUAL", "8"))
+RAG_TOP_K_TEXT = int(os.environ.get("RAG_TOP_K_TEXT", "12"))
+RAG_FINAL_K = int(os.environ.get("RAG_FINAL_K", "4"))
+RAG_RENDER_DPI = int(os.environ.get("RAG_RENDER_DPI", "144"))
+
 TOP_K = int(os.environ.get("TOP_K", "5"))
 HIGH_CONFIDENCE_THRESHOLD = float(os.environ.get("HIGH_CONFIDENCE_THRESHOLD", "0.65"))
 MAX_HISTORY_TURNS = int(os.environ.get("MAX_HISTORY_TURNS", "6"))

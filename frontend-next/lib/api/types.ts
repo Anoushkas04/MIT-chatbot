@@ -7,11 +7,15 @@ export interface HealthResponse {
   docs_url: string;
 }
 
-export interface ChatCitation { source: string; snippet: string; score: number }
+export interface ChatCitation {
+  source: string; snippet: string; score: number; document_id?: string; page_number?: number;
+  retrieval_method?: string; source_url?: string;
+}
 export interface ChatRequest { message: string; session_id: string; role?: string; language?: string }
 export interface ChatResponse {
   text: string; sources: string[]; citations: ChatCitation[]; confidence: string;
-  confidence_type: string; followups: string[];
+  confidence_type: string; followups: string[]; provider: string; model: string;
+  verification_warnings: string[];
 }
 
 export interface TimelineEvent {

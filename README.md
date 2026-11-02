@@ -173,15 +173,33 @@ graph TD
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
-3. Configure Environment (.env):
+3. Configure Environment (`.env`; copy `backend/.env.example`):
    ```env
-   GEMINI_API_KEY=your_google_gemini_api_key_here
+   # Choose openai, anthropic, gemini, local, or auto.
+   LLM_PROVIDER=auto
+   OPENAI_API_KEY=
+   ANTHROPIC_API_KEY=
+   GEMINI_API_KEY=
+
+   # Laptop-safe ColPali-family visual retrieval. The first enabled run
+   # downloads the checkpoint; HF_TOKEN is recommended.
+   VISUAL_RAG_ENABLED=false
+   COLVISION_MODEL=vidore/colSmol-500M
+   HF_TOKEN=
    ```
-4. Ingest Official Documents into FAISS Vector Store:
+4. Build the page-aware dense + BM25 index:
    ```bash
    python -m app.rag.ingest
    ```
-5. Start FastAPI Backend:
+   To include scanned pages, set `VISUAL_RAG_ENABLED=true` before ingestion.
+   The visual build uses the Sentence Transformers v6 multi-vector interface
+   and ColPali-style late-interaction retrieval. On CPU-only systems, build it
+   deliberately because the 1,736-page corpus is expensive.
+5. Run the retrieval fixture audit (40 text, CSV, and visual cases):
+   ```bash
+   python -m app.rag.evaluate
+   ```
+6. Start FastAPI Backend:
    ```bash
    uvicorn app.main:app --host 0.0.0.0 --port 8000
    ```
