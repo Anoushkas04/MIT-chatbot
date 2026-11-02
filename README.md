@@ -142,6 +142,12 @@ graph TD
 │   │   └── translations.js         # English, Hindi, and Kannada tables
 │   └── package.json
 │
+├── frontend-next/                 # Redesigned Next.js frontend (staged integration)
+│   ├── app/                       # App Router UI and global styles
+│   ├── components/                # Shared UI and backend connection status
+│   ├── lib/api/                   # Typed FastAPI client foundation
+│   └── README.md                  # Current integration scope and commands
+│
 ├── minor_project_docs/            # Official MAHE raw institutional PDFs/CSVs
 │   ├── Academic Calendar 25-26_ Final_June30_2025.pdf
 │   ├── Academic Calendar 26-27 (1).pdf
