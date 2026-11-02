@@ -36,9 +36,10 @@ def evidence_text(request: GenerationRequest) -> str:
         text = item.get("text", "").strip() or "[Visual page; inspect the attached image.]"
         blocks.append(f"[E{index}: {item.get('source', 'Source')}{page}]\n{text}")
     history = "\n".join(f"{turn.get('role')}: {turn.get('text')}" for turn in request.history[-6:])
+    evidence_blocks = "\n\n".join(blocks)
     return (
         f"Conversation history:\n{history or '[none]'}\n\n"
-        f"Retrieved evidence:\n{'\n\n'.join(blocks)}\n\n"
+        f"Retrieved evidence:\n{evidence_blocks}\n\n"
         f"Question: {request.question}\n\n"
         "Answer only from the retrieved evidence. Cite evidence inline as [E1], [E2], etc. "
         "If the evidence does not answer the question, say that clearly and do not guess."
