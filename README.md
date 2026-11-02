@@ -1,6 +1,6 @@
 # MAHE MIT CampusOS — Enterprise University Digital Operating Platform 🏛️🤖
 
-[![React](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite%208-61DAFB?logo=react&logoColor=black)](frontend/)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2016%20%7C%20React%2019-000000?logo=nextdotjs&logoColor=white)](frontend/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.11-009688?logo=fastapi&logoColor=white)](backend/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite%20%7C%20SQLAlchemy-003B57?logo=sqlite&logoColor=white)](backend/)
 [![FAISS](https://img.shields.io/badge/Vector%20Store-FAISS%20%7C%20text--embedding--004-00599C?logo=meta&logoColor=white)](backend/)
@@ -119,27 +119,17 @@ graph TD
 │   ├── campus_os.db               # SQLite database file
 │   └── requirements.txt           # Python dependencies
 │
-├── frontend/                      # React 18 + Vite frontend
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── AICommunityHandoffModal.jsx # 1-click AI to community post modal
-│   │   │   ├── AdminPortal.jsx     # Enterprise Admin & Analytics Console
-│   │   │   ├── ChatWindow.jsx      # Retractable sidecar AI Copilot drawer
-│   │   │   ├── FacultyPortal.jsx   # Faculty Workspace & Cabin Lookup
-│   │   │   ├── FeedbackModal.jsx   # Universal platform feedback modal
-│   │   │   ├── GlobalSearchModal.jsx # Cmd+K search modal dialog
-│   │   │   ├── KnowledgeLoopDiagram.jsx # Interactive 11-stage flowchart
-│   │   │   ├── MessageBubble.jsx   # Structured trust cards & TTS audio narration
-│   │   │   ├── Navbar.jsx          # Institutional header & workspace switcher
-│   │   │   ├── NotificationsDrawer.jsx # 5-category notification drawer
-│   │   │   ├── ParentHub.jsx       # Parent & Admissions Hub
-│   │   │   ├── ReportContentModal.jsx # Post & comment report trigger modal
-│   │   │   ├── RewardsModal.jsx    # Campus Points & Leaderboards modal
-│   │   │   ├── SourceInspector.jsx # Visual PDF source passage inspector
-│   │   │   └── StudentCorner.jsx   # 11-channel Reddit-style community
-│   │   ├── App.css                 # Authoritative institutional design system
-│   │   ├── App.jsx                 # Application state & custom event router
-│   │   └── translations.js         # English, Hindi, and Kannada tables
+├── frontend/                      # Next.js (App Router) + TypeScript + Tailwind frontend
+│   ├── app/
+│   │   ├── page.tsx                # Landing page
+│   │   ├── login/ · signup/        # Email-OTP sign-in & sign-up (calls backend /api/auth)
+│   │   └── (app)/                  # Signed-in workspace: home, chat, community, discover,
+│   │                               #   network, planner, search, settings, utilities
+│   ├── components/                 # Sidebar, logo, auth frame, cards, shadcn ui
+│   ├── lib/
+│   │   ├── api.ts                  # Backend client (auth OTP + /api/chat)
+│   │   ├── session.ts              # Stores the backend session token & profile
+│   │   └── mock-data.ts            # Placeholder data for pages not yet on the backend
 │   └── package.json
 │
 ├── minor_project_docs/            # Official MAHE raw institutional PDFs/CSVs
@@ -189,12 +179,20 @@ graph TD
    ```bash
    cd frontend
    ```
-2. Install Dependencies & Start Dev Server:
+2. Point it at the backend (optional — defaults to `http://localhost:8000`):
    ```bash
-   npm install
-   npm run dev
+   cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
    ```
-3. Open `http://localhost:5173` in your browser!
+3. Install dependencies & start the dev server (uses pnpm; `npx pnpm` works without installing it):
+   ```bash
+   npx pnpm install
+   npx pnpm dev
+   ```
+4. Open `http://localhost:3000` in your browser.
+
+Sign-up and sign-in use the backend's real email OTP flow, and **Ask MITra** answers come
+from the backend's `/api/chat`. The other workspace pages still use placeholder data from
+`lib/mock-data.ts`.
 
 ---
 
