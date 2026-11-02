@@ -71,7 +71,7 @@ def perform_search(
             results.append({
                 "id": f"community-{post.id}", "title": post.title, "category": "Community",
                 "source_type": "community", "badge": "Verified community" if post.verified else "Community post",
-                "snippet": post.content[:320], "link_target": f"/api/community?category={quote(post.sub_community)}",
+                "snippet": post.content[:320], "link_target": f"/api/posts?category={quote(post.sub_community)}",
                 "relevance": relevance, "source": post.sub_community,
             })
     finally:

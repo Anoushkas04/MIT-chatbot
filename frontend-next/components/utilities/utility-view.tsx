@@ -1,0 +1,20 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { ArrowUpRight, BookOpen, GraduationCap, Plus, Search, Trash2 } from 'lucide-react'
+
+type Course = { id: number; name: string; grade: number; credits: number }
+
+export function UtilityView({ setActive }: { setActive: (view: string) => void }) {
+  const [courses, setCourses] = useState<Course[]>([{ id: 1, name: 'Course 1', grade: 10, credits: 4 }])
+  const [attended, setAttended] = useState(0)
+  const [total, setTotal] = useState(0)
+  const gpa = useMemo(() => { const credits = courses.reduce((sum, course) => sum + course.credits, 0); return credits ? courses.reduce((sum, course) => sum + course.grade * course.credits, 0) / credits : 0 }, [courses])
+  const percentage = total > 0 ? Math.min(100, attended / total * 100) : 0
+  const needed = total > 0 && percentage < 75 ? Math.ceil((0.75 * total - attended) / 0.25) : 0
+
+  const updateCourse = (id: number, field: keyof Course, value: string) => setCourses(current => current.map(course => course.id === id ? { ...course, [field]: field === 'name' ? value : Math.max(0, Number(value)) } : course))
+  return <div className="view"><div className="view-header"><div><p className="section-kicker">STUDENT UTILITIES</p><h1>Useful, when you need it.</h1><p className="view-sub">Transparent local calculators—no fabricated attendance or grades.</p></div></div><div className="utility-grid"><section className="utility-card gpa-card"><div className="utility-heading"><div className="utility-icon"><GraduationCap /></div><div><h3>GPA calculator</h3><p>Enter grade points and credits</p></div></div><div className="gpa-score"><strong>{gpa.toFixed(2)}</strong><span>/ 10.0 estimated GPA</span></div><div className="editable-courses">{courses.map(course => <div key={course.id}><input aria-label="Course name" value={course.name} onChange={event => updateCourse(course.id, 'name', event.target.value)} /><input aria-label="Grade points" type="number" min="0" max="10" value={course.grade} onChange={event => updateCourse(course.id, 'grade', event.target.value)} /><input aria-label="Credits" type="number" min="0" max="20" value={course.credits} onChange={event => updateCourse(course.id, 'credits', event.target.value)} /><button aria-label="Remove course" disabled={courses.length === 1} onClick={() => setCourses(current => current.filter(item => item.id !== course.id))}><Trash2 /></button></div>)}</div><button className="utility-link" onClick={() => setCourses(current => [...current, { id: Math.max(0,...current.map(course => course.id)) + 1, name: `Course ${current.length + 1}`, grade: 10, credits: 3 }])}><Plus /> Add course</button></section>
+      <section className="utility-card attendance-card"><div className="utility-heading"><div className="utility-icon coral-bg"><BookOpen /></div><div><h3>Attendance calculator</h3><p>Uses the 75% target you provide</p></div></div><div className="attendance-inputs"><label>Classes attended<input type="number" min="0" value={attended} onChange={event => setAttended(Math.max(0, Number(event.target.value)))} /></label><label>Total classes<input type="number" min="0" value={total} onChange={event => setTotal(Math.max(0, Number(event.target.value)))} /></label></div><div className="attendance-ring"><strong>{percentage.toFixed(0)}<span>%</span></strong><small>Calculated</small></div><p className="calculator-note">{total === 0 ? 'Enter your actual counts.' : attended > total ? 'Attended cannot exceed total classes.' : needed > 0 ? `Attend the next ${needed} classes to reach 75%.` : 'At or above the 75% target.'}</p></section>
+      <section className="utility-card resources-card"><div className="utility-heading"><div className="utility-icon yellow-bg"><Search /></div><div><h3>Live campus resources</h3><p>Open source-backed tools</p></div></div>{[['Search indexed documents','Search'],['Faculty and cabin directory','Directory'],['Academic calendar','Planner'],['Ask a grounded question','Ask MITra']].map(([label,view]) => <button className="resource-link" key={label} onClick={() => setActive(view)}><span>{label}</span><ArrowUpRight /></button>)}</section></div></div>
+}

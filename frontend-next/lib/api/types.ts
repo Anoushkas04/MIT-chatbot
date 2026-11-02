@@ -36,6 +36,21 @@ export interface SearchResponse {
   total_results: number; official_count: number; community_count: number; results: SearchResult[];
 }
 
+export interface CommunityComment { id: number; author: string; content: string; is_helpful: boolean }
+export interface CommunityPost {
+  id: number; author: string; sub_community: string; tag: string; title: string; content: string;
+  upvotes: number; downvotes: number; verified: boolean; time: string; comments: CommunityComment[];
+}
+export interface CommunityLeader { rank: number; name: string; points: number; helpful_answers?: number; badge?: string }
+
+export interface FacultyMember {
+  id: string; name: string; dept: string; designation: string; cabin: string | null;
+  email: string; qualification: string; source: string;
+}
+export interface FacultyResponse {
+  count: number; page: number; page_size: number; total_pages: number; data: FacultyMember[];
+}
+
 export interface Department {
   id: number;
   code: string;

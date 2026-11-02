@@ -69,7 +69,7 @@ check; interactive API docs at `http://localhost:8000/docs`.
 | `/api/chat` | `chat_router.py` | RAG copilot chat, source citations |
 | `/api/academic` | `academic_router.py` | Academic calendar, timeline, cutoff ranks |
 | `/api/faculty` | `faculty_router.py` | Faculty & cabin directory |
-| `/api/community` | `community_router.py` | Student community posts, votes, comments |
+| `/api/posts` | `community_router.py` | Student community posts, votes, comments |
 | `/api/notifications` | `notifications_router.py` | Notification center, popups |
 | `/api/feedback` | `feedback_router.py` | Crowdsourced feedback / learning signals |
 | `/api/admin` | `admin_router.py` | Admin console (analytics, users, moderation, events) |

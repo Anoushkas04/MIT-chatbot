@@ -1,31 +1,76 @@
+import csv
+from functools import lru_cache
 from typing import Optional
+
 from fastapi import APIRouter
+
+from app.config import DOCS_DIR
 
 router = APIRouter(prefix="/api/faculty", tags=["4. Faculty & Cabin Directory"])
 
 
-@router.get("", summary="Search faculty members, cabin locations, and research focus")
-def get_faculty(query: Optional[str] = None, dept: Optional[str] = None):
-    faculty_list = [
-        {"name": "Dr. Somanath S.", "dept": "Computer Science & Engg", "designation": "Professor & Head", "cabin": "AB5-302", "email": "somanath.s@manipal.edu", "research": "AI & Distributed Systems"},
-        {"name": "Dr. Radhika M. Pai", "dept": "Computer Science & Engg", "designation": "Professor", "cabin": "AB5-314", "email": "radhika.pai@manipal.edu", "research": "Cloud Computing & Security"},
-        {"name": "Dr. Srikanth Prabhu", "dept": "Computer Science & Engg", "designation": "Associate Professor", "cabin": "AB5-308", "email": "srikanth.prabhu@manipal.edu", "research": "Biometrics & Machine Learning"},
-        {"name": "Dr. Ashalatha Nayak", "dept": "Computer Science & Engg", "designation": "Professor", "cabin": "AB5-301", "email": "ashalatha.nayak@manipal.edu", "research": "Network Systems"},
-        {"name": "Dr. Harish Kumar S.", "dept": "Information Technology", "designation": "Professor & Head", "cabin": "AB5-402", "email": "harish.kumar@manipal.edu", "research": "Cybersecurity & IoT"},
-        {"name": "Dr. Smitha N. Pai", "dept": "Information Technology", "designation": "Professor", "cabin": "AB5-410", "email": "smitha.pai@manipal.edu", "research": "Data Science"},
-        {"name": "Dr. Niranjan N. Chiplunkar", "dept": "Data Science & CA", "designation": "Professor", "cabin": "AB5-201", "email": "niranjan.c@manipal.edu", "research": "Big Data Analytics"},
-        {"name": "Dr. Subramanya Bhat", "dept": "Electronics & Comm Engg", "designation": "Professor & Head", "cabin": "AB3-104", "email": "subramanya.bhat@manipal.edu", "research": "VLSI Design & Embedded Systems"},
-        {"name": "Dr. Kumara Shama", "dept": "Electronics & Comm Engg", "designation": "Professor", "cabin": "AB3-112", "email": "kumara.shama@manipal.edu", "research": "Signal Processing"},
-        {"name": "Dr. Raviraja Adhikari", "dept": "Mechanical Engineering", "designation": "Professor & Head", "cabin": "AB1-205", "email": "raviraja.adhikari@manipal.edu", "research": "Thermal & Fluid Sciences"},
-    ]
+@lru_cache
+def _load_faculty() -> list[dict]:
+    by_email: dict[str, dict] = {}
+    general_path = DOCS_DIR / "mit_manipal_faculty.csv"
+    if general_path.is_file():
+        with general_path.open(encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                email = (row.get("Mail ID") or "").strip().lower()
+                if not email:
+                    continue
+                by_email[email] = {
+                    "id": f"faculty-{len(by_email) + 1}",
+                    "name": (row.get("Professor Name") or "").strip(),
+                    "dept": (row.get("Department") or "").strip(),
+                    "designation": (row.get("Title") or "").strip(),
+                    "cabin": None,
+                    "email": email,
+                    "qualification": (row.get("Qualification") or "").strip(),
+                    "source": general_path.name,
+                }
 
-    filtered = faculty_list
-    if dept and dept != "All":
-        filtered = [f for f in filtered if dept.lower() in f["dept"].lower()]
-    if query:
-        q = query.lower()
-        filtered = [
-            f for f in filtered
-            if q in f["name"].lower() or q in f["cabin"].lower() or q in f["dept"].lower() or q in f["research"].lower()
+    cabins_path = DOCS_DIR / "manipal_sce_faculty_cabins.csv"
+    if cabins_path.is_file():
+        with cabins_path.open(encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                email = (row.get("email") or "").strip().lower()
+                if not email:
+                    continue
+                existing = by_email.get(email, {})
+                by_email[email] = {
+                    "id": row.get("id") or existing.get("id") or f"faculty-{len(by_email) + 1}",
+                    "name": (row.get("name") or existing.get("name") or "").strip(),
+                    "dept": existing.get("dept") or "School of Computer Engineering",
+                    "designation": (row.get("designation") or existing.get("designation") or "").strip(),
+                    "cabin": (row.get("cabin_no") or "").strip() or None,
+                    "email": email,
+                    "qualification": existing.get("qualification") or "",
+                    "source": cabins_path.name,
+                }
+    return sorted(by_email.values(), key=lambda faculty: faculty["name"].lower())
+
+
+@router.get("", summary="Search the source-backed faculty and cabin directory")
+def get_faculty(query: Optional[str] = None, dept: Optional[str] = None, page: int = 1, page_size: int = 25):
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+    faculty = _load_faculty()
+    if dept and dept.lower() != "all":
+        faculty = [item for item in faculty if dept.lower() in item["dept"].lower()]
+    if query and query.strip():
+        terms = [term for term in query.lower().split() if term]
+        faculty = [
+            item for item in faculty
+            if all(term in " ".join(str(value or "") for value in item.values()).lower() for term in terms)
         ]
-    return {"count": len(filtered), "data": filtered}
+
+    total = len(faculty)
+    offset = (page - 1) * page_size
+    return {
+        "count": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size if total else 0,
+        "data": faculty[offset:offset + page_size],
+    }

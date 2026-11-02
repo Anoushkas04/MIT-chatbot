@@ -3,6 +3,7 @@ import numpy as np
 from app.rag.chunker import chunk_text
 from app.rag.store import cosine_search, get_store_status
 from app.llm import synthesize_local_concise_answer
+from app.routers.faculty_router import get_faculty
 
 
 def test_chunk_text():
@@ -65,6 +66,14 @@ def test_local_answer_only_uses_retrieved_evidence():
     assert "tuition" not in answer.lower()
 
 
+def test_faculty_directory_uses_csv_source():
+    result = get_faculty(query="Radhika Pai", page=1, page_size=5)
+    assert result["count"] >= 1
+    faculty = result["data"][0]
+    assert faculty["cabin"]
+    assert faculty["source"] == "manipal_sce_faculty_cabins.csv"
+
+
 if __name__ == "__main__":
     test_chunk_text()
     test_chunk_text_empty()
@@ -73,4 +82,5 @@ if __name__ == "__main__":
     test_cosine_search_ranks_exact_match_first()
     test_store_status_matches_generated_index()
     test_local_answer_only_uses_retrieved_evidence()
+    test_faculty_directory_uses_csv_source()
     print("All checks passed.")

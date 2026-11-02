@@ -1,26 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   ArrowUpRight,
   Bell,
-  BookOpen,
   Bot,
   CalendarDays,
-  Check,
   ChevronRight,
   Compass,
-  FileText,
-  Filter,
-  Flame,
-  GraduationCap,
   Heart,
   LayoutDashboard,
-  Lightbulb,
   Menu,
   MessageCircle,
   MoreHorizontal,
-  Plus,
   Search,
   Settings,
   Sparkles,
@@ -32,21 +24,21 @@ import { ConnectionStatus } from '@/components/system/connection-status'
 import { ChatView } from '@/components/chat/chat-view'
 import { HomeView } from '@/components/dashboard/home-view'
 import { SearchView } from '@/components/search/search-view'
+import { CommunityView } from '@/components/community/community-view'
+import { DirectoryView } from '@/components/directory/directory-view'
+import { DiscoverView } from '@/components/discover/discover-view'
+import { PlannerView } from '@/components/planner/planner-view'
+import { UtilityView } from '@/components/utilities/utility-view'
 
 const navItems = [
   { label: 'Home', icon: LayoutDashboard },
   { label: 'Ask MITra', icon: MessageCircle },
   { label: 'Discover', icon: Compass },
+  { label: 'Community', icon: Users },
+  { label: 'Directory', icon: Search },
   { label: 'Planner', icon: CalendarDays },
   { label: 'Utilities', icon: Zap },
 ]
-
-const discoveries = [
-  { title: 'Manipal Hackathon 2026', type: 'Competition', meta: 'Oct 25 · Innovation Centre', tone: 'coral', icon: Flame, why: 'Matches your interest in building' },
-  { title: 'IEEE Student Branch', type: 'Club', meta: '48 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Popular with CSE students' },
-  { title: 'Design Thinking Workshop', type: 'Workshop', meta: 'Nov 02 · Student Plaza', tone: 'yellow', icon: Sparkles, why: 'Based on your saved events' },
-]
-
 
 function Logo({ light = false }: { light?: boolean }) {
   return <div className={`brand ${light ? 'brand-light' : ''}`}><span className="brand-mark">M</span><span>MIT<span className="brand-accent">ra</span></span></div>
@@ -76,14 +68,23 @@ function Sidebar({ active, setActive, onLogout }: { active: string; setActive: (
 }
 
 
-function DiscoverView() { const [saved, setSaved] = useState<string[]>([]); return <div className="view"><div className="view-header"><div><p className="section-kicker">DISCOVER</p><h1>Find your next thing.</h1><p className="view-sub">Clubs, projects, events and opportunities selected for you.</p></div><Button variant="outline"><Filter data-icon="inline-start" /> Filter</Button></div><div className="discover-tabs"><button className="active">For you</button><button>Clubs</button><button>Projects</button><button>Events</button><button>Opportunities</button></div><div className="discover-list">{[...discoveries, { title: 'Product Lab · Student Innovation Cell', type: 'Project', meta: 'Rolling applications · 6 spots open', tone: 'green', icon: Users, why: 'A new way to explore your interests' }].map(item => <article className={`discover-row ${item.tone}`} key={item.title}><span className="discovery-icon"><item.icon /></span><div className="discover-info"><span className="pill">{item.type}</span><h3>{item.title}</h3><p>{item.meta}</p><div className="why"><Sparkles /> {item.why}</div></div><button className={`save-button ${saved.includes(item.title) ? 'saved' : ''}`} onClick={() => setSaved(saved.includes(item.title) ? saved.filter(x => x !== item.title) : [...saved, item.title])}>{saved.includes(item.title) ? <Check /> : <Heart />}</button><ArrowUpRight /></article>)}</div></div> }
 
-function UtilityView() { const [credits, setCredits] = useState([{ grade: 'A', value: 10, course: 'Data Structures', credits: 4 }, { grade: 'A-', value: 9, course: 'Operating Systems', credits: 4 }, { grade: 'B+', value: 8, course: 'Computer Networks', credits: 3 }]); const gpa = (credits.reduce((a, c) => a + c.value * c.credits, 0) / credits.reduce((a, c) => a + c.credits, 0)).toFixed(2); return <div className="view"><div className="view-header"><div><p className="section-kicker">STUDENT UTILITIES</p><h1>Useful, when you need it.</h1><p className="view-sub">Small tools that make student life a little easier.</p></div></div><div className="utility-grid"><section className="utility-card gpa-card"><div className="utility-heading"><div className="utility-icon"><GraduationCap /></div><div><h3>GPA calculator</h3><p>Current semester estimate</p></div></div><div className="gpa-score"><strong>{gpa}</strong><span>/ 10.0 estimated GPA</span></div><div className="grade-rows">{credits.map((c, i) => <div key={i}><span>{c.course}</span><b>{c.grade}</b><small>{c.credits} credits</small></div>)}</div><button className="utility-link" onClick={() => setCredits([...credits, { grade: 'A', value: 10, course: 'New course', credits: 3 }])}><Plus /> Add course</button></section><section className="utility-card attendance-card"><div className="utility-heading"><div className="utility-icon coral-bg"><BookOpen /></div><div><h3>Attendance</h3><p>Stay above the 75% line</p></div></div><div className="attendance-ring"><strong>82<span>%</span></strong><small>Overall</small></div><div className="attendance-stats"><span><b>124</b> attended</span><span><b>27</b> missed</span></div><button className="utility-link">View by course <ArrowUpRight /></button></section><section className="utility-card resources-card"><div className="utility-heading"><div className="utility-icon yellow-bg"><FileText /></div><div><h3>Quick resources</h3><p>Verified campus information</p></div></div>{['Academic regulations', 'Examination cell', 'Student support', 'Campus map'].map(x => <button className="resource-link" key={x}><span>{x}</span><ArrowUpRight /></button>)}</section></div></div> }
+function SettingsView() { return <div className="view settings-view"><div className="view-header"><div><p className="section-kicker">GUEST SETTINGS</p><h1>Preview preferences.</h1><p className="view-sub">Guest preferences are local-only until identity features are integrated separately.</p></div></div><div className="settings-list"><section><h3>Profile</h3><div className="settings-card profile-setting"><div className="header-avatar large">G</div><div><strong>Guest</strong><span>No account connected</span><small>Integration preview workspace</small></div><button disabled>Unavailable in guest mode</button></div></section><section><h3>Personalization preview</h3><div className="settings-card"><div><strong>Behavioral personalization</strong><span>Requires a signed-in profile and is intentionally disabled.</span></div><button className="toggle" disabled><i /></button></div><div className="settings-card"><div><strong>Show inferred interests</strong><span>No interests are inferred or stored for guests.</span></div><button className="toggle" disabled><i /></button></div></section><section><h3>Notifications</h3><div className="settings-card"><div><strong>Public campus updates</strong><span>Live published notices are available in the Planner. Personal notification preferences require sign-in.</span></div><button className="toggle" disabled><i /></button></div></section></div></div> }
 
-function PlannerView() { return <div className="view"><div className="view-header"><div><p className="section-kicker">YOUR PLANNER</p><h1>Keep moving forward.</h1><p className="view-sub">A calm view of what&apos;s coming up next.</p></div><Button><Plus data-icon="inline-start" /> Add task</Button></div><div className="planner-layout"><section className="planner-card"><div className="planner-month"><button>‹</button><h3>October 2026</h3><button>›</button></div><div className="week-days">{['M','T','W','T','F','S','S'].map((d,i)=><span key={i}>{d}</span>)}</div><div className="calendar-grid">{Array.from({length:31}, (_, i) => <button key={i} className={i === 19 ? 'today' : [3, 8, 14, 24].includes(i) ? 'has-event' : ''}>{i+1}</button>)}</div></section><section className="deadline-card"><p className="section-kicker">UP NEXT</p><h3>Deadlines & reminders</h3>{[['Oct 22','Submit OS assignment','Academic'],['Oct 25','Manipal Hackathon 2026','Event'],['Nov 01','Course registration closes','Important']].map((x,i)=><div className="deadline" key={i}><time>{x[0]}</time><div><strong>{x[1]}</strong><span>{x[2]}</span></div><MoreHorizontal /></div>)}</section></div></div> }
-
-function SettingsView() { return <div className="view settings-view"><div className="view-header"><div><p className="section-kicker">GUEST SETTINGS</p><h1>Preview preferences.</h1><p className="view-sub">Guest preferences are local-only until identity features are integrated separately.</p></div></div><div className="settings-list"><section><h3>Profile</h3><div className="settings-card profile-setting"><div className="header-avatar large">G</div><div><strong>Guest</strong><span>No account connected</span><small>Integration preview workspace</small></div><button disabled>Unavailable in guest mode</button></div></section><section><h3>Personalization preview</h3><div className="settings-card"><div><strong>Behavioral personalization</strong><span>Requires a signed-in profile and is intentionally disabled.</span></div><button className="toggle" disabled><i /></button></div><div className="settings-card"><div><strong>Show inferred interests</strong><span>No interests are inferred or stored for guests.</span></div><button className="toggle" disabled><i /></button></div></section><section><h3>Notifications</h3><div className="settings-card"><div><strong>Important campus updates</strong><span>Public notification integration is planned for a later batch.</span></div><button className="toggle" disabled><i /></button></div></section></div></div> }
-
-function Workspace({ onLogout }: { onLogout: () => void }) { const [active, setActive] = useState('Home'); const view = active === 'Home' ? <HomeView setActive={setActive} /> : active === 'Ask MITra' ? <ChatView /> : active === 'Search' ? <SearchView /> : active === 'Discover' ? <DiscoverView /> : active === 'Utilities' ? <UtilityView /> : active === 'Planner' ? <PlannerView /> : <SettingsView />; return <main className="workspace"><Sidebar active={active} setActive={setActive} onLogout={onLogout} /><div className="workspace-main"><div className="mobile-top"><Logo /><button><Menu /></button></div>{view}</div></main> }
+function Workspace({ onLogout }: { onLogout: () => void }) {
+  const [active, setActive] = useState('Home')
+  const views: Record<string, ReactNode> = {
+    Home: <HomeView setActive={setActive} />,
+    'Ask MITra': <ChatView />,
+    Search: <SearchView />,
+    Discover: <DiscoverView />,
+    Community: <CommunityView />,
+    Directory: <DirectoryView />,
+    Utilities: <UtilityView setActive={setActive} />,
+    Planner: <PlannerView />,
+    Settings: <SettingsView />,
+  }
+  return <main className="workspace"><Sidebar active={active} setActive={setActive} onLogout={onLogout} /><div className="workspace-main"><div className="mobile-top"><Logo /><button><Menu /></button></div>{views[active] ?? views.Home}</div></main>
+}
 
 export default function Page() { const [screen, setScreen] = useState<'landing' | 'guest' | 'workspace'>('landing'); if (screen === 'guest') return <GuestGate onBack={() => setScreen('landing')} onContinue={() => setScreen('workspace')} />; if (screen === 'workspace') return <Workspace onLogout={() => setScreen('landing')} />; return <Landing onEnter={() => setScreen('guest')} /> }

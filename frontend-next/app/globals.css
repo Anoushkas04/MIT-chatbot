@@ -57,3 +57,48 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .live-notices strong { color: #44524a; font-size: 11px; }
 .live-notices p { color: #7b867f; font-size: 10px; line-height: 1.45; margin: 4px 0; }
 .live-notices small { color: #9aa39b; font-size: 9px; }
+.guest-disabled { align-items: center; background: #f1f3ef; border: 1px solid #dfe4dc; border-radius: 9px; color: #879189; cursor: not-allowed; display: flex; font-size: 10px; gap: 6px; padding: 9px 12px; }
+.guest-disabled svg { width: 13px; }
+.planner-month button svg { width: 16px; }
+.editable-courses { display: flex; flex-direction: column; gap: 7px; }
+.editable-courses > div { display: grid; gap: 6px; grid-template-columns: minmax(110px, 1fr) 65px 65px 28px; }
+.editable-courses input { background: #fafbf8; border: 1px solid #e1e5dd; border-radius: 7px; color: #526058; min-width: 0; padding: 7px; font-size: 10px; }
+.editable-courses button { background: none; border: 0; color: #a87569; padding: 4px; }
+.editable-courses button:disabled { opacity: .3; }
+.editable-courses svg { width: 14px; }
+.attendance-inputs { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; margin-top: 23px; text-align: left; }
+.attendance-inputs label { color: #7d8780; display: grid; font-size: 9px; gap: 5px; }
+.attendance-inputs input { border: 1px solid #dfe4dc; border-radius: 8px; color: #526058; min-width: 0; padding: 8px; }
+.calculator-note { color: #718078; font-size: 10px; line-height: 1.45; margin: 12px auto 0; max-width: 230px; }
+.community-layout { align-items: start; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) 250px; margin-top: 22px; }
+.community-feed { display: flex; flex-direction: column; gap: 10px; }
+.community-post, .leaderboard-card { background: #fff; border: 1px solid #e2e6df; border-radius: 14px; padding: 18px; }
+.post-meta { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.post-meta span { background: #edf4f1; border-radius: 10px; color: #53766f; font-size: 9px; padding: 4px 7px; }
+.post-meta small { color: #9aa39b; font-size: 9px; }
+.post-meta b { align-items: center; color: #488062; display: flex; font-size: 8px; gap: 3px; margin-left: auto; }
+.post-meta svg { width: 10px; }
+.community-post h3 { color: #234f4a; font-size: 14px; margin: 12px 0 7px; }
+.community-post > p { color: #707c74; font-size: 11px; line-height: 1.55; }
+.post-stats { display: flex; gap: 14px; margin-top: 13px; }
+.post-stats span { align-items: center; color: #8b958d; display: flex; font-size: 9px; gap: 4px; }
+.post-stats svg { width: 12px; }
+.community-post blockquote { align-items: flex-start; background: #f3f7ef; border-left: 3px solid #91aa6c; border-radius: 7px; color: #66736b; display: flex; font-size: 10px; gap: 7px; line-height: 1.45; margin: 13px 0 0; padding: 10px; }
+.community-post blockquote svg { color: #5e8b64; flex: 0 0 auto; width: 13px; }
+.community-post blockquote b { display: block; margin-bottom: 3px; }
+.leaderboard-card { position: sticky; top: 20px; }
+.leaderboard-card h3 { align-items: center; color: #234f4a; display: flex; font-size: 13px; gap: 6px; margin: 10px 0 17px; }
+.leaderboard-card h3 svg { color: #c99e34; width: 16px; }
+.leaderboard-card > div { align-items: center; border-top: 1px solid #eef0eb; display: grid; font-size: 10px; gap: 7px; grid-template-columns: 25px 1fr auto; padding: 10px 0; }
+.leaderboard-card > div b { color: #e07b64; }.leaderboard-card > div span { color: #526058; }.leaderboard-card > div small { color: #929b93; }
+.faculty-grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0,1fr)); }
+.faculty-grid article { align-items: flex-start; background: #fff; border: 1px solid #e2e6df; border-radius: 13px; display: flex; gap: 12px; padding: 16px; }
+.faculty-avatar { background: #dbe9e7; border-radius: 10px; color: #315954; display: grid; flex: 0 0 36px; font-size: 10px; font-weight: 800; height: 36px; place-items: center; }
+.faculty-grid article > div:last-child { min-width: 0; }
+.faculty-grid h3 { color: #234f4a; font-size: 13px; margin: 0 0 5px; }
+.faculty-grid p { color: #78847c; font-size: 9px; line-height: 1.4; margin: 0 0 9px; }
+.faculty-grid span, .faculty-grid a { align-items: flex-start; color: #64756b; display: flex; font-size: 9px; gap: 5px; margin-top: 5px; overflow-wrap: anywhere; }
+.faculty-grid svg { flex: 0 0 auto; width: 11px; }
+.faculty-grid small { color: #a0a8a1; display: block; font-size: 8px; margin-top: 10px; }
+@media (max-width: 850px) { .community-layout { grid-template-columns: 1fr; } .leaderboard-card { position: static; } .faculty-grid { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .editable-courses > div { grid-template-columns: 1fr 52px 52px 24px; } .guest-disabled { display: none; } }
