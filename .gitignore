@@ -31,6 +31,7 @@ backend/data/pages.json
 backend/data/page_images/
 backend/data/visual_embeddings.pt
 backend/data/visual_manifest.json
+backend/data/visual_model_ready.json
 
 # Operating System & Editor Metadata
 .DS_Store

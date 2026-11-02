@@ -1,25 +1,45 @@
 import json
+import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.config import COLVISION_DEVICE, COLVISION_MODEL, DATA_DIR
+from app.config import (
+    COLVISION_DEVICE,
+    COLVISION_LOCAL_FILES_ONLY,
+    COLVISION_MODEL,
+    DATA_DIR,
+    VISUAL_RAG_SCOPE,
+)
 
 
 VISUAL_EMBEDDINGS_PATH = DATA_DIR / "visual_embeddings.pt"
 VISUAL_MANIFEST_PATH = DATA_DIR / "visual_manifest.json"
+VISUAL_MODEL_READY_PATH = DATA_DIR / "visual_model_ready.json"
 
 
 def _device() -> str:
     import torch
     if COLVISION_DEVICE != "auto":
+        if COLVISION_DEVICE.startswith("cuda") and not torch.cuda.is_available():
+            raise RuntimeError("COLVISION_DEVICE requests CUDA, but this PyTorch build cannot access CUDA.")
         return COLVISION_DEVICE
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
 @lru_cache
 def get_visual_model():
+    import torch
     from sentence_transformers import MultiVectorEncoder
-    return MultiVectorEncoder(COLVISION_MODEL, device=_device())
+    device = _device()
+    model_kwargs = {"torch_dtype": torch.float16} if device.startswith("cuda") else {}
+    return MultiVectorEncoder(
+        COLVISION_MODEL,
+        device=device,
+        token=os.environ.get("HF_TOKEN") or None,
+        local_files_only=COLVISION_LOCAL_FILES_ONLY,
+        model_kwargs=model_kwargs,
+    )
 
 
 def build_visual_index(pages: list[dict], image_root: Path, progress_callback=None) -> dict:
@@ -30,11 +50,19 @@ def build_visual_index(pages: list[dict], image_root: Path, progress_callback=No
         raise RuntimeError("No rendered page images are available for visual indexing.")
     model = get_visual_model()
     embeddings = []
-    batch_size = 1 if _device() == "cpu" else 2
+    # Batch size one is deliberate for 4 GB laptop GPUs.
+    batch_size = 1
     for start in range(0, len(candidates), batch_size):
         batch = candidates[start:start + batch_size]
         paths = [str(image_root / Path(page["image_path"]).name) for page in batch]
-        encoded = model.encode_document(paths, batch_size=batch_size, convert_to_numpy=False, show_progress_bar=False)
+        try:
+            encoded = model.encode_document(paths, batch_size=batch_size, convert_to_numpy=False, show_progress_bar=False)
+        except torch.OutOfMemoryError as exc:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            raise RuntimeError(
+                "The visual encoder exhausted GPU memory. Close other GPU applications or set COLVISION_DEVICE=cpu."
+            ) from exc
         if isinstance(encoded, torch.Tensor):
             encoded = list(torch.unbind(encoded))
         embeddings.extend(item.detach().cpu().to(torch.float16) for item in encoded)
@@ -46,9 +74,11 @@ def build_visual_index(pages: list[dict], image_root: Path, progress_callback=No
         "model": COLVISION_MODEL,
         "device": _device(),
         "page_count": len(candidates),
+        "scope": VISUAL_RAG_SCOPE,
+        "storage_dtype": "float16",
     }, indent=2), encoding="utf-8")
     clear_visual_cache()
-    return {"page_count": len(candidates), "model": COLVISION_MODEL, "device": _device()}
+    return {"page_count": len(candidates), "model": COLVISION_MODEL, "device": _device(), "scope": VISUAL_RAG_SCOPE}
 
 
 class VisualStore:
@@ -67,12 +97,39 @@ class VisualStore:
         import torch
         model = get_visual_model()
         query_embeddings = model.encode_query([query], batch_size=1, convert_to_numpy=False, show_progress_bar=False)
-        scores = model.similarity(query_embeddings, self.embeddings).detach().cpu().reshape(-1)
-        indices = torch.argsort(scores, descending=True)[:k]
+        query_device = query_embeddings.device if isinstance(query_embeddings, torch.Tensor) else query_embeddings[0].device
+        document_embeddings = [embedding.to(query_device) for embedding in self.embeddings]
+        scores = model.similarity(query_embeddings, document_embeddings).detach().cpu().reshape(-1)
+        query_tokens = _metadata_tokens(query)
+        adjusted = []
+        metadata_matches = []
+        for index, page in enumerate(self.pages):
+            matches = len(query_tokens.intersection(_metadata_tokens(str(page.get("source", "")))))
+            metadata_matches.append(matches)
+            adjusted.append(float(scores[index]) + min(matches, 5) * 1.5)
+        indices = sorted(range(len(adjusted)), key=adjusted.__getitem__, reverse=True)[:k]
         return [
-            {**self.pages[int(index)], "score": float(scores[index]), "retrieval_method": "colvision"}
+            {
+                **self.pages[int(index)],
+                "score": adjusted[int(index)],
+                "visual_score": float(scores[index]),
+                "metadata_matches": metadata_matches[int(index)],
+                "retrieval_method": "colvision",
+            }
             for index in indices
         ]
+
+
+def _metadata_tokens(value: str) -> set[str]:
+    tokens = {token for token in re.findall(r"[a-z0-9]+", value.lower()) if len(token) > 1}
+    for token in tuple(tokens):
+        if len(token) == 4 and token.startswith("20"):
+            tokens.add(token[2:])
+    if "computer" in tokens and "science" in tokens:
+        tokens.add("cs")
+    if "cs" in tokens:
+        tokens.update({"computer", "science"})
+    return tokens
 
 
 @lru_cache
@@ -85,6 +142,14 @@ def clear_visual_cache() -> None:
 
 
 def get_visual_status() -> dict:
+    import torch
+    cuda_available = torch.cuda.is_available()
+    hardware = {
+        "torch_version": torch.__version__,
+        "cuda_available": cuda_available,
+        "cuda_runtime": torch.version.cuda,
+        "gpu": torch.cuda.get_device_name(0) if cuda_available else None,
+    }
     try:
         store = get_visual_store()
         return {
@@ -92,7 +157,23 @@ def get_visual_status() -> dict:
             "page_count": len(store.pages),
             "model": store.manifest.get("model"),
             "device": _device(),
+            "scope": store.manifest.get("scope"),
+            "model_prefetched": VISUAL_MODEL_READY_PATH.exists(),
+            "hardware": hardware,
             "error": None,
         }
-    except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
-        return {"ready": False, "page_count": 0, "model": COLVISION_MODEL, "device": _device(), "error": str(exc)}
+    except (FileNotFoundError, ValueError, OSError, RuntimeError, ImportError, json.JSONDecodeError) as exc:
+        try:
+            device = _device()
+        except RuntimeError:
+            device = COLVISION_DEVICE
+        return {
+            "ready": False,
+            "page_count": 0,
+            "model": COLVISION_MODEL,
+            "device": device,
+            "scope": VISUAL_RAG_SCOPE,
+            "model_prefetched": VISUAL_MODEL_READY_PATH.exists(),
+            "hardware": hardware,
+            "error": str(exc),
+        }

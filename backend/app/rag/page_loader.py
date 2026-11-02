@@ -7,7 +7,16 @@ from app.rag.chunker import chunk_text
 from app.rag.manifest import document_id
 
 
-def load_corpus(docs_dir: Path, image_dir: Path, *, render_images: bool, render_dpi: int = 144) -> tuple[list[dict], list[dict]]:
+def load_corpus(
+    docs_dir: Path,
+    image_dir: Path,
+    *,
+    render_images: bool,
+    render_dpi: int = 144,
+    visual_scope: str = "scanned",
+) -> tuple[list[dict], list[dict]]:
+    if visual_scope not in {"scanned", "all"}:
+        raise ValueError("visual_scope must be 'scanned' or 'all'.")
     pages: list[dict] = []
     chunks: list[dict] = []
     if render_images:
@@ -16,7 +25,7 @@ def load_corpus(docs_dir: Path, image_dir: Path, *, render_images: bool, render_
     for path in sorted(item for item in docs_dir.iterdir() if item.is_file()):
         suffix = path.suffix.lower()
         if suffix == ".pdf":
-            pdf_pages, pdf_chunks = _load_pdf(path, image_dir, render_images, render_dpi)
+            pdf_pages, pdf_chunks = _load_pdf(path, image_dir, render_images, render_dpi, visual_scope)
             pages.extend(pdf_pages)
             chunks.extend(pdf_chunks)
         elif suffix == ".csv" or _looks_like_csv(path):
@@ -24,7 +33,13 @@ def load_corpus(docs_dir: Path, image_dir: Path, *, render_images: bool, render_
     return pages, chunks
 
 
-def _load_pdf(path: Path, image_dir: Path, render_images: bool, render_dpi: int) -> tuple[list[dict], list[dict]]:
+def _load_pdf(
+    path: Path,
+    image_dir: Path,
+    render_images: bool,
+    render_dpi: int,
+    visual_scope: str,
+) -> tuple[list[dict], list[dict]]:
     doc_id = document_id(path)
     page_records: list[dict] = []
     chunk_records: list[dict] = []
@@ -34,7 +49,8 @@ def _load_pdf(path: Path, image_dir: Path, render_images: bool, render_dpi: int)
             page_id = f"{doc_id}-p{page_number:04d}"
             text = page.get_text("text").strip()
             image_rel = None
-            if render_images:
+            should_render = render_images and (visual_scope == "all" or not text)
+            if should_render:
                 image_name = f"{page_id}.png"
                 image_path = image_dir / image_name
                 pixmap = page.get_pixmap(dpi=render_dpi, alpha=False)
@@ -49,6 +65,7 @@ def _load_pdf(path: Path, image_dir: Path, render_images: bool, render_dpi: int)
                 "text": text,
                 "image_path": image_rel,
                 "document_type": "pdf_page",
+                "is_scanned": not bool(text),
             })
             for chunk_index, value in enumerate(chunk_text(text)):
                 chunk_records.append({

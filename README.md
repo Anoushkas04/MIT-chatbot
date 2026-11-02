@@ -184,6 +184,7 @@ graph TD
    # Laptop-safe ColPali-family visual retrieval. The first enabled run
    # downloads the checkpoint; HF_TOKEN is recommended.
    VISUAL_RAG_ENABLED=false
+   VISUAL_RAG_SCOPE=scanned
    COLVISION_MODEL=vidore/colSmol-500M
    HF_TOKEN=
    ```
@@ -191,7 +192,17 @@ graph TD
    ```bash
    python -m app.rag.ingest
    ```
-   To include scanned pages, set `VISUAL_RAG_ENABLED=true` before ingestion.
+   Prefetch the visual model with a Hugging Face read token before enabling it:
+   ```bash
+   python -m app.rag.prefetch_visual_model --max-workers 1 --timeout 300
+   ```
+   On an NVIDIA Windows machine, install the CUDA wheel selected at
+   `https://pytorch.org/get-started/locally/` and verify that
+   `python -c "import torch; print(torch.cuda.is_available())"` prints `True`.
+   Then set `VISUAL_RAG_ENABLED=true` and `COLVISION_LOCAL_FILES_ONLY=true`
+   before ingestion. `VISUAL_RAG_SCOPE=scanned` renders only pages without
+   extractable text (53 pages in the current corpus); use `all` only on a
+   workstation intended to index all 1,736 pages.
    The visual build uses the Sentence Transformers v6 multi-vector interface
    and ColPali-style late-interaction retrieval. On CPU-only systems, build it
    deliberately because the 1,736-page corpus is expensive.

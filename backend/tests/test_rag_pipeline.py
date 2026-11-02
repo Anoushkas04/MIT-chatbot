@@ -28,6 +28,62 @@ def test_page_loader_preserves_pdf_page_metadata(tmp_path):
     assert chunks[0]["page_id"] == pages[0]["page_id"]
 
 
+def test_scanned_scope_renders_only_pages_without_text(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    path = docs / "mixed.pdf"
+    with fitz.open() as document:
+        text_page = document.new_page()
+        text_page.insert_text(
+            (72, 72),
+            "This text page is intentionally long enough to become a normal searchable text chunk in the index.",
+        )
+        document.new_page()
+        document.save(path)
+
+    pages, _ = load_corpus(
+        docs,
+        tmp_path / "images",
+        render_images=True,
+        render_dpi=72,
+        visual_scope="scanned",
+    )
+    assert pages[0]["image_path"] is None
+    assert pages[0]["is_scanned"] is False
+    assert pages[1]["image_path"].endswith("p0002.png")
+    assert pages[1]["is_scanned"] is True
+
+
+def test_visual_metadata_tokens_handle_years_and_cs_alias():
+    from app.rag.visual_store import _metadata_tokens
+
+    query = _metadata_tokens("first year computer science BTech subjects 2026")
+    source = _metadata_tokens("First year CS 2026 B.Tech.pdf")
+    assert {"first", "year", "cs", "26"}.issubset(query.intersection(source))
+
+
+def test_hybrid_promotes_stronger_scanned_source_metadata(monkeypatch):
+    from types import SimpleNamespace
+    import app.rag.hybrid as hybrid
+
+    text_hit = {"id": "text-1", "source": "general-handbook.pdf", "text": "academic calendar", "score": 1.0}
+    visual_hit = {
+        "id": "visual-1", "page_id": "visual-1", "source": "Academic Calendar 26-27.pdf",
+        "page_number": 1, "text": "", "image_path": "page_images/calendar.png", "score": 20.0,
+        "metadata_matches": 4,
+    }
+    monkeypatch.setattr(hybrid, "embed_query", lambda query: [0.0])
+    monkeypatch.setattr(hybrid, "get_store", lambda: SimpleNamespace(search=lambda *args, **kwargs: [text_hit]))
+    monkeypatch.setattr(hybrid, "get_keyword_store", lambda: SimpleNamespace(search=lambda *args, **kwargs: [text_hit]))
+    monkeypatch.setattr(hybrid, "get_visual_store", lambda: SimpleNamespace(search=lambda *args, **kwargs: [visual_hit]))
+    monkeypatch.setattr(hybrid, "VISUAL_RAG_ENABLED", True)
+
+    results = hybrid.hybrid_search("What dates are in Academic Calendar 2026-27?", final_k=2)
+    assert results[0]["source"] == "Academic Calendar 26-27.pdf"
+    assert results[0]["promoted_visual"] is True
+    assert results[0]["score"] == 1.0
+
+
 def test_local_provider_returns_evidence_markers():
     result = LocalProvider().generate(GenerationRequest(
         question="What attendance is required?",
@@ -35,6 +91,16 @@ def test_local_provider_returns_evidence_markers():
         evidence=[{"text": "Students require 75 percent attendance."}],
     ))
     assert "75 percent" in result.text
+    assert "[E1]" in result.text
+
+
+def test_local_provider_is_honest_about_visual_only_evidence():
+    result = LocalProvider().generate(GenerationRequest(
+        question="What date is shown?",
+        system_prompt="",
+        evidence=[{"text": "", "image_path": "page_images/calendar.png"}],
+    ))
+    assert "cannot interpret" in result.text
     assert "[E1]" in result.text
 
 

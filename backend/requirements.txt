@@ -8,7 +8,7 @@ sqlalchemy>=2.0,<3
 
 # Page-aware hybrid RAG and ColPali-family visual retrieval.
 PyMuPDF>=1.26,<2
-Pillow>=10,<13
+Pillow>=10,<14
 rank-bm25>=0.2,<0.3
 sentence-transformers[image]>=6,<7
 peft>=0.17,<1

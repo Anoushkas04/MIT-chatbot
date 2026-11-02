@@ -17,6 +17,7 @@ from app.config import (
     EMBEDDING_MODEL,
     RAG_RENDER_DPI,
     VISUAL_RAG_ENABLED,
+    VISUAL_RAG_SCOPE,
 )
 from app.llm import embed_texts
 from app.rag.manifest import build_manifest, write_manifest
@@ -49,6 +50,7 @@ def run_ingestion(progress_callback=None) -> dict:
             image_dir,
             render_images=VISUAL_RAG_ENABLED,
             render_dpi=RAG_RENDER_DPI,
+            visual_scope=VISUAL_RAG_SCOPE,
         )
         if not records:
             raise RuntimeError(f"No extractable text or CSV rows found in {DOCS_DIR}.")
@@ -72,6 +74,8 @@ def run_ingestion(progress_callback=None) -> dict:
         manifest["page_count"] = len(pages)
         manifest["text_chunk_count"] = len(records)
         manifest["scanned_page_count"] = sum(not page.get("text") for page in pages)
+        manifest["visual_scope"] = VISUAL_RAG_SCOPE
+        manifest["visual_page_count"] = sum(bool(page.get("image_path")) for page in pages)
         write_manifest(temp_path / "manifest.json", manifest)
 
         progress(65, "Replacing the validated text index")

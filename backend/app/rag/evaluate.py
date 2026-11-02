@@ -18,12 +18,23 @@ def run_evaluation(path: Path = DEFAULT_FIXTURE) -> dict:
         passed = case["expected_source"] in sources
         results.append({"id": case["id"], "passed": passed, "sources": sources})
     passed = sum(result["passed"] for result in results)
+    modality_metrics = {}
+    for modality in sorted({case["modality"] for case in evaluated}):
+        ids = {case["id"] for case in evaluated if case["modality"] == modality}
+        subset = [result for result in results if result["id"] in ids]
+        subset_passed = sum(result["passed"] for result in subset)
+        modality_metrics[modality] = {
+            "evaluated": len(subset),
+            "passed": subset_passed,
+            "recall_at_final_k": round(subset_passed / len(subset), 4) if subset else 0.0,
+        }
     return {
         "total_fixtures": len(cases),
         "evaluated": len(results),
         "skipped_visual": len(cases) - len(results),
         "passed": passed,
         "recall_at_final_k": round(passed / len(results), 4) if results else 0.0,
+        "by_modality": modality_metrics,
         "failures": [result for result in results if not result["passed"]],
     }
 

@@ -30,6 +30,10 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
 VISUAL_RAG_ENABLED = os.environ.get("VISUAL_RAG_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 COLVISION_MODEL = os.environ.get("COLVISION_MODEL", "vidore/colSmol-500M")
 COLVISION_DEVICE = os.environ.get("COLVISION_DEVICE", "auto").strip().lower()
+COLVISION_LOCAL_FILES_ONLY = os.environ.get("COLVISION_LOCAL_FILES_ONLY", "false").strip().lower() in {"1", "true", "yes", "on"}
+VISUAL_RAG_SCOPE = os.environ.get("VISUAL_RAG_SCOPE", "scanned").strip().lower()
+if VISUAL_RAG_SCOPE not in {"scanned", "all"}:
+    raise ValueError("VISUAL_RAG_SCOPE must be 'scanned' or 'all'.")
 RAG_TOP_K_VISUAL = int(os.environ.get("RAG_TOP_K_VISUAL", "8"))
 RAG_TOP_K_TEXT = int(os.environ.get("RAG_TOP_K_TEXT", "12"))
 RAG_FINAL_K = int(os.environ.get("RAG_FINAL_K", "4"))

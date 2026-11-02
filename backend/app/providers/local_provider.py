@@ -9,6 +9,15 @@ class LocalProvider(Provider):
     model = "extractive-evidence-v1"
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
+        if request.evidence and request.evidence[0].get("image_path") and not request.evidence[0].get("text"):
+            return GenerationResult(
+                text=(
+                    "I found a relevant scanned page [E1], but local extractive mode cannot interpret "
+                    "the page image. Configure an OpenAI, Anthropic, or Gemini API key to answer from it."
+                ),
+                provider=self.name,
+                model=self.model,
+            )
         terms = {
             word for word in re.findall(r"[a-z0-9]+", request.question.lower())
             if len(word) > 2 and word not in {"what", "where", "when", "which", "with", "the", "for"}
@@ -23,7 +32,14 @@ class LocalProvider(Provider):
         candidates.sort(reverse=True)
         selected = [candidate for candidate in candidates if candidate[0] > 0][:2] or candidates[:1]
         if not selected:
-            text = NO_EVIDENCE_MESSAGE
+            visual = next((index for index, item in enumerate(request.evidence, start=1) if item.get("image_path")), None)
+            if visual:
+                text = (
+                    f"I found a relevant scanned page [E{visual}], but local extractive mode cannot interpret "
+                    "the page image. Configure an OpenAI, Anthropic, or Gemini API key to answer from it."
+                )
+            else:
+                text = NO_EVIDENCE_MESSAGE
         else:
             excerpts = []
             for _, index, value in selected:
