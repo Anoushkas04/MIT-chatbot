@@ -189,18 +189,19 @@ graph TD
 
 ---
 
-### 2. Frontend Setup
+### 2. Integrated Next.js Frontend Setup
 
 1. In a new terminal, navigate to `frontend`:
    ```bash
-   cd frontend
+   cd frontend-next
    ```
 2. Install Dependencies & Start Dev Server:
    ```bash
    npm install
    npm run dev
    ```
-3. Open `http://localhost:5173` in your browser!
+3. Open `http://localhost:3000` in your browser. The earlier Vite client remains
+   in `frontend/` for reference while the integration is reviewed in batches.
 
 ---
 

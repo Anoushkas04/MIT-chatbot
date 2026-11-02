@@ -27,7 +27,7 @@ cp .env.example .env   # then fill in the variables below
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Google Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)) for chat generation and embeddings. |
+| `GEMINI_API_KEY` | No | Google Gemini key for generated answers and embeddings. Without it, the backend uses deterministic local embeddings and extractive, evidence-only answers. |
 | `GEMINI_MODEL` / `CHAT_MODEL` | No | Overrides the chat model (default `gemini-flash-latest`). |
 | `EMBEDDING_MODEL` | No | Overrides the embedding model (default `gemini-embedding-001`). |
 | `TOP_K`, `HIGH_CONFIDENCE_THRESHOLD`, `MAX_HISTORY_TURNS` | No | RAG/chat tuning knobs, see `app/config.py`. |
@@ -45,7 +45,7 @@ python -m app.rag.ingest
 ```
 
 This reads every PDF/CSV in `minor_project_docs`, chunks and embeds the text via
-Gemini, and writes `data/chunks.json` + `data/embeddings.npy`. If the Gemini
+Gemini, and atomically replaces `data/chunks.json` + `data/embeddings.npy`. If the Gemini
 embedding quota is exhausted (free tier is 1000 requests/day) it falls back to
 a local deterministic hash embedding so the app keeps working — retrieval
 quality is noticeably lower in that mode; re-run ingest once quota resets.
@@ -69,12 +69,16 @@ check; interactive API docs at `http://localhost:8000/docs`.
 | `/api/chat` | `chat_router.py` | RAG copilot chat, source citations |
 | `/api/academic` | `academic_router.py` | Academic calendar, timeline, cutoff ranks |
 | `/api/faculty` | `faculty_router.py` | Faculty & cabin directory |
-| `/api/posts` | `community_router.py` | Student community posts, votes, comments |
+| `/api/community` | `community_router.py` | Student community posts, votes, comments |
 | `/api/notifications` | `notifications_router.py` | Notification center, popups |
 | `/api/feedback` | `feedback_router.py` | Crowdsourced feedback / learning signals |
 | `/api/admin` | `admin_router.py` | Admin console (analytics, users, moderation, events) |
 | `/api/rewards` | `rewards_router.py` | Student reputation, badges, leaderboard |
 | `/api/search` | `search_router.py` | Global multi-domain search |
+
+`POST /api/admin/reindex` starts a protected background reindex job and
+`GET /api/admin/reindex/status` reports its progress, result, or failure. The
+previous index stays readable until replacement files are ready.
 
 ## Authentication: Learner ID → institutional email → OTP
 

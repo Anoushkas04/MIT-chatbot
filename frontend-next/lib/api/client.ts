@@ -3,8 +3,12 @@ import type { ApiErrorBody } from "./types";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_GET_RETRIES = 1;
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+}
+
+export function resolveApiUrl(path: string): string {
+  return `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export class ApiError extends Error {

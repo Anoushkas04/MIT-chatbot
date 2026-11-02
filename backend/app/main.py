@@ -10,7 +10,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.seed import seed_database
-from app.rag.store import get_store
+from app.rag.store import get_store_status
 
 # Import all modular APIRouters
 from app.routers.auth_router import router as auth_router
@@ -77,10 +77,13 @@ def root():
 
 @app.get("/api/health", tags=["0. System Health"])
 def health():
+    rag = get_store_status()
     return {
         "status": "ok",
         "platform": "MIT CampusOS",
-        "rag_store_ready": True,
+        "rag_store_ready": rag["ready"],
+        "rag_chunk_count": rag["chunk_count"],
+        "rag_error": rag["error"],
         "docs_url": "http://localhost:8000/docs",
     }
 

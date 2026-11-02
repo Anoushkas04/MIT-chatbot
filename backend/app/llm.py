@@ -1,4 +1,5 @@
 import hashlib
+import re
 import time
 import numpy as np
 
@@ -61,7 +62,7 @@ def _hash_embed(text: str, dim: int = 768) -> list[float]:
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     if not is_valid_key(GEMINI_API_KEY):
-        print("ℹ️  No GEMINI_API_KEY — using local hash embeddings (add key for Gemini embeddings).")
+        print("No GEMINI_API_KEY - using local hash embeddings (add a key for Gemini embeddings).")
         return [_hash_embed(t) for t in texts]
     try:
         client = get_client()
@@ -72,7 +73,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
             vectors.extend(_embed_batch_with_retry(client, batch))
         return vectors
     except Exception as err:
-        print(f"⚠️ Gemini Embedding API Notice: {err}. Using local feature hash embeddings.")
+        print(f"Gemini embedding notice: {err}. Using local feature hash embeddings.")
         return [_hash_embed(t) for t in texts]
 
 
@@ -99,136 +100,40 @@ def embed_query(text: str) -> list[float]:
 
 
 def synthesize_local_concise_answer(message: str, kb_part: str) -> str:
-    """Synthesizes a clean, concise, intent-focused response from retrieved context
-
-    without dumping raw vector chunks, PDF headers, or handbook metadata.
-    """
-    msg_lower = message.lower()
-
-    # 0. Check for Student Community Discussion matches in context
-    if "Student Community Discussion:" in kb_part or "[Source (COMMUNITY):" in kb_part:
-        comm_lines = []
-        for block in kb_part.split("[Source"):
-            if "Student Community Discussion:" in block or "COMMUNITY" in block:
-                # Extract clean lines
-                lines = [l.strip() for l in block.split("\n") if l.strip()]
-                for l in lines:
-                    if l.startswith("Community Question by") or l.startswith("Question Context:") or l.startswith("• "):
-                        comm_lines.append(l)
-
-        if comm_lines:
-            extracted_ans = "\n".join(comm_lines[:4])
-            return (
-                f"Based on **Student Community Insights (`r/Manipal_Academics` consensus)**:\n\n"
-                f"{extracted_ans}\n\n"
-                f"*(Verified peer experience from MIT Manipal senior students).* "
-            )
-
-    # 1. Branch / Programs Query
-    if any(w in msg_lower for w in ["branch", "branches", "course", "courses", "program", "programs", "discipline"]):
-        return (
-            "MIT Manipal offers B.Tech undergraduate programs across major engineering disciplines, including:\n\n"
-            "• **Computer Science & Engineering (CSE)** (along with AI & ML, Data Science)\n"
-            "• **Information Technology (IT)** & **Computer & Communication (CCE)**\n"
-            "• **Electronics & Communication (ECE)** & **Electrical & Electronics (EEE)**\n"
-            "• **Mechanical Engineering**, **Mechatronics**, **Automobile**, & **Aeronautical**\n"
-            "• **Civil Engineering**, **Chemical Engineering**, & **Biotechnology**\n"
-            "• **Biomedical Engineering** & **Industrial Production**\n\n"
-            "*(Would you like cutoff ranks or admission eligibility for a specific branch?)*"
-        )
-
-    # 2. Fee / Tuition Query
-    if any(w in msg_lower for w in ["fee", "fees", "tuition", "cost", "charge"]):
-        return (
-            "Based on official MAHE MIT Manipal guidelines, here is the fee structure summary:\n\n"
-            "• **B.Tech Annual Tuition Fee**: Approx. ₹3.35 Lakhs – ₹4.85 Lakhs per year (varying by specialization).\n"
-            "• **Hostel & Mess Charges**: Approx. ₹1.20 Lakhs – ₹1.80 Lakhs annually (depending on AC/Non-AC preference).\n"
-            "• **Caution Deposit**: ₹10,000 (Refundable one-time deposit).\n\n"
-            "*(Detailed installment schedules are accessible via the SLCM Student Portal).* "
-        )
-
-    # 3. Hostel Registration & Issues Query
-    if any(w in msg_lower for w in ["hostel", "room", "frustrated", "broken"]):
-        return (
-            "Hostel booking & registration details for MIT Manipal:\n\n"
-            "• **Hostel Portal**: Accessible via SLCM / Hostels Portal during designated counseling windows.\n"
-            "• **Warden Desk Support**: Chief Warden Office (Block 5 near Student Care Clinic) operates 9:00 AM – 7:30 PM for manual verification.\n"
-            "• **Common Resolution**: Server timeouts during peak registration hours usually resolve by 8:00 PM. If your payment or room choice is pending, visit Block 5 Chief Warden desk.\n\n"
-            "*(Note: High-frequency hostel registration issues are automatically logged into the Admin Knowledge Gap queue for investigation).* "
-        )
-
-    # 4. Documents / Registration Procedure Query
-    if any(w in msg_lower for w in ["document", "documents", "reporting"]):
-        return (
-            "For physical reporting and course registration at MIT Manipal, the following verified documents are required:\n\n"
-            "1. **MAHE Admission Allotment Letter** & MET Scorecard\n"
-            "2. **Class 10 & Class 12 Original Marksheets** and Passing Certificates\n"
-            "3. **Transfer Certificate (TC)** and Conduct/Migration Certificate\n"
-            "4. **Aadhar Card Copy** / Passport copy for international students\n"
-            "5. **Recent Passport Photographs** (6 copies) & Signed Medical Fitness Certificate\n\n"
-            "*(Ensure originals and 2 self-attested photocopies are carried during verification).* "
-        )
-
-    # 5. Student Community / Mess Query
-    if any(w in msg_lower for w in ["mess", "food", "canteen"]):
-        return (
-            "Based on student community feedback & consensus across campus mess halls:\n\n"
-            "• **FC-1 (Food Court 1)**: Highly recommended for North Indian meal menu & Sunday specials.\n"
-            "• **Block 17 South Indian Mess**: Preferred for fresh Dosa breakfast and filter coffee.\n"
-            "• **Timings**: Breakfast (7:30–9:30 AM), Lunch (12:00–2:00 PM), Dinner (7:30–9:30 PM).\n\n"
-            "*(Entry closes strictly 15 minutes before closing time).* "
-        )
-
-    # 6. Knowledge Gaps / Data Deficit Query
-    if any(w in msg_lower for w in ["not have enough data", "knowledge gap", "data about"]):
-        return (
-            "Based on live system analytics, the top active knowledge gaps currently under verification are:\n\n"
-            "1. **Hostel Registration Portal Timeout Extensions** (High student query volume)\n"
-            "2. **AB5 3rd Floor Compute Lab GPU Reservation Rules**\n"
-            "3. **Block 17 Gym Subscription & Evening Hours Update**\n\n"
-            "*(Administrators can review and verify these items directly in the Admin Console).* "
-        )
-
-    # 7. Exam / Calendar / Date Query
-    if any(w in msg_lower for w in ["exam", "exams", "schedule", "calendar", "mid-sem", "end-sem", "start", "date"]):
-        date_lines = []
-        for line in kb_part.split("\n"):
-            line_str = line.strip()
-            if any(k in line_str.lower() for k in ["exam", "semester", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "january", "february"]):
-                if len(line_str) > 10 and not line_str.startswith("[Source"):
-                    date_lines.append(line_str)
-        
-        if date_lines:
-            summary = "\n".join([f"• {l}" for l in date_lines[:4]])
-            return (
-                f"According to the official MIT Manipal Academic Calendar:\n\n"
-                f"{summary}\n\n"
-                f"*(Be sure to check SLCM for official room allotments prior to examination week).* "
-            )
-
-    # 8. Faculty / HOD Query
-    if any(w in msg_lower for w in ["hod", "head", "professor", "cabin", "faculty"]):
-        lines = [l.strip() for l in kb_part.split("\n") if l.strip() and not l.startswith("[Source")]
-        relevant = [l for l in lines if any(k in l.lower() for k in ["dept", "department", "cabin", "prof", "dr", "hod", "head"])]
-        if relevant:
-            res = "\n".join([f"• {r}" for r in relevant[:3]])
-            return f"Official Faculty & Cabin details:\n\n{res}"
-
-    # 9. Default General Relevance Extraction
-    clean_lines = []
-    for line in kb_part.split("\n"):
-        l = line.strip()
-        if not l or l.startswith("[Source") or l.startswith("Grounding") or len(l) < 15:
+    """Create a conservative extractive answer using retrieved evidence only."""
+    clean_lines: list[str] = []
+    for raw_line in kb_part.splitlines():
+        line = raw_line.strip()
+        if (
+            not line
+            or line.startswith("[Source")
+            or line.startswith("Grounding")
+            or line.startswith("---")
+            or len(line) < 12
+        ):
             continue
-        clean_lines.append(l)
+        clean_lines.append(line)
 
-    if clean_lines:
-        extracted = " ".join(clean_lines[:3])
-        if len(extracted) > 350:
-            extracted = extracted[:350] + "..."
-        return f"{extracted}"
+    if not clean_lines:
+        return (
+            "I could not find enough indexed evidence to answer that reliably. "
+            "Try a more specific question or ask the student community."
+        )
 
-    return "Information grounded in official MAHE MIT records. Request specific details if needed."
+    query_terms = {
+        word for word in re.findall(r"\w+", message.lower())
+        if len(word) > 2 and word not in {"where", "what", "when", "which", "with", "find", "can", "the", "for"}
+    }
+    ranked = sorted(
+        clean_lines,
+        key=lambda line: sum(term in line.lower() for term in query_terms),
+        reverse=True,
+    )
+    relevant = [line for line in ranked if any(term in line.lower() for term in query_terms)]
+    evidence = " ".join((relevant or ranked)[:3])
+    if len(evidence) > 700:
+        evidence = evidence[:697].rstrip() + "..."
+    return f"Based on the retrieved campus sources: {evidence}"
 
 
 def chat(system_instruction: str, history: list[dict], message: str) -> str:
@@ -257,7 +162,7 @@ def chat(system_instruction: str, history: list[dict], message: str) -> str:
         )
         return response.text
     except Exception as err:
-        print(f"⚠️ Gemini API Call Exception: {err}")
+        print(f"Gemini API call exception: {err}")
         if "RETRIEVED KNOWLEDGE BASE:\n" in system_instruction:
             kb_part = system_instruction.split("RETRIEVED KNOWLEDGE BASE:\n")[1].strip()
             if kb_part and kb_part != "No direct match found in indexed vector knowledge base.":

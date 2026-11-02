@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   ArrowUpRight,
   Bell,
@@ -15,16 +15,13 @@ import {
   Flame,
   GraduationCap,
   Heart,
-  HelpCircle,
   LayoutDashboard,
   Lightbulb,
   Menu,
   MessageCircle,
   MoreHorizontal,
-  Paperclip,
   Plus,
   Search,
-  Send,
   Settings,
   Sparkles,
   Users,
@@ -32,6 +29,9 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConnectionStatus } from '@/components/system/connection-status'
+import { ChatView } from '@/components/chat/chat-view'
+import { HomeView } from '@/components/dashboard/home-view'
+import { SearchView } from '@/components/search/search-view'
 
 const navItems = [
   { label: 'Home', icon: LayoutDashboard },
@@ -47,11 +47,6 @@ const discoveries = [
   { title: 'Design Thinking Workshop', type: 'Workshop', meta: 'Nov 02 · Student Plaza', tone: 'yellow', icon: Sparkles, why: 'Based on your saved events' },
 ]
 
-const searchResults = [
-  { title: 'Academic Regulations 2025–26', kind: 'Official document', excerpt: 'Rules governing attendance, examinations, grading and academic progression.', icon: FileText },
-  { title: 'How do I apply for a bonafide certificate?', kind: 'Campus procedure', excerpt: 'A step-by-step guide from the Student Affairs office, updated Aug 2026.', icon: HelpCircle },
-  { title: 'End semester examination schedule', kind: 'Notice · Examination Cell', excerpt: 'B.Tech III & V semester end semester examinations begin December 01.', icon: CalendarDays },
-]
 
 function Logo({ light = false }: { light?: boolean }) {
   return <div className={`brand ${light ? 'brand-light' : ''}`}><span className="brand-mark">M</span><span>MIT<span className="brand-accent">ra</span></span></div>
@@ -80,15 +75,6 @@ function Sidebar({ active, setActive, onLogout }: { active: string; setActive: (
   return <aside className="sidebar"><div className="sidebar-top"><Logo /><button className="mobile-menu"><Menu /></button></div><div className="profile-mini"><div className="profile-avatar">G</div><div><strong>Guest</strong><span>Integration preview</span></div><MoreHorizontal /></div><nav className="side-nav">{navItems.map(item => <button key={item.label} className={active === item.label ? 'active' : ''} onClick={() => setActive(item.label)}><item.icon /><span>{item.label}</span>{item.label === 'Ask MITra' && <span className="nav-badge">Preview</span>}</button>)}</nav><div className="sidebar-section"><span className="side-label">SAVED</span><button onClick={() => setActive('Discover')}><Heart /><span>Saved for later</span><small>Local</small></button><button onClick={() => setActive('Planner')}><Bell /><span>Notifications</span><small className="alert-dot" /></button></div><div className="sidebar-bottom"><ConnectionStatus /><button onClick={() => setActive('Settings')}><Settings /><span>Settings</span></button><button onClick={onLogout}><span className="profile-avatar small">G</span><span>Exit guest mode</span><ArrowUpRight /></button></div></aside>
 }
 
-function HomeView({ setActive }: { setActive: (v: string) => void }) {
-  return <div className="view"><div className="view-header"><div><p className="section-kicker">GUEST WORKSPACE</p><h1>Welcome to MITra <span>✦</span></h1><p className="view-sub">Explore the new frontend while it is connected to the CampusOS backend.</p></div><div className="header-actions"><button className="icon-button"><Bell /><i /></button><div className="header-avatar">G</div></div></div><div className="search-bar" onClick={() => setActive('Search')}><Search /><span>Search campus, courses, events, anything...</span><kbd>⌘ K</kbd></div><div className="home-grid"><section className="ask-card"><div className="ask-glow" /><div className="ask-content"><div className="ai-avatar"><Sparkles /></div><p className="section-kicker">YOUR AI CAMPUS COMPANION</p><h2>What&apos;s on your mind?</h2><p>Ask about academics, campus life, events, or just get pointed in the right direction.</p><button className="ask-input" onClick={() => setActive('Ask MITra')}><span>Ask MITra anything...</span><Send /></button><div className="suggestions"><button onClick={() => setActive('Ask MITra')}>What can I do this weekend?</button><button onClick={() => setActive('Ask MITra')}>Explain attendance rules</button></div></div></section><section className="today-card"><div className="card-heading"><div><p className="section-kicker">PREVIEW DATA</p><h3>Today at a glance</h3></div><button onClick={() => setActive('Planner')}>View planner <ArrowUpRight /></button></div><div className="timeline"><div><time>10:00</time><span className="timeline-line blue-line" /><article><strong>Data Structures</strong><span>AB4 · Room 301</span></article></div><div><time>13:00</time><span className="timeline-line coral-line" /><article><strong>Lunch with team</strong><span>Food Court · Personal</span></article></div><div><time>16:30</time><span className="timeline-line yellow-line" /><article><strong>Club fair</strong><span>Student Plaza · 12 clubs</span></article></div></div></section></div><div className="section-row"><div><p className="section-kicker">CURATED PREVIEW</p><h2>Worth a look</h2></div><button className="link-button" onClick={() => setActive('Discover')}>See all discoveries <ArrowUpRight /></button></div><div className="discovery-grid">{discoveries.map(item => <DiscoveryCard key={item.title} item={item} />)}</div></div>
-}
-
-function DiscoveryCard({ item }: { item: typeof discoveries[number] }) { const Icon = item.icon; return <article className={`discovery-card ${item.tone}`}><div className="discovery-top"><span className="discovery-icon"><Icon /></span><button className="save-button"><Heart /></button></div><span className="pill">{item.type}</span><h3>{item.title}</h3><p>{item.meta}</p><div className="why"><Sparkles /> {item.why}</div></article> }
-
-function ChatView() { const [messages, setMessages] = useState([{ from: 'ai', text: 'Hi! I&apos;m MITra. This batch prepares the backend connection; live AI responses arrive in the next approved batch.', time: 'Preview' }]); const [draft, setDraft] = useState(''); const send = () => { if (!draft.trim()) return; setMessages([...messages, { from: 'user', text: draft, time: 'Now' }]); setDraft('') }; return <div className="chat-view"><div className="chat-head"><div><p className="section-kicker">MITRA ASSISTANT · PREVIEW</p><h1>Ask MITra</h1></div><button className="new-chat"><Plus /> New conversation</button></div><div className="chat-transcript">{messages.map((m, i) => <div key={i} className={`message-row ${m.from}`}><div className={`chat-avatar ${m.from}`}>{m.from === 'ai' ? <Sparkles /> : 'G'}</div><div className="message-body"><div className="message-bubble">{m.text}</div><time>{m.time}</time></div></div>)}</div><div className="chat-compose"><button className="compose-icon"><Paperclip /></button><input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) send() }} placeholder="Live AI integration starts in the next batch..." /><button className="send-button" onClick={send}><Send /></button></div><div className="chat-suggestions"><span>Preview prompts</span><button onClick={() => setDraft('How do I calculate my CGPA?')}>How do I calculate my CGPA?</button><button onClick={() => setDraft('What events are happening this week?')}>Events this week</button></div></div> }
-
-function SearchView() { const [query, setQuery] = useState(''); const results = useMemo(() => query ? searchResults.filter(r => `${r.title} ${r.excerpt}`.toLowerCase().includes(query.toLowerCase())) : searchResults, [query]); return <div className="search-view"><div className="view-header"><div><p className="section-kicker">CAMPUS KNOWLEDGE</p><h1>Search everything.</h1><p className="view-sub">Find verified answers across MIT Manipal.</p></div></div><div className="large-search"><Search /><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Try 'attendance rules' or 'clubs for designers'" /><button><Filter /> Filters</button></div><div className="search-meta"><span>{results.length} results · Verified sources</span><button>Most relevant <ChevronRight /></button></div><div className="result-list">{results.map(r => <article className="result-item" key={r.title}><span className="result-icon"><r.icon /></span><div><span className="result-kind">{r.kind}</span><h3>{r.title}</h3><p>{r.excerpt}</p><small><Check /> Verified source · Updated recently</small></div><ArrowUpRight /></article>)}</div></div> }
 
 function DiscoverView() { const [saved, setSaved] = useState<string[]>([]); return <div className="view"><div className="view-header"><div><p className="section-kicker">DISCOVER</p><h1>Find your next thing.</h1><p className="view-sub">Clubs, projects, events and opportunities selected for you.</p></div><Button variant="outline"><Filter data-icon="inline-start" /> Filter</Button></div><div className="discover-tabs"><button className="active">For you</button><button>Clubs</button><button>Projects</button><button>Events</button><button>Opportunities</button></div><div className="discover-list">{[...discoveries, { title: 'Product Lab · Student Innovation Cell', type: 'Project', meta: 'Rolling applications · 6 spots open', tone: 'green', icon: Users, why: 'A new way to explore your interests' }].map(item => <article className={`discover-row ${item.tone}`} key={item.title}><span className="discovery-icon"><item.icon /></span><div className="discover-info"><span className="pill">{item.type}</span><h3>{item.title}</h3><p>{item.meta}</p><div className="why"><Sparkles /> {item.why}</div></div><button className={`save-button ${saved.includes(item.title) ? 'saved' : ''}`} onClick={() => setSaved(saved.includes(item.title) ? saved.filter(x => x !== item.title) : [...saved, item.title])}>{saved.includes(item.title) ? <Check /> : <Heart />}</button><ArrowUpRight /></article>)}</div></div> }
 
