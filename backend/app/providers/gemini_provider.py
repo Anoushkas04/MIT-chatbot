@@ -1,7 +1,7 @@
 from google import genai
 from google.genai import types
 
-from app.config import GEMINI_API_KEY, GEMINI_MODEL
+from app.config import GEMINI_API_KEY, GEMINI_MODEL, LLM_TIMEOUT_SECONDS
 from app.providers.base import GenerationRequest, GenerationResult, Provider, evidence_text, image_payloads
 
 
@@ -10,7 +10,10 @@ class GeminiProvider(Provider):
     model = GEMINI_MODEL
 
     def __init__(self):
-        self.client = genai.Client(api_key=GEMINI_API_KEY)
+        self.client = genai.Client(
+            api_key=GEMINI_API_KEY,
+            http_options=types.HttpOptions(timeout=int(LLM_TIMEOUT_SECONDS * 1000)),
+        )
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         contents = [evidence_text(request)]

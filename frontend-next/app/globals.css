@@ -27,6 +27,7 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .inline-error svg { flex: 0 0 auto; width: 16px; }
 .inline-error button { align-items: center; background: none; border: 0; color: inherit; display: flex; font-weight: 700; gap: 4px; margin-left: auto; }
 .answer-meta { color: #7b8a81; font-size: 9px; text-transform: capitalize; }
+.message-bubble { overflow-wrap: anywhere; white-space: pre-wrap; }
 .citation-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .citation-row button { align-items: center; background: #edf4f1; border: 0; border-radius: 12px; color: #426a63; display: flex; font-size: 9px; gap: 4px; padding: 5px 8px; }
 .citation-row svg { width: 11px; }

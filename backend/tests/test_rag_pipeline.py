@@ -92,6 +92,37 @@ def test_local_provider_returns_evidence_markers():
     ))
     assert "75 percent" in result.text
     assert "[E1]" in result.text
+    assert not result.text.startswith("Based on the retrieved")
+
+
+def test_local_provider_selects_a_concise_relevant_sentence():
+    result = LocalProvider().generate(GenerationRequest(
+        question="What is the minimum attendance requirement?",
+        system_prompt="",
+        evidence=[{
+            "text": (
+                "This section describes the grading system and contains general introductory material. "
+                "Only students with a minimum attendance of 75% may appear for the end semester examination. "
+                "A separate rule explains grade-point calculations for completed courses."
+            ),
+        }],
+    ))
+    assert "minimum attendance of 75%" in result.text
+    assert "general introductory material" not in result.text
+    assert len(result.text) < 400
+
+
+def test_system_prompt_does_not_duplicate_raw_evidence():
+    from app.prompts import build_system_prompt
+
+    prompt = build_system_prompt(
+        role="student",
+        language="en",
+        context_chunks=[{"text": "RAW EVIDENCE MUST NOT BE DUPLICATED"}],
+    )
+    assert "RAW EVIDENCE MUST NOT BE DUPLICATED" not in prompt
+    assert "at most 120 words" in prompt
+    assert "supplied separately" in prompt
 
 
 def test_local_provider_is_honest_about_visual_only_evidence():
@@ -169,3 +200,50 @@ def test_gemini_adapter_uses_generate_content():
     result = provider.generate(_generation_request())
     assert result.text == "Rule [E1]"
     assert captured["contents"][0].endswith("do not guess.")
+
+
+def test_provider_failure_falls_back_to_grounded_local_answer(monkeypatch):
+    import app.providers.registry as registry
+
+    class FailingProvider:
+        name = "openai"
+
+        def generate(self, request):
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(registry, "get_provider", lambda: FailingProvider())
+    result = registry.generate_answer(_generation_request())
+    assert result.provider == "local"
+    assert "75 percent" in result.text
+    assert "[E1]" in result.text
+
+
+def test_relevance_filter_rejects_unrelated_high_score_result():
+    from app.routers.chat_router import filter_chunk_relevance
+
+    result = filter_chunk_relevance(
+        [{
+            "source": "Official Clubs Directory.pdf",
+            "text": "The official electronics club email address is club@example.edu.",
+            "score": 1.0,
+        }],
+        "What is the official MIT Manipal policy for teleportation portals?",
+        "simple_factual",
+    )
+    assert result == []
+
+
+def test_relevance_filter_keeps_visual_source_metadata_match():
+    from app.routers.chat_router import filter_chunk_relevance
+
+    result = filter_chunk_relevance(
+        [{
+            "source": "Academic Calendar 26-27.pdf",
+            "text": "",
+            "image_path": "page_images/calendar.png",
+            "score": 0.8,
+        }],
+        "What dates are in the academic calendar for 2026-27?",
+        "simple_factual",
+    )
+    assert result[0]["source"] == "Academic Calendar 26-27.pdf"

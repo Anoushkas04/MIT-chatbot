@@ -26,6 +26,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "90"))
 
 VISUAL_RAG_ENABLED = os.environ.get("VISUAL_RAG_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 COLVISION_MODEL = os.environ.get("COLVISION_MODEL", "vidore/colSmol-500M")

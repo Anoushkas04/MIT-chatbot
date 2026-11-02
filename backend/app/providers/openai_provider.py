@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from app.config import LLM_TIMEOUT_SECONDS, OPENAI_API_KEY, OPENAI_MODEL
 from app.providers.base import GenerationRequest, GenerationResult, Provider, evidence_text, image_payloads
 
 
@@ -9,7 +9,7 @@ class OpenAIProvider(Provider):
     model = OPENAI_MODEL
 
     def __init__(self):
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
+        self.client = OpenAI(api_key=OPENAI_API_KEY, timeout=LLM_TIMEOUT_SECONDS, max_retries=1)
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         content = [{"type": "input_text", "text": evidence_text(request)}]

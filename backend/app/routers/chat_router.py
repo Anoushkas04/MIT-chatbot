@@ -28,7 +28,8 @@ COMMON_STOPWORDS = {
     "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who",
     "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll",
     "you're", "you've", "your", "yours", "yourself", "yourselves", "tell", "show", "give", "list", "please",
-    "available", "right", "now"
+    "available", "right", "now", "official", "mit", "manipal", "mahe", "campus", "university",
+    "institution", "institutional", "policy", "information", "details"
 }
 
 ACADEMIC_KEYWORDS = {
@@ -177,7 +178,7 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
 
     filtered = []
     for m in vector_matches:
-        text = m.get("text", "").lower()
+        text = f"{m.get('source', '')} {m.get('text', '')}".lower()
         score = float(m.get("score", 0.0))
 
         # Check keyword/entity match count
@@ -188,16 +189,16 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
             if not any(b in q for b in ["book", "author", "textbook", "reference"]):
                 score *= 0.5
 
-        if match_count >= 1 or score > 0.35:
+        if match_count >= 1:
             m_copy = dict(m)
             m_copy["score"] = min(1.0, score + (match_count * 0.05))
             filtered.append(m_copy)
 
     filtered.sort(key=lambda x: x["score"], reverse=True)
-    return filtered[:4] if filtered else vector_matches[:3]
+    return filtered[:4]
 
 
-@router.post("", response_model=ChatResponse, summary="Query Gemini AI Copilot with RAG grounding")
+@router.post("", response_model=ChatResponse, summary="Query the configured AI provider with RAG grounding")
 def chat_query(req: ChatRequest):
     db = SessionLocal()
     try:

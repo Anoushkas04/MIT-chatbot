@@ -1,6 +1,6 @@
 import anthropic
 
-from app.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+from app.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, LLM_TIMEOUT_SECONDS
 from app.providers.base import GenerationRequest, GenerationResult, Provider, evidence_text, image_payloads
 
 
@@ -9,7 +9,11 @@ class AnthropicProvider(Provider):
     model = ANTHROPIC_MODEL
 
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        self.client = anthropic.Anthropic(
+            api_key=ANTHROPIC_API_KEY,
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=1,
+        )
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         content = [
