@@ -31,7 +31,11 @@ cp .env.example .env   # then fill in the variables below
 | `GEMINI_MODEL` / `CHAT_MODEL` | No | Overrides the chat model (default `gemini-flash-latest`). |
 | `EMBEDDING_MODEL` | No | Overrides the embedding model (default `gemini-embedding-001`). |
 | `TOP_K`, `HIGH_CONFIDENCE_THRESHOLD`, `MAX_HISTORY_TURNS` | No | RAG/chat tuning knobs, see `app/config.py`. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | No | Real OTP email delivery. See **Authentication** below for the fallback when these are unset. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | For real email | Supabase Auth sends and verifies OTP codes. See **Authentication** below. |
+| `SESSION_SECRET` | Yes (deployed) | Signs login tokens; without it, logins end on every restart. |
+| `DATABASE_URL` | For deployment | Postgres URL (Supabase). Empty = local SQLite `campus_os.db`. |
+| `AUTH_DEV_MODE` | No | `true` returns the OTP in the API response when Supabase is unset (local testing). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | No | Direct SMTP OTP delivery when Supabase isn't used. |
 
 Never commit real values for any of the above — `.env` is gitignored; only
 `.env.example` (with empty values) is tracked.
@@ -76,29 +80,60 @@ check; interactive API docs at `http://localhost:8000/docs`.
 | `/api/rewards` | `rewards_router.py` | Student reputation, badges, leaderboard |
 | `/api/search` | `search_router.py` | Global multi-domain search |
 
-## Authentication: Learner ID → institutional email → OTP
+## Authentication: Learner ID → email OTP (no passwords)
 
-A student's **Learner ID is their institutional email address** — the format
-is enforced by `LEARNER_ID_PATTERN` in `app/routers/auth_router.py`:
-`<name><optional-digit>.mitmpl<admission-year>@learner.manipal.edu`
-(e.g. `student.mitmpl2023@learner.manipal.edu`). There's no separate lookup —
-the ID the student types *is* the address the OTP is sent to.
+A student's **Learner ID is their institutional email address**
+(e.g. `student.mitmpl2023@learner.manipal.edu`); the OTP is sent there.
 
-Flow: `POST /api/auth/verify-learner-id` (validates format, generates a 6-digit
-OTP, hashes it before storing, sets a 10-minute expiry and 60-second resend
-cooldown) → `POST /api/auth/verify-otp` (checks hash/expiry/single-use, max 5
-attempts) → `POST /api/auth/register-complete` (9-digit registration number +
-password + terms acceptance creates the account) → `POST /api/auth/login`
-(password-based for returning users; OTP is only required once, at signup).
+**Register** (`AuthPage`): `POST /api/auth/register-send-otp` with name +
+registration number + Learner ID (validates the reg-no format and that its
+admission year matches the Learner ID, rejects already-registered details, emails
+a 6-digit code) → `POST /api/auth/register-verify-otp` with the code → account is
+created and a session token returned.
 
-**Development vs. production OTP delivery** (`app/email_service.py`):
+**Sign in**: `POST /api/auth/login-send-otp` with the registration number *or*
+Learner ID (code goes to the stored Learner ID) → `POST /api/auth/login-verify-otp`.
 
-- **Development** (no `SMTP_*` vars set): the OTP is printed to the backend
-  console/log instead of emailed, so signup works without any email
-  provider. Look for a block starting `[DEV MODE — SMTP NOT CONFIGURED]` in
-  the terminal running `uvicorn`.
-- **Production** (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD` set):
-  the OTP is emailed for real via SMTP and is never printed or logged.
+Rules (all in `app/routers/auth_router.py`, `_issue_otp` / `_verify_otp`): codes
+expire after 10 minutes, are single-use, allow 5 wrong attempts, and can be
+re-sent after 45 seconds. Session tokens are signed JWTs (`SESSION_SECRET`,
+7-day expiry), so logins survive restarts and serverless deploys.
+
+The older password-based endpoints used by `AuthModal` (`verify-learner-id`,
+`verify-otp`, `register-complete`, `login`) still work and share the same OTP checks.
+
+### Who sends and checks the codes
+
+| Setup | Behaviour |
+|---|---|
+| `SUPABASE_URL` + `SUPABASE_ANON_KEY` set | Supabase Auth generates, emails and verifies the code. |
+| Supabase unset, `SMTP_*` set | Backend generates the code and emails it over SMTP. |
+| Neither set | Code is printed to the uvicorn console. With `AUTH_DEV_MODE=true` it is also returned as `test_otp`, which the sign-in page displays. Local testing only. |
+
+### One-time Supabase + Gmail setup (free, no domain needed)
+
+1. **Gmail**: turn on 2-Step Verification, then create an App Password
+   (Google Account → Security → App passwords).
+2. **Supabase** → create a free project, then under **Authentication**:
+   - **Emails → SMTP Settings**: enable custom SMTP. Host `smtp.gmail.com`, port
+     `465`, username = your Gmail address, password = the App Password, sender
+     email = the same Gmail address. Set "Minimum interval between emails" to
+     45 seconds or less (the sign-in page allows a resend after 45s).
+   - **Emails → Templates**: in both **Magic Link** and **Confirm signup**, put
+     the code in the body, e.g. `Your MIT CampusOS code is {{ .Token }}`.
+     Without `{{ .Token }}` students get a link instead of a code.
+   - **Providers → Email**: email OTP length 6, expiry 600 seconds.
+   - **Rate limits**: raise "emails sent per hour" (the default is low).
+3. Copy **Project URL** and **anon key** (Project Settings → API) into
+   `SUPABASE_URL` / `SUPABASE_ANON_KEY`, and set `SESSION_SECRET`.
+4. For deployment (e.g. Vercel), set `DATABASE_URL` to the Supabase Postgres
+   pooler connection string so accounts persist; tables are created on startup.
+
+University mail servers can flag Gmail senders, so check spam/quarantine on the
+first test. **Switching to Resend later** (once you own a domain): verify the
+domain in Resend, then change only the Supabase SMTP settings to host
+`smtp.resend.com`, port `465`, username `resend`, password = Resend API key,
+sender `noreply@yourdomain`. No code changes.
 
 ## Self-check
 
@@ -114,9 +149,8 @@ python test_rag.py
 - Cutoff-rank PDFs are tabular; `pypdf` text extraction is naive and may mangle
   columns. Swap `rag/loaders.py`'s PDF path for `pdfplumber` if retrieval quality
   on those specific documents turns out to matter.
-- Conversation history and auth session tokens are in-memory and reset when
-  the server restarts (`app/session_memory.py`, `TOKENS_STORE` in
-  `auth_router.py`).
+- Chat conversation history is in-memory and resets when the server restarts
+  (`app/session_memory.py`). Login sessions are signed tokens and are not affected.
 - Password hashing (`hash_password` in `auth_router.py`) uses unsalted
   SHA-256, consistent with this codebase's existing conventions — swap for
   `bcrypt`/`argon2` before any real production deployment.

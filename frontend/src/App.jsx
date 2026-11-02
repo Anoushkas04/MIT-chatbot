@@ -27,10 +27,19 @@ import GlobalSearchModal from "./components/GlobalSearchModal";
 import AICommunityHandoffModal from "./components/AICommunityHandoffModal";
 import ReportContentModal from "./components/ReportContentModal";
 import Sidebar from "./components/Sidebar";
+import AuthPage from "./components/AuthPage";
+import LandingPage from "./components/LandingPage";
+import Logo from "./components/Logo";
 import "./App.css";
 
 function App() {
   const [activeTab, setActiveTab] = useState("student_corner"); // "student_corner" | "faculty_portal" | "parent_hub" | "admin_portal"
+  // Screen flow: "landing" | "auth" | "workspace"
+  const [screen, setScreen] = useState(() => {
+    const savedToken = localStorage.getItem("campus_token");
+    const savedUser = localStorage.getItem("campus_user");
+    return savedToken && savedUser ? "workspace" : "landing";
+  });
   // Auth & User State
   const [token, setToken] = useState(() => localStorage.getItem("campus_token") || null);
   const [user, setUser] = useState(() => {
@@ -170,13 +179,14 @@ function App() {
 
   const handleLoginSuccess = (userData, userToken) => {
     setUser(userData);
-    setToken(userToken);
+    const resolvedToken = userToken || localStorage.getItem("campus_token") || `token_${Date.now()}`;
+    setToken(resolvedToken);
     setRole(userData.role || "student");
     if (userData.department) setDepartment(userData.department);
     if (userData.academic_year) setAcademicYear(userData.academic_year);
     if (userData.semester) setSemester(userData.semester);
 
-    localStorage.setItem("campus_token", userToken);
+    localStorage.setItem("campus_token", resolvedToken);
     localStorage.setItem("campus_user", JSON.stringify(userData));
 
     if (userData.role === "student") setActiveTab("student_corner");
@@ -190,6 +200,7 @@ function App() {
     setToken(null);
     localStorage.removeItem("campus_token");
     localStorage.removeItem("campus_user");
+    setScreen("landing");
   };
 
   const handleMarkAllRead = async () => {
@@ -320,6 +331,23 @@ function App() {
     setMessages([]);
   };
 
+
+  // Screen-based routing: Landing → Auth → Workspace
+  if (screen === "landing") {
+    return <LandingPage onEnter={() => setScreen("auth")} />;
+  }
+
+  if (screen === "auth" || !user) {
+    return (
+      <AuthPage
+        onLoginSuccess={(userData, token) => {
+          handleLoginSuccess(userData, token);
+          setScreen("workspace");
+        }}
+      />
+    );
+  }
+
   return (
     <div className="platform-root">
       {/* Platform Navigation Bar */}
@@ -345,8 +373,30 @@ function App() {
 
       {/* Main Platform Body */}
       <main className="platform-body">
-        {/* Persistent Left Sidebar Navigation */}
-        <nav className="platform-sidebar" aria-label="Main navigation">
+        {/* Persistent Left Sidebar Navigation — Mitra Style */}
+        <nav className="platform-sidebar mitra-sidebar" aria-label="Main navigation">
+          {/* Logo at top */}
+          <div className="mitra-sb-top">
+            <Logo size="sm" />
+          </div>
+
+          {/* Profile mini-card */}
+          {user && (
+            <div className="mitra-profile-mini">
+              <div className="mitra-profile-avatar">
+                {user.avatar_icon
+                  ? <span style={{ fontSize: 16 }}>{user.avatar_icon}</span>
+                  : <span>{(user.name || "U").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()}</span>
+                }
+              </div>
+              <div className="mitra-profile-info">
+                <strong>{user.name?.split(" ")[0] || "Student"}</strong>
+                <span>{user.role} · {department?.split(" ")[0] || "MIT"}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation items */}
           <div className="sidebar-nav">
             <span className="sidebar-section-label">Workspaces</span>
             <button
@@ -397,17 +447,13 @@ function App() {
             </button>
           </div>
 
-          {user && (
-            <div className="sidebar-footer">
-              <div className="sidebar-user-block">
-                <span style={{ fontSize: "18px" }}>{user.avatar_icon || "👤"}</span>
-                <div>
-                  <div className="sidebar-user-name">{user.name}</div>
-                  <div className="sidebar-user-role">{user.role} · {department?.split(" ")[0] || "MIT"}</div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Sign out at bottom */}
+          <div className="mitra-sb-bottom">
+            <button className="mitra-signout-btn" onClick={handleLogout}>
+              <span className="nav-item-icon">↗</span>
+              Sign out
+            </button>
+          </div>
         </nav>
 
         {/* Stakeholder Workspace Panels */}

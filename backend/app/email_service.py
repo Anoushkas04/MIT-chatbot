@@ -4,6 +4,9 @@ import logging
 import traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+
+from app.email_templates import render_otp_email
 
 logger = logging.getLogger("email_service")
 
@@ -15,6 +18,7 @@ def get_smtp_config():
         "user": os.environ.get("SMTP_USER", "").strip(),
         "password": os.environ.get("SMTP_PASSWORD", "").strip(),
         "from_email": os.environ.get("SMTP_FROM", os.environ.get("SMTP_USER", "")).strip() or "noreply@manipal.edu",
+        "from_name": os.environ.get("SMTP_FROM_NAME", "MITra").strip(),
     }
 
 
@@ -23,9 +27,10 @@ def is_smtp_configured() -> bool:
     return bool(config["host"] and config["user"] and config["password"])
 
 
-def send_otp_email(to_email: str, otp_code: str) -> dict:
+def send_otp_email(to_email: str, otp_code: str, purpose: str = "signup", name: str = "") -> dict:
     """
     Attempts to send a 6-digit OTP code to the student's @learner.manipal.edu mailbox via SMTP.
+    `purpose` ("signup" | "signin") picks the email wording; `name` personalises the greeting.
     If SMTP credentials are missing, returns an explicit unconfigured status.
     If SMTP dispatch fails, catches the exact exception, logs it, and returns the provider error.
     """
@@ -48,20 +53,16 @@ def send_otp_email(to_email: str, otp_code: str) -> dict:
             "message": "SMTP not configured — OTP was logged to the backend console for local development.",
         }
 
-    subject = "MAHE MIT Manipal — Your Learner ID Verification Code"
-    body = (
-        f"Hello Student,\n\n"
-        f"Your verification code for MAHE MIT CampusOS is: {otp_code}\n\n"
-        f"This OTP is valid for 10 minutes. Do not share this code with anyone.\n\n"
-        f"Best regards,\nMAHE MIT CampusOS Identity Team"
-    )
+    subject, text_body, html_body = render_otp_email(otp_code, to_email, purpose=purpose, name=name)
 
     try:
-        msg = MIMEMultipart()
-        msg["From"] = config["from_email"]
+        # Plain text first, HTML last: clients show the last part they can render
+        msg = MIMEMultipart("alternative")
+        msg["From"] = formataddr((config["from_name"], config["from_email"]))
         msg["To"] = to_email
         msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         logger.info(f"Connecting to SMTP server {config['host']}:{config['port']}...")
         with smtplib.SMTP(config["host"], config["port"], timeout=12) as server:

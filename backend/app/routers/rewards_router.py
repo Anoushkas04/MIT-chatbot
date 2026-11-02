@@ -19,9 +19,8 @@ def get_user_rewards(authorization: Optional[str] = Header(None)):
             "activity_log": [],
         }
 
-    token = authorization.replace("Bearer ", "").strip()
-    from app.routers.auth_router import TOKENS_STORE
-    user_id = TOKENS_STORE.get(token)
+    from app.routers.auth_router import resolve_user_id, token_from_header
+    user_id = resolve_user_id(token_from_header(authorization))
 
     db = SessionLocal()
     try:

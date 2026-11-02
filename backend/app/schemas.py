@@ -59,6 +59,28 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterSendOTPRequest(BaseModel):
+    name: str
+    registration_number: str
+    learner_id: str
+
+
+class RegisterVerifyOTPRequest(BaseModel):
+    name: str
+    registration_number: str
+    learner_id: str
+    otp_code: str
+
+
+class LoginSendOTPRequest(BaseModel):
+    identifier: str  # Learner ID or 9-digit Registration Number
+
+
+class LoginVerifyOTPRequest(BaseModel):
+    identifier: str  # Learner ID or 9-digit Registration Number
+    otp_code: str
+
+
 class ProfileUpdateRequest(BaseModel):
     department: Optional[str] = None
     academic_year: Optional[str] = None
@@ -68,5 +90,6 @@ class ProfileUpdateRequest(BaseModel):
     skills: Optional[str] = None
     interests: Optional[str] = None
     activities: Optional[str] = None
+
 
 

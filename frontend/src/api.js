@@ -56,6 +56,58 @@ export async function loginUser(emailOrId, password) {
   return res.json();
 }
 
+export async function registerSendOTP({ name, registration_number, learner_id }) {
+  const res = await fetch(`${BASE_URL}/api/auth/register-send-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, registration_number, learner_id }),
+  });
+  if (!res.ok) {
+    const errData = await res.json();
+    throw new Error(errData.detail || "Failed to send registration OTP.");
+  }
+  return res.json();
+}
+
+export async function registerVerifyOTP({ name, registration_number, learner_id, otp_code }) {
+  const res = await fetch(`${BASE_URL}/api/auth/register-verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, registration_number, learner_id, otp_code }),
+  });
+  if (!res.ok) {
+    const errData = await res.json();
+    throw new Error(errData.detail || "Failed to verify registration OTP.");
+  }
+  return res.json();
+}
+
+export async function loginSendOTP(identifier) {
+  const res = await fetch(`${BASE_URL}/api/auth/login-send-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier }),
+  });
+  if (!res.ok) {
+    const errData = await res.json();
+    throw new Error(errData.detail || "Failed to send login OTP.");
+  }
+  return res.json();
+}
+
+export async function loginVerifyOTP(identifier, otp_code) {
+  const res = await fetch(`${BASE_URL}/api/auth/login-verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier, otp_code }),
+  });
+  if (!res.ok) {
+    const errData = await res.json();
+    throw new Error(errData.detail || "Failed to verify login OTP.");
+  }
+  return res.json();
+}
+
 export async function fetchCurrentUserProfile(token) {
   if (!token) return null;
   const res = await fetch(`${BASE_URL}/api/auth/me`, {

@@ -1,51 +1,59 @@
 /* ================================================================
-   MIT CAMPUSOS — DESIGN SYSTEM
-   Human-designed. Information-first. University-grade.
-   Linear × Notion × Gov.uk quality. Navy + stone palette.
+   MITRA CAMPUSOS — DESIGN SYSTEM
+   MITra forest-green + cream palette.
    ================================================================ */
 
 /* ----------------------------------------------------------------
-   DESIGN TOKENS
+   DESIGN TOKENS — Mitra Edition
    ---------------------------------------------------------------- */
 :root {
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  /* Core palette */
-  --navy:       #1A3A6B;   /* Primary accent — deep, trustworthy */
-  --navy-dark:  #152E56;   /* Hover/active state */
-  --navy-light: #EBF0F8;   /* Selected state, light accent bg */
-  --navy-mid:   #2D4E8A;   /* Secondary buttons */
+  /* Mitra Core Palette */
+  --mitra-primary:    #234f4a;   /* Forest green — trust, campus */
+  --mitra-primary-dk: #1b3f3b;   /* Hover/active */
+  --mitra-primary-lt: #eff3eb;   /* Selected state, light bg */
+  --mitra-accent:     #d8ef68;   /* Lime yellow — attention/highlight */
+  --mitra-coral:      #e07b64;   /* Coral — notifications, emphasis */
+  --mitra-coral-lt:   #f5ded6;   /* Light coral bg */
+  --mitra-teal:       #7ea59b;   /* Mid-teal — focus rings */
+
+  /* Legacy aliases (keep existing components working) */
+  --navy:       #234f4a;
+  --navy-dark:  #1b3f3b;
+  --navy-light: #eff3eb;
+  --navy-mid:   #426a63;
 
   /* Surfaces */
-  --bg-canvas:   #F5F4F2;  /* Page background — warm off-white */
-  --surface:     #FFFFFF;  /* Card / panel surface */
-  --surface-2:   #F9F8F6;  /* Inset sections, row alternates */
-  --surface-3:   #F2F1EF;  /* Hover state on list items */
+  --bg-canvas:   #f8f8f5;   /* Warm off-white — Mitra background */
+  --surface:     #ffffff;
+  --surface-2:   #f4f5f1;
+  --surface-3:   #eef0eb;
 
   /* Text */
-  --text-primary:   #1C1C1E;   /* Near-black — headings, labels */
-  --text-secondary: #6B7280;   /* Supporting text, labels */
-  --text-tertiary:  #9CA3AF;   /* Timestamps, hints, disabled */
-  --text-on-navy:   #FFFFFF;
+  --text-primary:   #202320;
+  --text-secondary: #727873;
+  --text-tertiary:  #a6ada6;
+  --text-on-navy:   #f9faf5;
 
   /* Borders */
-  --border:        #E5E4E2;   /* Default subtle border */
-  --border-strong: #D1D0CE;   /* Dividers, prominent borders */
-  --border-focus:  #1A3A6B;   /* Focus ring */
+  --border:        #e1e4dd;
+  --border-strong: #cdd0c9;
+  --border-focus:  #234f4a;
 
-  /* Semantic colors (muted, not neon) */
-  --green-bg:  #F0FDF4; --green-text: #166534; --green-border: #BBF7D0;
+  /* Semantic colors */
+  --green-bg:  #eff3eb; --green-text: #234f4a; --green-border: #c8d9c4;
   --amber-bg:  #FFFBEB; --amber-text: #92400E; --amber-border: #FDE68A;
   --red-bg:    #FEF2F2; --red-text:   #991B1B; --red-border:   #FECACA;
-  --blue-bg:   #EBF0F8; --blue-text:  #1A3A6B; --blue-border:  #C3D3EA;
+  --blue-bg:   #dbe9e7; --blue-text:  #234f4a; --blue-border:  #a8c8c2;
 
-  /* Radius — restrained */
-  --r-xs:   2px;
-  --r-sm:   4px;
-  --r-md:   6px;
-  --r-lg:   8px;
-  --r-xl:   10px;
+  /* Radius — Mitra-style generous rounding */
+  --r-xs:   3px;
+  --r-sm:   6px;
+  --r-md:   9px;
+  --r-lg:   12px;
+  --r-xl:   16px;
   --r-full: 9999px;
 
   /* Spacing (4px grid) */
@@ -53,18 +61,18 @@
   --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
 
   /* Type scale */
-  --text-xs:   0.6875rem;  /* 11px */
-  --text-sm:   0.8125rem;  /* 13px */
-  --text-base: 0.9375rem;  /* 15px */
-  --text-lg:   1.0625rem;  /* 17px */
+  --text-xs:   0.6875rem;
+  --text-sm:   0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg:   1.0625rem;
   --text-xl:   1.25rem;
   --text-2xl:  1.5rem;
 
-  /* Shadows — very minimal */
-  --shadow-xs: 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.09);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(35,79,74,0.05);
+  --shadow-sm: 0 1px 4px rgba(35,79,74,0.07);
+  --shadow-md: 0 2px 12px rgba(35,79,74,0.09);
+  --shadow-lg: 0 4px 20px rgba(35,79,74,0.11);
 
   /* Motion */
   --ease:      cubic-bezier(0.16, 1, 0.3, 1);
@@ -200,13 +208,15 @@ a { color: inherit; text-decoration: none; }
   padding: 2px 7px;
   border-radius: var(--r-sm);
   letter-spacing: 0.3px;
+  background: var(--mitra-primary);
+  color: var(--text-on-navy);
 }
 
 .brand-title {
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.2px;
+  font-weight: 700;
+  color: var(--mitra-primary);
+  letter-spacing: -0.3px;
 }
 
 .system-status-pill {
@@ -534,6 +544,108 @@ a { color: inherit; text-decoration: none; }
 }
 .sidebar-user-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
 .sidebar-user-role { font-size: var(--text-xs); color: var(--text-tertiary); }
+
+/* ---- Mitra Sidebar Enhancements ---- */
+.mitra-sidebar {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mitra-sb-top {
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mitra-profile-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  margin: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  flex-shrink: 0;
+}
+
+.mitra-profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #efd2c8;
+  color: #6d4940;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.mitra-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mitra-profile-info strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mitra-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mitra-profile-info span {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mitra-sb-bottom {
+  padding: 10px 8px 16px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.mitra-signout-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.mitra-signout-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+/* Mitra active sidebar nav item */
+.mitra-sidebar .sidebar-nav-item.active {
+  background: var(--mitra-primary-lt);
+  color: var(--mitra-primary);
+  font-weight: 600;
+}
+
+.mitra-sidebar .sidebar-nav-item:hover {
+  background: var(--surface-3);
+  color: var(--mitra-primary);
+}
 
 /* Main workspace */
 .workspace-wrapper {

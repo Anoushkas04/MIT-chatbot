@@ -34,3 +34,15 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 _domains_raw = os.environ.get("ALLOWED_EMAIL_DOMAINS", "learner.manipal.edu,manipal.edu")
 ALLOWED_EMAIL_DOMAINS = [d.strip().lower() for d in _domains_raw.split(",") if d.strip()]
 
+# Database: Postgres URL (e.g. Supabase pooler) in production, local SQLite file when unset
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+
+# Signed session tokens (HS256). Without a fixed secret, a random one is generated per
+# process, so tokens stop working when the server restarts — always set it when deployed.
+SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
+SESSION_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "7"))
+
+# Local-only testing: when Supabase isn't configured, return the generated OTP in the
+# API response so it can be entered without an email provider. Ignored if Supabase is set.
+AUTH_DEV_MODE = os.environ.get("AUTH_DEV_MODE", "").strip().lower() in ("1", "true", "yes")
+

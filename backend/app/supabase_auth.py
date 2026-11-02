@@ -59,7 +59,7 @@ def send_supabase_email_otp(email: str) -> Dict[str, Any]:
 
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8")) if resp.length else {}
             return {
                 "status": "success",
@@ -75,22 +75,9 @@ def send_supabase_email_otp(email: str) -> Dict[str, Any]:
         except Exception:
             msg = err_body or str(e)
         
-        # Graceful handling for Supabase free-tier default mailer rate limits (e.g. 3-4 emails/hour limit)
-        if "rate limit" in msg.lower() or "over_email_send_rate_limit" in msg.lower() or e.code == 429:
-            print(f"\n[SUPABASE RATE LIMIT DETECTED] {msg}")
-            print(f"Fallback to test OTP '123456' enabled for email {email}.\n")
-            return {
-                "status": "success",
-                "provider": "supabase_rate_limited_fallback",
-                "message": (
-                    "Too many verification emails were requested. "
-                    "Use test OTP code '123456' to complete your verification immediately!"
-                ),
-                "rate_limited": True,
-            }
-
+        print(f"[SUPABASE OTP DISPATCH ERROR] {e.code}: {msg}")
         friendly_msg = map_supabase_error(msg, status_code=e.code)
-        raise HTTPException(status_code=e.code, detail=friendly_msg)
+        raise HTTPException(status_code=e.code if 400 <= e.code < 500 else 502, detail=friendly_msg)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Unable to connect to Supabase Auth service: {str(e)}")
 
@@ -101,7 +88,8 @@ def verify_supabase_email_otp(email: str, otp_token: str) -> Tuple[bool, Dict[st
         raise HTTPException(status_code=400, detail="Invalid email domain.")
 
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        return True, {"provider": "dev_fallback", "user": {"id": f"sub_dev_{email.split('@')[0]}"}}
+        # Never treat a code as valid without a provider to check it against
+        raise HTTPException(status_code=500, detail="Supabase Auth is not configured on the server.")
 
     url = f"{SUPABASE_URL}/auth/v1/verify"
     payload = json.dumps({
@@ -116,7 +104,7 @@ def verify_supabase_email_otp(email: str, otp_token: str) -> Tuple[bool, Dict[st
 
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             res_data = json.loads(resp.read().decode("utf-8"))
             user_data = res_data.get("user") or {}
             session_data = res_data.get("session") or {}
@@ -152,7 +140,7 @@ def supabase_sign_in_with_password(email: str, password: str) -> Dict[str, Any]:
 
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             res_data = json.loads(resp.read().decode("utf-8"))
             return {
                 "status": "success",

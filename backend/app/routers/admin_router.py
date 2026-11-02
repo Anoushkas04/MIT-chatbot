@@ -25,19 +25,19 @@ def require_admin_user(authorization: Optional[str] = Header(None)):
             detail="Access Denied: You do not have System Administrator privileges."
         )
 
-    # 2. Database validation: check token against admin user in DB
+    # 2. Real session token: must belong to an active admin account
+    from app.routers.auth_router import resolve_user_id
+    user_id = resolve_user_id(token)
     db = SessionLocal()
     try:
-        # Check if token belongs to an admin user
-        # In our system tokens start with token_{hash}
-        admin_user = db.query(models.User).filter(models.User.role == "admin").first()
+        admin_user = (
+            db.query(models.User)
+            .filter(models.User.id == user_id, models.User.role == "admin", models.User.status == "active")
+            .first()
+            if user_id
+            else None
+        )
         if not admin_user:
-            raise HTTPException(
-                status_code=403,
-                detail="Access Denied: System Administrator privileges required."
-            )
-        # If token is generic or non-admin token without 'adm':
-        if "adm" not in token and "admin" not in token.lower():
             raise HTTPException(
                 status_code=403,
                 detail="Access Denied: System Administrator privileges required."
