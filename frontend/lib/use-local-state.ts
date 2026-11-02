@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 /**
  * Local-storage backed useState. There is no backend yet, so this is how
@@ -9,22 +9,24 @@ import { useEffect, useRef, useState } from 'react'
  */
 export function useLocalState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(initial)
-  const loaded = useRef(false)
+  // State, not a ref: the save effect must wait for the render that applies the
+  // stored value, otherwise it overwrites storage with `initial` on first mount.
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(key)
       if (raw) setValue(JSON.parse(raw))
     } catch {}
-    loaded.current = true
+    setLoaded(true)
   }, [key])
 
   useEffect(() => {
-    if (!loaded.current) return
+    if (!loaded) return
     try {
       localStorage.setItem(key, JSON.stringify(value))
     } catch {}
-  }, [key, value])
+  }, [key, value, loaded])
 
   return [value, setValue] as const
 }
