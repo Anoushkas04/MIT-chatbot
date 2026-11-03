@@ -48,7 +48,7 @@ function shorten(text: string, max = 70) {
 }
 
 function questionTopics(q: CommunityQuestion): string[] {
-  return q.tags.length > 0 ? q.tags : matchTopics(`${q.title} ${q.body}`).slice(0, 2)
+  return q.tags.length > 0 ? q.tags : matchTopics(`${q.title} ${q.body}`, false).slice(0, 2)
 }
 
 export function buildNotifications({
