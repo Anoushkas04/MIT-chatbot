@@ -15,17 +15,13 @@ def require_admin_user(authorization: Optional[str] = Header(None)):
 
     token = authorization.replace("Bearer ", "").strip()
 
-    # 1. Quick check for demo role tokens
-    if token == "token_demo_admin" or "token_adm_" in token:
-        return True
-
-    if token in ["token_demo_student", "token_demo_faculty", "token_demo_parent"]:
+    if token in ["token_demo_student", "token_demo_faculty", "token_demo_parent", "token_demo_admin"]:
         raise HTTPException(
             status_code=403,
             detail="Access Denied: You do not have System Administrator privileges."
         )
 
-    # 2. Real session token: must belong to an active admin account
+    # Real session token: must belong to an active admin account
     from app.routers.auth_router import resolve_user_id
     user_id = resolve_user_id(token)
     db = SessionLocal()
