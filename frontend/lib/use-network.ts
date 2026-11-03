@@ -1,10 +1,12 @@
 'use client'
 
 import { useLocalState } from './use-local-state'
-import { defaultNetworkPeople, type NetworkPerson, type NetworkStatus } from './mock-data'
+import { defaultActivity, defaultNetworkPeople, type ActivityEvent, type NetworkPerson, type NetworkStatus } from './mock-data'
 
 export function useNetworkPeople() {
   const [people, setPeople] = useLocalState<NetworkPerson[]>('mitra_network', defaultNetworkPeople)
+  // Things other people did that concern you, shown on the Notifications page.
+  const [activity, setActivity] = useLocalState<ActivityEvent[]>('mitra_activity', defaultActivity)
 
   function setStatus(id: string, status: NetworkStatus) {
     setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)))
@@ -12,7 +14,10 @@ export function useNetworkPeople() {
 
   function connect(id: string) {
     setStatus(id, 'pending')
-    setTimeout(() => setStatus(id, 'connected'), 1600)
+    setTimeout(() => {
+      setStatus(id, 'connected')
+      setActivity((prev) => [{ id: `act-${Date.now()}`, kind: 'accepted', personId: id, at: Date.now() }, ...prev])
+    }, 1600)
   }
 
   function withdraw(id: string) {
@@ -46,5 +51,5 @@ export function useNetworkPeople() {
     connect(person.id)
   }
 
-  return { people, setPeople, connect, withdraw, accept, ignore, dismiss, block, unblock, connectNew }
+  return { people, setPeople, activity, connect, withdraw, accept, ignore, dismiss, block, unblock, connectNew }
 }

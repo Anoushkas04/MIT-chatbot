@@ -244,3 +244,17 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .sidebar-section a.active { color: #234f4a; background: #eff3eb; }
 .saved-list { margin-top: 34px; }
 .inline-link { color: #53766f; text-decoration: underline; }
+.notification-list { display: flex; flex-direction: column; gap: 8px; }
+.notification-row { display: flex; align-items: center; gap: 13px; padding: 14px 16px; border: 1px solid #e3e6df; border-radius: 12px; background: #fff; }
+.notification-row.unread { border-color: #cfe0cd; background: #f6faf2; }
+.notification-icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: #eff3eb; color: #53766f; }
+.notification-icon svg { width: 16px; }
+.notification-icon.request { background: #dbe9e7; }
+.notification-icon.like { background: #f5ded6; color: #c75c45; }
+.notification-icon.recommendation { background: #f4ecc9; color: #a78a2c; }
+.notification-body { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
+.notification-body strong { color: #234f4a; font-size: 12px; font-weight: 600; }
+.notification-body span { color: #7e887f; font-size: 11px; line-height: 1.4; }
+.notification-body time { color: #a4aaa4; font-size: 9px; }
+.unread-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: #e07b64; }
+@media (max-width: 520px) { .notification-row { flex-wrap: wrap; } .notification-row .network-action-row { margin-left: 47px; } }

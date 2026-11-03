@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   ArrowUpRight,
@@ -21,6 +22,7 @@ import { Logo } from '@/components/logo'
 import { clearSession } from '@/lib/session'
 import { useLocalState } from '@/lib/use-local-state'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
+import { countUnreadNotifications } from '@/lib/notifications'
 
 const navItems = [
   { label: 'Home', href: '/home', icon: LayoutDashboard },
@@ -37,6 +39,12 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
   const pathname = usePathname()
   const router = useRouter()
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
+  const [unread, setUnread] = useState(0)
+
+  // The sidebar stays mounted across pages, so recount from storage on each navigation.
+  useEffect(() => {
+    setUnread(countUnreadNotifications())
+  }, [pathname])
 
   function logout() {
     clearSession()
@@ -79,10 +87,10 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
             <Heart />
             <span>Saved for later</span>
           </Link>
-          <Link href="/planner" onClick={onCloseMobile}>
+          <Link href="/notifications" className={pathname === '/notifications' ? 'active' : ''} onClick={onCloseMobile}>
             <Bell />
             <span>Notifications</span>
-            <small className="alert-dot" />
+            {unread > 0 && <span className="nav-badge">{unread}</span>}
           </Link>
         </div>
         <div className="sidebar-bottom">

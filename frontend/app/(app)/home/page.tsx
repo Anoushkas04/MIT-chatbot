@@ -50,7 +50,7 @@ export default function HomePage() {
           <p className="view-sub">Here&apos;s what&apos;s happening around your campus.</p>
         </div>
         <div className="header-actions">
-          <Link href="/planner" className="icon-button" aria-label="Notifications">
+          <Link href="/notifications" className="icon-button" aria-label="Notifications">
             <Bell />
             <i />
           </Link>

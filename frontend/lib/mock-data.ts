@@ -327,6 +327,15 @@ export const defaultNetworkPeople: NetworkPerson[] = [
   { id: 'n10', name: 'Yusuf Ali', initials: 'YA', branch: 'ECE', semester: '5th sem', sharedInterests: ['Music'], status: 'incoming' },
 ]
 
+// A thing someone else did that concerns you. `at` is a timestamp for live events;
+// seeded demo events carry a display `time` instead.
+export type ActivityEvent = { id: string; kind: 'accepted'; personId: string; at?: number; time?: string }
+
+export const defaultActivity: ActivityEvent[] = [
+  { id: 'act-seed-1', kind: 'accepted', personId: 'n5', time: '1d ago' },
+  { id: 'act-seed-2', kind: 'accepted', personId: 'n3', time: '3d ago' },
+]
+
 export type DirectMessage = { id: string; from: 'me' | 'them'; text: string; time: string }
 
 export const defaultMessages: Record<string, DirectMessage[]> = {
