@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import {
   amenities,
-  councilMembers,
   defaultAttendanceCourses,
   documents,
   gradeOptions,
@@ -29,7 +28,7 @@ import {
 import { curriculum } from '@/lib/curriculum'
 import { useLocalState } from '@/lib/use-local-state'
 
-type Section = 'gpa' | 'attendance' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'council' | 'amenities'
+type Section = 'gpa' | 'attendance' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'amenities'
 
 const hubCards: { id: Section; title: string; subtitle: string; icon: typeof GraduationCap }[] = [
   { id: 'gpa', title: 'GPA Calculator', subtitle: 'GPA, CGPA & aggregate %', icon: GraduationCap },
@@ -38,7 +37,6 @@ const hubCards: { id: Section; title: string; subtitle: string; icon: typeof Gra
   { id: 'labs', title: 'Labs', subtitle: 'Locate department labs', icon: Building2 },
   { id: 'documents', title: 'Documents', subtitle: 'Regulations, forms & notices', icon: FileText },
   { id: 'helpdesk', title: 'Academic Helpdesk', subtitle: 'Who to contact, and when', icon: HelpCircle },
-  { id: 'council', title: 'Student Council', subtitle: 'Meet your student representatives', icon: Users },
   { id: 'amenities', title: 'Amenities', subtitle: 'Food, medical, sports & more', icon: MapPin },
 ]
 
@@ -518,21 +516,6 @@ function HelpdeskSection() {
   )
 }
 
-function CouncilSection() {
-  return (
-    <section className="people-grid">
-      {councilMembers.map((c) => (
-        <article className="people-card" key={c.id}>
-          <div className="network-avatar">{c.name.split(' ').map((n) => n[0]).join('')}</div>
-          <strong>{c.name}</strong>
-          <span>{c.position}</span>
-          <small>{c.branch}</small>
-        </article>
-      ))}
-    </section>
-  )
-}
-
 function AmenitiesSection() {
   return (
     <section className="people-grid">
@@ -557,7 +540,6 @@ const sectionComponents: Record<Section, () => React.ReactElement> = {
   labs: LabsSection,
   documents: DocumentsSection,
   helpdesk: HelpdeskSection,
-  council: CouncilSection,
   amenities: AmenitiesSection,
 }
 

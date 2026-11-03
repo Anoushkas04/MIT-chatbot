@@ -169,15 +169,6 @@ export const helpdeskContacts: HelpdeskContact[] = [
   { id: 'h5', role: 'International Relations Office', office: 'Admin Block · Room 30', timings: 'Mon–Fri, 9:30–4:30' },
 ]
 
-export type CouncilMember = { id: string; name: string; position: string; branch: string }
-
-export const councilMembers: CouncilMember[] = [
-  { id: 'c1', name: 'Sanya Mehta', position: 'General Secretary', branch: 'CSE, 7th semester' },
-  { id: 'c2', name: 'Varun Kapoor', position: 'Cultural Secretary', branch: 'ECE, 5th semester' },
-  { id: 'c3', name: 'Diya Shetty', position: 'Technical Secretary', branch: 'CSE, 7th semester' },
-  { id: 'c4', name: 'Rahul Menon', position: 'Sports Secretary', branch: 'Mechanical, 5th semester' },
-]
-
 export type Amenity = { id: string; name: string; category: string; location: string }
 
 export const amenities: Amenity[] = [
