@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Plus } from 'lucide-react'
+import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   communityQuestions as seedQuestions,
   defaultProfile,
@@ -145,18 +145,40 @@ function AnswerRow({
 
 function QuestionCard({
   question,
+  isOwn,
   myVotes,
   onVote,
   onAddAnswer,
   onAddReply,
+  onEdit,
+  onDelete,
 }: {
   question: CommunityQuestion
+  isOwn: boolean
   myVotes: Votes
   onVote: (id: string, dir: 1 | -1) => void
   onAddAnswer: (questionId: string, body: string) => void
   onAddReply: (questionId: string, answerId: string, body: string) => void
+  onEdit: (questionId: string, title: string, body: string) => void
+  onDelete: (questionId: string) => void
 }) {
   const [replyOpen, setReplyOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(question.title)
+  const [editBody, setEditBody] = useState(question.body)
+
+  function handleSaveEdit() {
+    if (!editTitle.trim() || !editBody.trim()) return
+    onEdit(question.id, editTitle.trim(), editBody.trim())
+    setEditing(false)
+  }
+
+  function handleCancelEdit() {
+    setEditTitle(question.title)
+    setEditBody(question.body)
+    setEditing(false)
+  }
+
   return (
     <article className="community-card">
       <VoteControl id={question.id} votes={question.votes} myVotes={myVotes} onVote={onVote} />
@@ -165,9 +187,35 @@ function QuestionCard({
           <span className="comment-avatar">{question.initials}</span>
           <strong>{question.author}</strong>
           <time>{question.time}</time>
+          {question.edited && <span className="edited-tag">edited</span>}
+          {isOwn && !editing && (
+            <div className="own-post-actions">
+              <button className="icon-action" onClick={() => setEditing(true)} aria-label="Edit post" title="Edit">
+                <Pencil size={14} />
+              </button>
+              <button className="icon-action danger" onClick={() => onDelete(question.id)} aria-label="Delete post" title="Delete">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          )}
         </div>
-        <h3>{question.title}</h3>
-        <p>{question.body}</p>
+
+        {editing ? (
+          <div className="community-composer inline-edit">
+            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Question title" />
+            <textarea value={editBody} onChange={(e) => setEditBody(e.target.value)} placeholder="Details..." autoFocus />
+            <div className="composer-actions">
+              <button className="text-button" onClick={handleCancelEdit}>Cancel</button>
+              <button className="community-ask-btn small" onClick={handleSaveEdit}>Save</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h3>{question.title}</h3>
+            <p>{question.body}</p>
+          </>
+        )}
+
         <div className="tag-row">
           {question.tags.map((t) => (
             <span key={t} className="tag-chip">
@@ -279,6 +327,16 @@ export default function CommunityPage() {
     setComposerOpen(false)
   }
 
+  function editQuestion(questionId: string, title: string, body: string) {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, title, body, edited: true } : q)),
+    )
+  }
+
+  function deleteQuestion(questionId: string) {
+    setQuestions((prev) => prev.filter((q) => q.id !== questionId))
+  }
+
   const base = sort === 'top' ? [...questions].sort((a, b) => b.votes - a.votes) : questions
   const visible = sort === 'unanswered' ? base.filter((q) => q.answers.length === 0) : base
 
@@ -339,7 +397,17 @@ export default function CommunityPage() {
 
       <div className="community-list">
         {visible.map((q) => (
-          <QuestionCard key={q.id} question={q} myVotes={myVotes} onVote={vote} onAddAnswer={addAnswer} onAddReply={addReply} />
+          <QuestionCard
+            key={q.id}
+            question={q}
+            isOwn={q.author === profile.name}
+            myVotes={myVotes}
+            onVote={vote}
+            onAddAnswer={addAnswer}
+            onAddReply={addReply}
+            onEdit={editQuestion}
+            onDelete={deleteQuestion}
+          />
         ))}
         {visible.length === 0 && <p className="view-sub">No questions here yet.</p>}
       </div>

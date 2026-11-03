@@ -227,6 +227,7 @@ export type CommunityQuestion = {
   time: string
   votes: number
   answers: CommunityAnswer[]
+  edited?: boolean
 }
 
 export const communityQuestions: CommunityQuestion[] = [
