@@ -191,3 +191,10 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
   .sidebar.mobile-open .side-nav a, .sidebar.mobile-open .sidebar-bottom a, .sidebar.mobile-open .sidebar-bottom button { justify-content: flex-start; padding: 10px 11px; }
   .dm-panel { width: 100%; }
 }
+.community-toolbar { display: flex; align-items: stretch; gap: 10px; margin-top: 30px; }
+.community-search { flex: 1; min-width: 0; margin-top: 0; }
+.large-search .icon-action { padding: 3px; border: none; background: transparent; font-size: inherit; }
+.large-search .icon-action svg { width: 14px; color: inherit; }
+.interest-select { flex: 0 0 auto; padding: 0 12px; border: 1px solid #dfe4dc; border-radius: 12px; background: white; color: #53766f; font-size: 12px; font-family: inherit; cursor: pointer; }
+.search-hint { margin: 10px 0 0; color: #9aa39b; font-size: 10px; }
+@media (max-width: 520px) { .community-toolbar { flex-direction: column; } .interest-select { height: 42px; } }

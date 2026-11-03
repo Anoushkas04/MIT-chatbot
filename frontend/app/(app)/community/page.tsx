@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import {
   communityQuestions as seedQuestions,
   defaultProfile,
@@ -9,6 +9,7 @@ import {
   type CommunityQuestion,
   type Profile,
 } from '@/lib/mock-data'
+import { MIN_RELEVANCE, matchTopics, scoreQuestion } from '@/lib/community-search'
 import { useLocalState } from '@/lib/use-local-state'
 
 const VERIFIED_THRESHOLD = 10
@@ -311,6 +312,8 @@ export default function CommunityPage() {
   const [storedQuestions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', seedQuestions)
   const [myVotes, setMyVotes] = useLocalState<Votes>('mitra_community_votes', {})
   const [sort, setSort] = useState<SortMode>('top')
+  const [interest, setInterest] = useState('All')
+  const [query, setQuery] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newBody, setNewBody] = useState('')
@@ -395,8 +398,21 @@ export default function CommunityPage() {
     setQuestions((prev) => prev.filter((q) => q.id !== questionId))
   }
 
+  const searching = query.trim().length > 0
+  const queryTopics = useMemo(() => (searching ? matchTopics(query) : []), [query, searching])
+
   const base = sort === 'top' ? [...questions].sort((a, b) => b.votes - a.votes) : questions
-  const visible = sort === 'unanswered' ? base.filter((q) => q.answers.length === 0) : base
+  const filtered = base.filter(
+    (q) => (interest === 'All' || q.tags.includes(interest)) && (sort !== 'unanswered' || q.answers.length === 0),
+  )
+  // While searching, relevance replaces the Top/New ordering.
+  const visible = searching
+    ? filtered
+        .map((q) => ({ q, score: scoreQuestion(q, query, queryTopics) }))
+        .filter((r) => r.score >= MIN_RELEVANCE)
+        .sort((a, b) => b.score - a.score)
+        .map((r) => r.q)
+    : filtered
 
   return (
     <div className="view community-view">
@@ -441,6 +457,37 @@ export default function CommunityPage() {
         </div>
       )}
 
+      <div className="community-toolbar">
+        <div className="large-search community-search">
+          <Search />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search questions, e.g. 'midsem prep' or 'hostel wifi'"
+            aria-label="Search community questions"
+          />
+          {searching && (
+            <button className="icon-action" onClick={() => setQuery('')} aria-label="Clear search" title="Clear">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <select className="interest-select" value={interest} onChange={(e) => setInterest(e.target.value)} aria-label="Filter by interest">
+          <option value="All">All interests</option>
+          {tagOptions.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </div>
+      {searching && (
+        <p className="search-hint">
+          {visible.length} result{visible.length === 1 ? '' : 's'}
+          {queryTopics.length > 0 && <> · related to {queryTopics.slice(0, 3).join(', ')}</>}
+        </p>
+      )}
+
       <div className="discover-tabs">
         <button className={sort === 'top' ? 'active' : ''} onClick={() => setSort('top')}>
           Top
@@ -469,7 +516,9 @@ export default function CommunityPage() {
             onDelete={deleteQuestion}
           />
         ))}
-        {visible.length === 0 && <p className="view-sub">No questions here yet.</p>}
+        {visible.length === 0 && (
+          <p className="view-sub">{searching ? `No questions match "${query.trim()}".` : 'No questions here yet.'}</p>
+        )}
       </div>
     </div>
   )
