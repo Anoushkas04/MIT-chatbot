@@ -5,16 +5,11 @@ import hashlib
 import datetime
 from typing import Optional
 
-import bcrypt
 import jwt
 from fastapi import APIRouter, HTTPException, Header
 from app.database import SessionLocal
 from app import models
 from app.schemas import (
-    LearnerIDVerifyRequest,
-    OTPVerifyRequest,
-    RegisterCompleteRequest,
-    LoginRequest,
     ProfileUpdateRequest,
     RegisterSendOTPRequest,
     RegisterVerifyOTPRequest,
@@ -138,14 +133,6 @@ if SESSION_SECRET:
 else:
     _SESSION_SECRET = secrets.token_hex(32)
     print("⚠️  SESSION_SECRET not set — using a random per-process secret; sessions end when the server restarts.")
-
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-
-def verify_password(password: str, password_hash: str) -> bool:
-    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
 def create_session_token(user_id: str) -> str:
@@ -334,19 +321,6 @@ def _verify_otp(db, lid: str, otp_code: str) -> None:
     db.commit()
 
 
-def _consume_verified_otp(db, lid: str, otp_code: str) -> None:
-    """Legacy two-step signup: accepts a code that /verify-otp already verified, exactly once."""
-    otp_rec = _latest_otp(db, lid)
-    expected = VERIFIED_OTP_PREFIX + _hash_otp((otp_code or "").strip())
-    if (
-        not otp_rec
-        or not hmac.compare_digest(otp_rec.otp_hash, expected)
-        or datetime.datetime.utcnow() > otp_rec.expires_at
-    ):
-        raise HTTPException(status_code=400, detail="OTP verification token invalid or expired.")
-    otp_rec.otp_hash = "consumed"
-
-
 def _validate_registration_details(name: str, reg_no: str, lid: str) -> dict:
     """Validates signup fields and that the reg-no admission year matches the Learner ID."""
     if not name or len(name) < 2:
@@ -446,7 +420,6 @@ def register_verify_otp(req: RegisterVerifyOTPRequest):
             learner_id=lid,
             registration_number=reg_no,
             admission_year=parsed_reg["admission_year"],
-            password_hash=hash_password(secrets.token_hex(16)),  # OTP-only account, no usable password
             name=name,
             role="student",
             is_verified=True,
@@ -517,134 +490,6 @@ def login_verify_otp(req: LoginVerifyOTPRequest):
             raise HTTPException(status_code=403, detail="Account suspended or disabled.")
 
         _verify_otp(db, user.learner_id or user.email, req.otp_code)
-        return session_response(user)
-    finally:
-        db.close()
-
-
-# ---------------------------------------------------------------------------
-# Legacy flow (AuthModal): verify Learner ID → verify OTP → complete with password
-# ---------------------------------------------------------------------------
-
-@router.post("/verify-learner-id", summary="Validate Learner ID format and email a signup OTP")
-def verify_learner_id(req: LearnerIDVerifyRequest):
-    lid = req.learner_id.strip().lower()
-
-    if not validate_email_domain(lid):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid student email domain. Must be a verified MIT/MAHE email address (e.g., student.mitmpl2023@learner.manipal.edu).",
-        )
-
-    year_match = re.search(r"20[0-9]{2}", lid)
-    admission_year = year_match.group(0) if year_match else "2023"
-
-    db = SessionLocal()
-    try:
-        existing_user = db.query(models.User).filter(models.User.learner_id == lid).first()
-        if existing_user and existing_user.is_verified:
-            raise HTTPException(
-                status_code=400,
-                detail="This Learner ID is already registered to a verified account. Please proceed to login.",
-            )
-
-        otp = _issue_otp(db, lid)
-        return {
-            "status": "success",
-            "learner_id": lid,
-            "admission_year": admission_year,
-            "message": f"Verification OTP code sent to {lid}.",
-            "dev_mode": otp["dev_mode"],
-            "test_otp": otp["test_otp"],
-            "expires_in_seconds": int(OTP_TTL.total_seconds()),
-        }
-    finally:
-        db.close()
-
-
-@router.post("/verify-otp", summary="Verify a signup OTP (legacy two-step flow)")
-def verify_otp(req: OTPVerifyRequest):
-    lid = req.learner_id.strip().lower()
-    db = SessionLocal()
-    try:
-        _verify_otp(db, lid, req.otp_code)
-        return {
-            "status": "verified",
-            "learner_id": lid,
-            "message": "OTP verified successfully. Proceed to enter your Registration Number.",
-        }
-    finally:
-        db.close()
-
-
-@router.post("/register-complete", summary="Complete legacy signup with Reg No, password and Terms")
-def register_complete(req: RegisterCompleteRequest):
-    lid = req.learner_id.strip().lower()
-    reg_no = req.registration_number.strip()
-    name = req.name.strip()
-    password = req.password
-
-    year_match = re.search(r"20[0-9]{2}", lid)
-    admission_year = year_match.group(0) if year_match else "2023"
-
-    if not REG_NO_PATTERN.match(reg_no):
-        raise HTTPException(
-            status_code=400,
-            detail="Registration Number must be either 9 digits (e.g. 230962088) or 12 digits (e.g. 261090330156).",
-        )
-    if not password or len(password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters in length.")
-    if not req.agreed_terms:
-        raise HTTPException(
-            status_code=400,
-            detail="You must explicitly accept the Terms & Conditions and Community Guidelines to create an account.",
-        )
-
-    db = SessionLocal()
-    try:
-        _ensure_not_registered(db, reg_no, lid)
-        _consume_verified_otp(db, lid, req.otp_code)
-
-        new_user = models.User(
-            id=f"usr_std_{secrets.token_hex(6)}",
-            email=lid,
-            learner_id=lid,
-            registration_number=reg_no,
-            admission_year=admission_year,
-            password_hash=hash_password(password),
-            name=name if name else "Student",
-            role="student",
-            is_verified=True,
-            account_state="Verified",
-            department=req.department or "Computer Science & Engg",
-            academic_year=req.academic_year or f"3rd Year ({admission_year}-27)",
-            semester=req.semester or "Even Semester (Jan - May)",
-            rewards_points=50,
-            avatar_icon="🎓",
-            agreed_terms=True,
-            terms_version="v1.0-2026",
-            terms_accepted_at=datetime.datetime.utcnow(),
-            status="active",
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        return session_response(new_user)
-    finally:
-        db.close()
-
-
-@router.post("/login", summary="Sign in with Learner ID / Registration Number and password (legacy)")
-def login(req: LoginRequest):
-    identifier = req.email_or_id.strip().lower()
-
-    db = SessionLocal()
-    try:
-        user = _find_user_by_identifier(db, identifier)
-        if not user or not verify_password(req.password, user.password_hash):
-            raise HTTPException(status_code=401, detail="Invalid Learner ID / Registration Number or password.")
-        if user.status != "active" or user.is_suspended:
-            raise HTTPException(status_code=403, detail="Account suspended or disabled due to policy violation.")
         return session_response(user)
     finally:
         db.close()

@@ -9,7 +9,6 @@ class User(Base):
 
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
     role = Column(String, default="student")  # student, faculty, parent, admin
     learner_id = Column(String, unique=True, index=True, nullable=True)

@@ -69,7 +69,6 @@ def process_user_strike_and_suspension(db, user_identifier: str, user_name: str,
         user = models.User(
             id=clean_id,
             email=f"{clean_id}@manipal.edu",
-            password_hash="demo_hash",
             name=user_name,
             role="student",
             strike_count=0,
