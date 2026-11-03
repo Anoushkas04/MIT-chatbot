@@ -129,14 +129,6 @@ export const gradeOptions: { grade: string; value: number }[] = [
   { grade: 'F', value: 0 },
 ]
 
-export type AttendanceCourse = { id: string; course: string; held: number; attended: number }
-
-export const defaultAttendanceCourses: AttendanceCourse[] = [
-  { id: 'a1', course: 'Data Structures', held: 42, attended: 38 },
-  { id: 'a2', course: 'Operating Systems', held: 40, attended: 30 },
-  { id: 'a3', course: 'Computer Networks', held: 39, attended: 33 },
-]
-
 export type Professor = { id: string; name: string; dept: string; cabin: string; email: string }
 
 export const professors: Professor[] = [

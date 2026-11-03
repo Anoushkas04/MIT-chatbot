@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react'
 import {
   ArrowLeft,
-  BookOpen,
   Building2,
   ChevronDown,
   FileText,
@@ -17,22 +16,19 @@ import {
 } from 'lucide-react'
 import {
   amenities,
-  defaultAttendanceCourses,
   documents,
   gradeOptions,
   helpdeskContacts,
   labs,
   professors,
-  type AttendanceCourse,
 } from '@/lib/mock-data'
 import { curriculum } from '@/lib/curriculum'
 import { useLocalState } from '@/lib/use-local-state'
 
-type Section = 'gpa' | 'attendance' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'amenities'
+type Section = 'gpa' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'amenities'
 
 const hubCards: { id: Section; title: string; subtitle: string; icon: typeof GraduationCap }[] = [
   { id: 'gpa', title: 'GPA Calculator', subtitle: 'GPA, CGPA & aggregate %', icon: GraduationCap },
-  { id: 'attendance', title: 'Attendance Calculator', subtitle: 'Stay above the 75% line', icon: BookOpen },
   { id: 'professors', title: 'Professors', subtitle: 'Find your professors on campus', icon: Users },
   { id: 'labs', title: 'Labs', subtitle: 'Locate department labs', icon: Building2 },
   { id: 'documents', title: 'Documents', subtitle: 'Regulations, forms & notices', icon: FileText },
@@ -335,91 +331,6 @@ function GpaSection() {
   )
 }
 
-function AttendanceSection() {
-  const [courses, setCourses] = useLocalState<AttendanceCourse[]>('mitra_attendance_courses', defaultAttendanceCourses)
-  const [formOpen, setFormOpen] = useState(false)
-  const [course, setCourse] = useState('')
-
-  const totalHeld = courses.reduce((a, c) => a + c.held, 0)
-  const totalAttended = courses.reduce((a, c) => a + c.attended, 0)
-  const overall = totalHeld === 0 ? 0 : Math.round((totalAttended / totalHeld) * 100)
-
-  function update(id: string, field: 'held' | 'attended', value: number) {
-    setCourses((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: Math.max(0, value) } : c)))
-  }
-
-  function addCourse() {
-    if (!course.trim()) return
-    setCourses((prev) => [...prev, { id: `a-${Date.now()}`, course: course.trim(), held: 0, attended: 0 }])
-    setCourse('')
-    setFormOpen(false)
-  }
-
-  function removeCourse(id: string) {
-    setCourses((prev) => prev.filter((c) => c.id !== id))
-  }
-
-  return (
-    <section className="utility-card attendance-card wide">
-      <div className="utility-heading">
-        <div className="utility-icon coral-bg">
-          <BookOpen />
-        </div>
-        <div>
-          <h3>Attendance</h3>
-          <p>Stay above the 75% line</p>
-        </div>
-      </div>
-      <div className="attendance-ring">
-        <strong>
-          {overall}
-          <span>%</span>
-        </strong>
-        <small>Overall</small>
-      </div>
-      <div className="attendance-table">
-        {courses.map((c) => {
-          const pct = c.held === 0 ? 0 : Math.round((c.attended / c.held) * 100)
-          return (
-            <div className="attendance-row" key={c.id}>
-              <span>{c.course}</span>
-              <label>
-                Held
-                <input type="number" min={0} value={c.held} onChange={(e) => update(c.id, 'held', Number(e.target.value))} />
-              </label>
-              <label>
-                Attended
-                <input type="number" min={0} value={c.attended} onChange={(e) => update(c.id, 'attended', Number(e.target.value))} />
-              </label>
-              <b className={pct < 75 ? 'low' : ''}>{pct}%</b>
-              <button className="icon-ghost" onClick={() => removeCourse(c.id)} aria-label={`Remove ${c.course}`}>
-                <Trash2 />
-              </button>
-            </div>
-          )
-        })}
-      </div>
-      {formOpen ? (
-        <div className="planner-form inline-form">
-          <input value={course} onChange={(e) => setCourse(e.target.value)} placeholder="Course name" autoFocus />
-          <div className="composer-actions">
-            <button className="text-button" onClick={() => setFormOpen(false)}>
-              Cancel
-            </button>
-            <button className="community-ask-btn small" onClick={addCourse}>
-              Add
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button className="utility-link" onClick={() => setFormOpen(true)}>
-          <Plus /> Add course
-        </button>
-      )}
-    </section>
-  )
-}
-
 function ProfessorsSection() {
   const [q, setQ] = useState('')
   const list = useMemo(
@@ -535,7 +446,6 @@ function AmenitiesSection() {
 
 const sectionComponents: Record<Section, () => React.ReactElement> = {
   gpa: GpaSection,
-  attendance: AttendanceSection,
   professors: ProfessorsSection,
   labs: LabsSection,
   documents: DocumentsSection,
