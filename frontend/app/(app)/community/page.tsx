@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowBigDown, ArrowBigUp, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import {
   communityQuestions as seedQuestions,
   defaultProfile,
@@ -12,7 +12,6 @@ import {
 import { MIN_RELEVANCE, matchTopics, scoreQuestion } from '@/lib/community-search'
 import { useLocalState } from '@/lib/use-local-state'
 
-const VERIFIED_THRESHOLD = 10
 // Past this depth sub-threads stop indenting further so deep chains stay readable.
 const MAX_INDENT_DEPTH = 4
 const tagOptions = ['Academics', 'Attendance', 'Exams', 'Hostel', 'Campus Life', 'Clubs', 'Opportunities', 'Registration']
@@ -112,7 +111,6 @@ function CommentThread({ comment, depth, ...handlers }: { comment: CommunityComm
   const [editing, setEditing] = useState(false)
   const isTop = depth === 0
   const isOwn = !comment.deleted && comment.author === currentUser
-  const verified = isTop && !comment.deleted && comment.votes >= VERIFIED_THRESHOLD
 
   return (
     <div className={isTop ? 'answer-row' : 'reply-row'}>
@@ -122,11 +120,6 @@ function CommentThread({ comment, depth, ...handlers }: { comment: CommunityComm
           <strong>{comment.deleted ? '[deleted]' : comment.author}</strong>
           <time>{comment.time}</time>
           {comment.edited && !comment.deleted && <span className="edited-tag">edited</span>}
-          {verified && (
-            <span className="verified-tag">
-              <BadgeCheck /> Community verified
-            </span>
-          )}
           {isOwn && !editing && (
             <div className="own-post-actions">
               <button className="icon-action" onClick={() => setEditing(true)} aria-label="Edit reply" title="Edit">
