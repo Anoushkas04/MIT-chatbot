@@ -1,12 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import {
   ArrowLeft,
   BookOpen,
   Building2,
-  CalendarDays,
   ChevronDown,
   FileText,
   GraduationCap,
@@ -605,20 +603,6 @@ export default function UtilitiesPage() {
             <span>{c.subtitle}</span>
           </button>
         ))}
-        <Link className="utility-hub-card" href="/discover?tab=event">
-          <span className="utility-icon">
-            <CalendarDays />
-          </span>
-          <strong>Events</strong>
-          <span>See what&apos;s happening on campus</span>
-        </Link>
-        <Link className="utility-hub-card" href="/discover?tab=club">
-          <span className="utility-icon">
-            <Users />
-          </span>
-          <strong>Clubs</strong>
-          <span>Browse active student clubs</span>
-        </Link>
       </div>
     </div>
   )
