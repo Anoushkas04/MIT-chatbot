@@ -5,6 +5,7 @@ import hashlib
 import datetime
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import APIRouter, HTTPException, Header
 from app.database import SessionLocal
@@ -140,7 +141,11 @@ else:
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
 def create_session_token(user_id: str) -> str:
@@ -636,7 +641,7 @@ def login(req: LoginRequest):
     db = SessionLocal()
     try:
         user = _find_user_by_identifier(db, identifier)
-        if not user or not hmac.compare_digest(user.password_hash, hash_password(req.password)):
+        if not user or not verify_password(req.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Invalid Learner ID / Registration Number or password.")
         if user.status != "active" or user.is_suspended:
             raise HTTPException(status_code=403, detail="Account suspended or disabled due to policy violation.")
