@@ -189,14 +189,22 @@ def clear_visual_cache() -> None:
 
 
 def get_visual_status() -> dict:
-    import torch
-    cuda_available = torch.cuda.is_available()
-    hardware = {
-        "torch_version": torch.__version__,
-        "cuda_available": cuda_available,
-        "cuda_runtime": torch.version.cuda,
-        "gpu": torch.cuda.get_device_name(0) if cuda_available else None,
-    }
+    try:
+        import torch
+        cuda_available = torch.cuda.is_available()
+        hardware = {
+            "torch_version": torch.__version__,
+            "cuda_available": cuda_available,
+            "cuda_runtime": torch.version.cuda,
+            "gpu": torch.cuda.get_device_name(0) if cuda_available else None,
+        }
+    except ImportError:
+        hardware = {
+            "torch_version": None,
+            "cuda_available": False,
+            "cuda_runtime": None,
+            "gpu": None,
+        }
     try:
         store = get_visual_store()
         return {
@@ -212,7 +220,7 @@ def get_visual_status() -> dict:
     except (FileNotFoundError, ValueError, OSError, RuntimeError, ImportError, json.JSONDecodeError) as exc:
         try:
             device = _device()
-        except RuntimeError:
+        except (RuntimeError, ImportError):
             device = COLVISION_DEVICE
         return {
             "ready": False,
