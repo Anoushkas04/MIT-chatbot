@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+google-genai
+pypdf
+python-dotenv
+numpy
+sqlalchemy
+PyJWT
+psycopg2-binary
