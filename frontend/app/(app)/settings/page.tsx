@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [draftInterests, setDraftInterests] = useState<string[]>(profile.interests)
   const [customInterest, setCustomInterest] = useState('')
   const [resetMessage, setResetMessage] = useState('')
+  const [confirmingReset, setConfirmingReset] = useState(false)
 
   function toggle(key: keyof SettingsFlags) {
     setFlags((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -59,8 +60,11 @@ export default function SettingsPage() {
 
   function resetInterests() {
     setProfile((prev) => ({ ...prev, interests: [] }))
-    setResetMessage('Interest profile reset.')
-    setTimeout(() => setResetMessage(''), 2500)
+    // An open profile editor holds a copy of the old interests; saving it would undo the reset.
+    setEditing(false)
+    setConfirmingReset(false)
+    setResetMessage('Interest profile reset. Add interests again from Edit profile.')
+    setTimeout(() => setResetMessage(''), 4000)
   }
 
   return (
@@ -205,14 +209,45 @@ export default function SettingsPage() {
             </div>
             <Toggle on={flags.showInferred} onClick={() => toggle('showInferred')} />
           </div>
-          <div className="settings-card">
+          <div className={`settings-card ${confirmingReset ? 'confirming' : ''}`}>
             <div>
               <strong>Reset interest profile</strong>
-              <span>{resetMessage || 'Clear learned preferences and start fresh.'}</span>
+              <span>
+                {resetMessage ||
+                  (profile.interests.length === 0
+                    ? 'No interests saved right now.'
+                    : 'Clear learned preferences and start fresh.')}
+              </span>
+              {confirmingReset && (
+                <div className="reset-confirm" role="alertdialog" aria-label="Confirm interest profile reset">
+                  <p>
+                    This will remove your {profile.interests.length} interest{profile.interests.length === 1 ? '' : 's'} (
+                    {profile.interests.join(', ')}), so recommendations start from scratch. Your saved items, posts and connections
+                    won&apos;t be affected. This can&apos;t be undone.
+                  </p>
+                  <div className="composer-actions">
+                    <button className="text-button" onClick={() => setConfirmingReset(false)} autoFocus>
+                      Cancel
+                    </button>
+                    <button className="community-ask-btn small danger" onClick={resetInterests}>
+                      Yes, reset
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <button className="settings-action" onClick={resetInterests}>
-              Reset
-            </button>
+            {!confirmingReset && (
+              <button
+                className="settings-action"
+                onClick={() => {
+                  setResetMessage('')
+                  setConfirmingReset(true)
+                }}
+                disabled={profile.interests.length === 0}
+              >
+                Reset
+              </button>
+            )}
           </div>
         </section>
 

@@ -261,3 +261,8 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 /* Pin the sidebar to the viewport so Settings / Sign out stay visible on long pages;
    if the nav is taller than the screen, the sidebar scrolls on its own. */
 .sidebar { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; }
+.settings-card.confirming { align-items: flex-start; }
+.reset-confirm { margin-top: 12px; padding: 12px; border: 1px solid #f0d3c9; border-radius: 10px; background: #fdf4f1; }
+.reset-confirm p { margin: 0 0 10px; color: #6d4940; font-size: 11px; line-height: 1.5; }
+.community-ask-btn.danger { background: #c75c45; color: #fff; }
+.settings-action:disabled { color: #b8beb8; cursor: not-allowed; }
