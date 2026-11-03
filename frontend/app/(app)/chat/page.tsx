@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileText, Paperclip, Plus, Send, Sparkles } from 'lucide-react'
-import { askMitra } from '@/lib/api'
+import { ExternalLink, FileText, Paperclip, Plus, Send, Sparkles, X } from 'lucide-react'
+import { API_BASE, askMitra, type CitationDetail } from '@/lib/api'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
@@ -12,7 +12,36 @@ type ChatMessage = {
   from: 'ai' | 'user'
   text: string
   time: string
-  source?: { title: string; office: string }
+  citations?: CitationDetail[]
+}
+
+function CitationModal({ citation, onClose }: { citation: CitationDetail; onClose: () => void }) {
+  const pageUrl = citation.source_url ? `${API_BASE}${citation.source_url}` : null
+  return (
+    <div className="citation-modal-overlay" onClick={onClose}>
+      <div className="citation-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="citation-modal-head">
+          <div>
+            <strong>{citation.source}</strong>
+            {citation.page_number != null && <span>Page {citation.page_number}</span>}
+          </div>
+          <button className="icon-ghost" onClick={onClose} aria-label="Close">
+            <X />
+          </button>
+        </div>
+        {pageUrl ? (
+          <img className="citation-modal-page" src={pageUrl} alt={`${citation.source}, page ${citation.page_number}`} />
+        ) : (
+          <p className="citation-modal-snippet">{citation.snippet}</p>
+        )}
+        {pageUrl && (
+          <a className="citation-modal-open" href={pageUrl} target="_blank" rel="noreferrer">
+            Open full size <ExternalLink />
+          </a>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function seedMessages(): ChatMessage[] {
@@ -27,6 +56,7 @@ function ChatInner() {
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages)
   const [draft, setDraft] = useState('')
   const [thinking, setThinking] = useState(false)
+  const [viewingCitation, setViewingCitation] = useState<CitationDetail | null>(null)
   const askedRef = useRef(false)
   const idRef = useRef(1)
   // Backend keeps a short per-conversation history keyed by this id
@@ -51,18 +81,12 @@ function ChatInner() {
         department: profile.branch || null,
         semester: profile.semester || null,
       })
-      const firstSource = answer.sources[0]
       reply = {
         id: nextId(),
         from: 'ai',
         text: answer.text,
         time: 'Now',
-        source: firstSource
-          ? {
-              title: firstSource,
-              office: answer.confidence_type === 'community_grounded' ? 'Student community' : 'Official document',
-            }
-          : undefined,
+        citations: answer.citations,
       }
     } catch {
       reply = { id: nextId(), from: 'ai', text: "I couldn't reach MITra's server. Please try again.", time: 'Now' }
@@ -112,9 +136,15 @@ function ChatInner() {
             <div className={`chat-avatar ${m.from}`}>{m.from === 'ai' ? <Sparkles /> : profile.avatar.emoji}</div>
             <div className="message-body">
               <div className="message-bubble">{m.text}</div>
-              {m.source && (
-                <div className="citation">
-                  <FileText /> Source: {m.source.title} · {m.source.office}
+              {m.citations && m.citations.length > 0 && (
+                <div className="citation-list">
+                  {m.citations.map((c, i) => (
+                    <button key={i} className="citation-chip" onClick={() => setViewingCitation(c)}>
+                      <FileText />
+                      {c.source}
+                      {c.page_number != null && <span>· p.{c.page_number}</span>}
+                    </button>
+                  ))}
                 </div>
               )}
               <time>{m.time}</time>
@@ -157,6 +187,7 @@ function ChatInner() {
         <button onClick={() => setDraft('How do I calculate my CGPA?')}>How do I calculate my CGPA?</button>
         <button onClick={() => setDraft('What events are happening this week?')}>Events this week</button>
       </div>
+      {viewingCitation && <CitationModal citation={viewingCitation} onClose={() => setViewingCitation(null)} />}
     </div>
   )
 }

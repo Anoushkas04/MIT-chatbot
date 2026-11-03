@@ -30,10 +30,28 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .search-submit svg { width: 13px; }
 
 /* ---- Chat typing indicator ---- */
-.message-bubble.typing { display: flex; gap: 4px; padding: 14px 15px; }
+.message-bubble { white-space: pre-wrap; }
+.message-bubble.typing { display: flex; gap: 4px; padding: 14px 15px; white-space: normal; }
 .message-bubble.typing span { width: 6px; height: 6px; border-radius: 50%; background: #9aa39b; animation: typing-bounce 1.1s infinite ease-in-out; }
 .message-bubble.typing span:nth-child(2) { animation-delay: .15s; }
 .message-bubble.typing span:nth-child(3) { animation-delay: .3s; }
+
+/* ---- Ask MITra: clickable citations + page-image modal ---- */
+.citation-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.citation-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid #e1e5dd; border-radius: 20px; background: #fff; color: #53766f; font-size: 9px; }
+.citation-chip:hover { border-color: #7ea59b; background: #eff3eb; }
+.citation-chip svg { width: 11px; }
+.citation-chip span { color: #9aa39b; }
+.citation-modal-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: #20232066; padding: 20px; }
+.citation-modal { display: flex; flex-direction: column; width: min(640px, 100%); max-height: 85vh; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 30px 60px #20232030; }
+.citation-modal-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid #eef0eb; }
+.citation-modal-head > div { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.citation-modal-head strong { color: #234f4a; font-size: 13px; }
+.citation-modal-head span { color: #9aa39b; font-size: 10px; }
+.citation-modal-page { display: block; width: 100%; max-height: 65vh; object-fit: contain; background: #f3f4f0; }
+.citation-modal-snippet { margin: 0; padding: 18px; color: #526058; font-size: 12px; line-height: 1.6; overflow-y: auto; }
+.citation-modal-open { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; border-top: 1px solid #eef0eb; color: #53766f; font-size: 11px; }
+.citation-modal-open svg { width: 13px; }
 @keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
 
 /* ---- Mobile nav drawer ---- */

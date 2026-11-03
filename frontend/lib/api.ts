@@ -33,9 +33,20 @@ export type OtpSentResponse = {
   expires_in_seconds: number
 }
 
+export type CitationDetail = {
+  source: string
+  snippet: string
+  score: number
+  document_id?: string | null
+  page_number?: number | null
+  retrieval_method?: string | null
+  source_url?: string | null
+}
+
 export type ChatResponse = {
   text: string
   sources: string[]
+  citations: CitationDetail[]
   confidence: string
   confidence_type: string
 }
