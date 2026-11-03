@@ -7,6 +7,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  ChevronDown,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -20,21 +21,20 @@ import {
   amenities,
   councilMembers,
   defaultAttendanceCourses,
-  defaultGpaCourses,
   documents,
   gradeOptions,
   helpdeskContacts,
   labs,
   professors,
   type AttendanceCourse,
-  type GpaCourse,
 } from '@/lib/mock-data'
+import { curriculum } from '@/lib/curriculum'
 import { useLocalState } from '@/lib/use-local-state'
 
 type Section = 'gpa' | 'attendance' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'council' | 'amenities'
 
 const hubCards: { id: Section; title: string; subtitle: string; icon: typeof GraduationCap }[] = [
-  { id: 'gpa', title: 'GPA Calculator', subtitle: 'Current semester estimate', icon: GraduationCap },
+  { id: 'gpa', title: 'GPA Calculator', subtitle: 'GPA, CGPA & aggregate %', icon: GraduationCap },
   { id: 'attendance', title: 'Attendance Calculator', subtitle: 'Stay above the 75% line', icon: BookOpen },
   { id: 'professors', title: 'Professors', subtitle: 'Find your professors on campus', icon: Users },
   { id: 'labs', title: 'Labs', subtitle: 'Locate department labs', icon: Building2 },
@@ -53,28 +53,129 @@ function SearchFilter({ value, onChange, placeholder }: { value: string; onChang
   )
 }
 
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
+const BRANCHES: { label: string; value: string }[] = [
+  { label: 'CSE', value: 'CS' },
+  { label: 'AIML', value: 'AIML' },
+  { label: 'CCE', value: 'CCE' },
+  { label: 'IT', value: 'IT' },
+  { label: 'DSE', value: 'DSE' },
+  { label: 'MNC', value: 'MNC' },
+  { label: 'CSFT', value: 'CSFT' },
+  { label: 'ECE', value: 'ECE' },
+  { label: 'VLSI', value: 'VLSI' },
+  { label: 'ENI', value: 'ENI' },
+  { label: 'EEE', value: 'EEE' },
+  { label: 'CPS', value: 'CPS' },
+  { label: 'BioMed', value: 'BioMed' },
+  { label: 'MechX', value: 'MechX' },
+  { label: 'Mech', value: 'Mech' },
+  { label: 'Aero', value: 'Aero' },
+  { label: 'Auto', value: 'Auto' },
+  { label: 'Industrial', value: 'Industrial' },
+  { label: 'Civil', value: 'Civil' },
+  { label: 'BioTech', value: 'BioTech' },
+  { label: 'Chem', value: 'Chem' },
+]
+
+type GpaSelection = {
+  semester: number | null
+  cycle: 'PHY' | 'CHM' | null
+  stream: 'CS' | 'NONCS' | null
+  branch: string | null
+  honors: boolean
+  minors: boolean
+  // Grades are kept per subject group so switching semester/branch doesn't lose them.
+  grades: Record<string, Record<string, string>>
+}
+
+const emptySelection: GpaSelection = { semester: null, cycle: null, stream: null, branch: null, honors: false, minors: false, grades: {} }
+
+function subjectGroup(s: GpaSelection): string | null {
+  if (!s.semester) return null
+  if (s.semester <= 2) return s.cycle && s.stream ? `${s.semester}-${s.stream}-${s.cycle}` : null
+  return s.branch ? `${s.semester}-${s.branch}` : null
+}
+
+function ChoiceRow<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: { label: string; value: T }[]
+  value: T | null
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className="gpa-step">
+      <span className="gpa-step-label">{label}</span>
+      <div className="tag-picker">
+        {options.map((o) => (
+          <button key={String(o.value)} className={value === o.value ? 'active' : ''} onClick={() => onChange(o.value)}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function GpaSection() {
-  const [courses, setCourses] = useLocalState<GpaCourse[]>('mitra_gpa_courses', defaultGpaCourses)
-  const [formOpen, setFormOpen] = useState(false)
-  const [course, setCourse] = useState('')
-  const [credits, setCredits] = useState(3)
-  const [grade, setGrade] = useState(gradeOptions[0].grade)
+  const [sel, setSel] = useLocalState<GpaSelection>('mitra_gpa_calc', emptySelection)
+  const [previous, setPrevious] = useLocalState<{ cgpa: string; credits: string }>('mitra_gpa_previous', { cgpa: '', credits: '' })
+  const [result, setResult] = useState<{ gpa: number; points: number; credits: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
 
-  const totalCredits = courses.reduce((a, c) => a + c.credits, 0)
-  const gpa = totalCredits === 0 ? '0.00' : (courses.reduce((a, c) => a + c.value * c.credits, 0) / totalCredits).toFixed(2)
+  const group = subjectGroup(sel)
+  const groupGrades = (group && sel.grades[group]) || {}
+  // Honors subjects only with the Honors option (sem 8); stand-alone minor courses only with
+  // the Minor option (sem 7). Program electives that double as minors always show.
+  const subjects = group
+    ? Object.entries(curriculum[group] ?? {}).filter(
+        ([name]) => !(!sel.honors && name.includes('Honors')) && !(!sel.minors && name.includes('Minor') && !name.includes('Program')),
+      )
+    : []
 
-  function addCourse() {
-    if (!course.trim()) return
-    const g = gradeOptions.find((g) => g.grade === grade) ?? gradeOptions[0]
-    setCourses((prev) => [...prev, { id: `g-${Date.now()}`, course: course.trim(), grade: g.grade, value: g.value, credits }])
-    setCourse('')
-    setCredits(3)
-    setFormOpen(false)
+  function update(patch: Partial<GpaSelection>) {
+    setSel((prev) => ({ ...prev, ...patch }))
+    setResult(null)
+    setError(null)
   }
 
-  function removeCourse(id: string) {
-    setCourses((prev) => prev.filter((c) => c.id !== id))
+  function setGrade(subject: string, grade: string) {
+    if (!group) return
+    setSel((prev) => ({ ...prev, grades: { ...prev.grades, [group]: { ...(prev.grades[group] ?? {}), [subject]: grade } } }))
+    setResult(null)
+    setError(null)
   }
+
+  // GPA = Σ(Grade Points × Credits) / Σ(Credits), over subjects that have a grade (Regulations 4.8.2).
+  function calculate() {
+    let points = 0
+    let credits = 0
+    for (const [name, cr] of subjects) {
+      const g = gradeOptions.find((o) => o.grade === groupGrades[name])
+      if (!g) continue
+      points += g.value * cr
+      credits += cr
+    }
+    if (credits === 0) {
+      setError('Please select grades for at least one subject!')
+      return
+    }
+    setResult({ gpa: Number((points / credits).toFixed(2)), points, credits })
+  }
+
+  // CGPA weights every graded course to date (4.8.3); earlier semesters enter as CGPA × credits.
+  const prevCgpa = Number(previous.cgpa)
+  const prevCredits = Number(previous.credits)
+  const prevValid = previous.cgpa !== '' && previous.credits !== '' && prevCgpa >= 0 && prevCgpa <= 10 && prevCredits > 0
+  const cgpa = result
+    ? (result.points + (prevValid ? prevCgpa * prevCredits : 0)) / (result.credits + (prevValid ? prevCredits : 0))
+    : null
 
   return (
     <section className="utility-card gpa-card">
@@ -84,56 +185,156 @@ function GpaSection() {
         </div>
         <div>
           <h3>GPA calculator</h3>
-          <p>Current semester estimate</p>
+          <p>Select your semester, stream, and grades to calculate your GPA.</p>
         </div>
       </div>
-      <div className="gpa-score">
-        <strong>{gpa}</strong>
-        <span>/ 10.0 estimated GPA</span>
-      </div>
-      <div className="grade-rows">
-        {courses.map((c) => (
-          <div key={c.id}>
-            <span>{c.course}</span>
-            <b>{c.grade}</b>
-            <small>{c.credits} credits</small>
-            <button className="icon-ghost" onClick={() => removeCourse(c.id)} aria-label={`Remove ${c.course}`}>
-              <Trash2 />
-            </button>
-          </div>
-        ))}
-      </div>
-      {formOpen ? (
-        <div className="planner-form inline-form">
-          <input value={course} onChange={(e) => setCourse(e.target.value)} placeholder="Course name" autoFocus />
-          <select value={credits} onChange={(e) => setCredits(Number(e.target.value))}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
-                {n} credits
-              </option>
-            ))}
-          </select>
-          <select value={grade} onChange={(e) => setGrade(e.target.value)}>
-            {gradeOptions.map((g) => (
-              <option key={g.grade} value={g.grade}>
-                {g.grade}
-              </option>
-            ))}
-          </select>
-          <div className="composer-actions">
-            <button className="text-button" onClick={() => setFormOpen(false)}>
-              Cancel
-            </button>
-            <button className="community-ask-btn small" onClick={addCourse}>
-              Add
-            </button>
-          </div>
+
+      <button className="gpa-guide-toggle" onClick={() => setGuideOpen((v) => !v)} aria-expanded={guideOpen}>
+        How does grading work? <ChevronDown className={guideOpen ? 'open' : ''} />
+      </button>
+      {guideOpen && (
+        <div className="gpa-guide">
+          <strong>Grade point scale</strong>
+          <p>{gradeOptions.map((g) => `${g.grade}: ${g.value}`).join(' · ')}</p>
+          <strong>GPA calculation</strong>
+          <p className="gpa-formula">GPA = Σ(Grade Points × Credits) / Σ(Credits)</p>
+          <p>Only subjects you&apos;ve picked a grade for are counted. An F counts with its credits.</p>
         </div>
-      ) : (
-        <button className="utility-link" onClick={() => setFormOpen(true)}>
-          <Plus /> Add course
-        </button>
       )}
+
+      <ChoiceRow
+        label="Select your semester"
+        options={ROMAN.map((r, i) => ({ label: r, value: i + 1 }))}
+        value={sel.semester}
+        onChange={(semester) => update({ semester })}
+      />
+      {sel.semester !== null && sel.semester <= 2 && (
+        <>
+          <ChoiceRow
+            label="Cycle"
+            options={[
+              { label: 'Physics Cycle', value: 'PHY' as const },
+              { label: 'Chemistry Cycle', value: 'CHM' as const },
+            ]}
+            value={sel.cycle}
+            onChange={(cycle) => update({ cycle })}
+          />
+          <ChoiceRow
+            label="Stream"
+            options={[
+              { label: 'CS Stream', value: 'CS' as const },
+              { label: 'Non-CS Stream', value: 'NONCS' as const },
+            ]}
+            value={sel.stream}
+            onChange={(stream) => update({ stream })}
+          />
+        </>
+      )}
+      {sel.semester !== null && sel.semester > 2 && (
+        <ChoiceRow label="Branch" options={BRANCHES} value={sel.branch} onChange={(branch) => update({ branch })} />
+      )}
+      {sel.semester === 8 && (
+        <label className="report-check gpa-option">
+          <input type="checkbox" checked={sel.honors} onChange={(e) => update({ honors: e.target.checked })} />
+          B.Tech Honors Program
+        </label>
+      )}
+      {sel.semester === 7 && (
+        <label className="report-check gpa-option">
+          <input type="checkbox" checked={sel.minors} onChange={(e) => update({ minors: e.target.checked })} />
+          Include Minor Course
+        </label>
+      )}
+
+      {subjects.length > 0 && (
+        <>
+          <div className="gpa-table" role="table">
+            <div className="gpa-table-head" role="row">
+              <span>Subject</span>
+              <span>Credits</span>
+              <span>Grade (/A+)</span>
+            </div>
+            {subjects.map(([name, cr]) => (
+              <div key={name} className="gpa-table-row" role="row">
+                <span>{name}</span>
+                <span>{cr}</span>
+                <select
+                  className="grade-select"
+                  value={groupGrades[name] ?? ''}
+                  onChange={(e) => setGrade(name, e.target.value)}
+                  aria-label={`Grade for ${name}`}
+                >
+                  <option value="" disabled>
+                    Grade
+                  </option>
+                  {gradeOptions.map((g) => (
+                    <option key={g.grade} value={g.grade}>
+                      {g.grade}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <button className="community-ask-btn gpa-calc-btn" onClick={calculate}>
+            Calculate GPA
+          </button>
+          {error && <p className="cgpa-error">{error}</p>}
+          {result && (
+            <div className="gpa-score">
+              <strong>{result.gpa.toFixed(2)}</strong>
+              <span>Your calculated GPA · {result.credits} credits</span>
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="cgpa-block">
+        <h4>CGPA</h4>
+        <p>Add your CGPA and credits from earlier semesters to include this semester.</p>
+        <div className="cgpa-inputs">
+          <label>
+            Previous CGPA
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={10}
+              step={0.01}
+              value={previous.cgpa}
+              onChange={(e) => setPrevious((p) => ({ ...p, cgpa: e.target.value }))}
+              placeholder="e.g. 8.42"
+            />
+          </label>
+          <label>
+            Credits completed
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={previous.credits}
+              onChange={(e) => setPrevious((p) => ({ ...p, credits: e.target.value }))}
+              placeholder="e.g. 80"
+            />
+          </label>
+        </div>
+        {(previous.cgpa !== '' || previous.credits !== '') && !prevValid && (
+          <p className="cgpa-error">Enter a CGPA between 0 and 10 and the credits it covers.</p>
+        )}
+        <div className="cgpa-results">
+          <div>
+            <strong>{cgpa === null ? '—' : cgpa.toFixed(2)}</strong>
+            <span>{prevValid ? 'cumulative CGPA' : 'CGPA (this semester only)'}</span>
+          </div>
+          <div>
+            {/* Senate guideline (4.8.3.1): aggregate % = CGPA × 10 */}
+            <strong>{cgpa === null ? '—' : `${(cgpa * 10).toFixed(2)}%`}</strong>
+            <span>aggregate marks</span>
+          </div>
+        </div>
+        {cgpa === null && <p className="cgpa-hint">Calculate your GPA above to see your CGPA.</p>}
+      </div>
     </section>
   )
 }

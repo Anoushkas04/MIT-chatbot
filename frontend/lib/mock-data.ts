@@ -109,23 +109,15 @@ export const searchResults: SearchResult[] = [
   { id: 's6', title: 'Hostel leave and outpass policy', kind: 'Campus procedure', excerpt: 'How to request an overnight outpass or vacation leave from your hostel warden.', icon: Building2 },
 ]
 
-export type GpaCourse = { id: string; course: string; grade: string; value: number; credits: number }
-
+// MIT Manipal 10-point grade scale (Regulations 4.8.1), as offered by the GPA calculator.
 export const gradeOptions: { grade: string; value: number }[] = [
   { grade: 'A+', value: 10 },
-  { grade: 'A', value: 10 },
-  { grade: 'A-', value: 9 },
-  { grade: 'B+', value: 8 },
-  { grade: 'B', value: 7 },
-  { grade: 'B-', value: 6 },
-  { grade: 'C', value: 5 },
+  { grade: 'A', value: 9 },
+  { grade: 'B', value: 8 },
+  { grade: 'C', value: 7 },
+  { grade: 'D', value: 6 },
+  { grade: 'E', value: 5 },
   { grade: 'F', value: 0 },
-]
-
-export const defaultGpaCourses: GpaCourse[] = [
-  { id: 'g1', course: 'Data Structures', grade: 'A', value: 10, credits: 4 },
-  { id: 'g2', course: 'Operating Systems', grade: 'A-', value: 9, credits: 4 },
-  { id: 'g3', course: 'Computer Networks', grade: 'B+', value: 8, credits: 3 },
 ]
 
 export type AttendanceCourse = { id: string; course: string; held: number; attended: number }

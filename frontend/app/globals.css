@@ -218,3 +218,34 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .blocked-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #e3e6df; border-radius: 10px; background: #fff; }
 .blocked-row .network-avatar { margin: 0; }
 .blocked-row strong { flex: 1; color: #526058; font-size: 12px; }
+.grade-select { width: 52px; height: 24px; margin-right: 15px; padding: 0 4px; border: 0; border-radius: 6px; background: #eff3eb; color: #53766f; font-size: 10px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.cgpa-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid #eef0eb; }
+.cgpa-block h4 { margin: 0; color: #234f4a; font-size: 13px; }
+.cgpa-block > p { margin: 4px 0 12px; color: #98a098; font-size: 10px; }
+.cgpa-inputs { display: flex; flex-wrap: wrap; gap: 10px; }
+.cgpa-inputs label { display: flex; flex: 1; min-width: 140px; flex-direction: column; gap: 5px; color: #5e6760; font-size: 10px; font-weight: 700; }
+.cgpa-inputs input { height: 38px; padding: 0 12px; border: 1px solid #dde3da; border-radius: 8px; color: #234f4a; font-size: 12px; font-family: inherit; }
+.cgpa-error { margin: 8px 0 0; color: #c0392b; font-size: 10px; }
+.cgpa-results { display: flex; gap: 30px; margin-top: 16px; }
+.cgpa-results div { display: flex; flex-direction: column; gap: 3px; }
+.cgpa-results strong { color: #234f4a; font-size: 26px; font-weight: 500; letter-spacing: -.05em; }
+.cgpa-results span { color: #8d968e; font-size: 10px; }
+.gpa-guide-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 18px; padding: 10px 12px; border: 1px solid #e3e6df; border-radius: 9px; background: #f9faf7; color: #53766f; font-size: 11px; font-weight: 700; cursor: pointer; }
+.gpa-guide-toggle svg { width: 14px; transition: transform .2s; }
+.gpa-guide-toggle svg.open { transform: rotate(180deg); }
+.gpa-guide { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid #e3e6df; border-top: 0; border-radius: 0 0 9px 9px; }
+.gpa-guide strong { margin-top: 4px; color: #234f4a; font-size: 11px; }
+.gpa-guide p { margin: 0; color: #6f7d74; font-size: 10px; line-height: 1.5; }
+.gpa-formula { padding: 8px; border-radius: 7px; background: #eff3eb; font-family: ui-monospace, monospace; text-align: center; }
+.gpa-step { display: flex; flex-direction: column; gap: 7px; margin-top: 18px; }
+.gpa-step-label { color: #5e6760; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.gpa-option { margin-top: 14px; }
+.gpa-table { margin-top: 20px; border: 1px solid #e3e6df; border-radius: 10px; overflow: hidden; }
+.gpa-table-head, .gpa-table-row { display: grid; grid-template-columns: 1fr 52px 76px; align-items: center; gap: 8px; padding: 8px 12px; }
+.gpa-table-head { background: #234f4a; color: #d8ef68; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.gpa-table-row { border-top: 1px solid #eef0eb; color: #526158; font-size: 11px; }
+.gpa-table-row:nth-child(even) { background: #fafbf8; }
+.gpa-table-head span:nth-child(2), .gpa-table-row span:nth-child(2) { text-align: center; }
+.gpa-table-row .grade-select { width: 100%; margin: 0; }
+.gpa-calc-btn { width: 100%; justify-content: center; margin-top: 14px; }
+.cgpa-hint { margin: 8px 0 0; color: #a4aba4; font-size: 10px; }
