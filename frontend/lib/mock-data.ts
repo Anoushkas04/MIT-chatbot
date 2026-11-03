@@ -318,7 +318,7 @@ export const communityQuestions: CommunityQuestion[] = [
 
 // ---- Network (LinkedIn-style connections) ----
 
-export type NetworkStatus = 'suggested' | 'pending' | 'incoming' | 'connected'
+export type NetworkStatus = 'suggested' | 'pending' | 'incoming' | 'connected' | 'dismissed'
 
 export type NetworkPerson = {
   id: string

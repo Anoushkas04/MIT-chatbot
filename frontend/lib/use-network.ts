@@ -27,5 +27,9 @@ export function useNetworkPeople() {
     setStatus(id, 'suggested')
   }
 
-  return { people, setPeople, connect, withdraw, accept, ignore }
+  function dismiss(id: string) {
+    setStatus(id, 'dismissed')
+  }
+
+  return { people, setPeople, connect, withdraw, accept, ignore, dismiss }
 }

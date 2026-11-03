@@ -43,7 +43,7 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .network-carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
 .network-carousel .network-card { flex: 0 0 150px; }
 .network-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 30px; }
-.network-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 14px; border: 1px solid #e3e6df; border-radius: 15px; background: #fff; text-align: center; }
+.network-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 14px; border: 1px solid #e3e6df; border-radius: 15px; background: #fff; text-align: center; }
 .network-avatar { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 6px; border-radius: 50%; background: #efd2c8; color: #6d4940; font-size: 14px; font-weight: 700; }
 .network-avatar.small { width: 34px; height: 34px; font-size: 11px; }
 .network-card strong { color: #234f4a; font-size: 12px; }
@@ -55,6 +55,9 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .network-action.connected { background: #eff3eb; color: #53766f; }
 .network-action-row { display: flex; gap: 6px; }
 .network-action.ghost { background: #f5ded6; color: #c75c45; padding: 7px 9px; }
+.network-dismiss { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #9aa39b; cursor: pointer; }
+.network-dismiss:hover { background: #eef0eb; color: #234f4a; }
+.network-dismiss svg { width: 13px; height: 13px; }
 .network-connected-tag { display: inline-flex; align-items: center; gap: 4px; color: #6fa07d; font-size: 9px; }
 .nav-badge.inline { display: inline-grid; margin-left: 6px; width: 16px; height: 16px; font-size: 8px; }
 

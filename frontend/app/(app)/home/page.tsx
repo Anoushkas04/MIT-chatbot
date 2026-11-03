@@ -16,7 +16,7 @@ export default function HomePage() {
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [saved, setSaved] = useLocalState<string[]>('mitra_saved', [])
   const [tasks] = useLocalState<PlannerTask[]>('mitra_planner_tasks', defaultPlannerTasks)
-  const { people, connect } = useNetworkPeople()
+  const { people, connect, dismiss } = useNetworkPeople()
 
   const todayLabel = new Date()
     .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -148,7 +148,7 @@ export default function HomePage() {
       <div className="network-carousel">
         {suggestions.length === 0 && <p className="view-sub">You&apos;re all caught up on suggestions.</p>}
         {suggestions.map((person) => (
-          <NetworkPersonCard key={person.id} person={person} onConnect={() => connect(person.id)} />
+          <NetworkPersonCard key={person.id} person={person} onConnect={() => connect(person.id)} onDismiss={() => dismiss(person.id)} />
         ))}
       </div>
     </div>

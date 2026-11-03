@@ -10,6 +10,7 @@ export function NetworkPersonCard({
   onAccept,
   onIgnore,
   onMessage,
+  onDismiss,
 }: {
   person: NetworkPerson
   onConnect?: () => void
@@ -17,9 +18,15 @@ export function NetworkPersonCard({
   onAccept?: () => void
   onIgnore?: () => void
   onMessage?: () => void
+  onDismiss?: () => void
 }) {
   return (
     <article className="network-card">
+      {person.status === 'suggested' && onDismiss && (
+        <button className="network-dismiss" onClick={onDismiss} aria-label="Remove suggestion">
+          <X />
+        </button>
+      )}
       <div className="network-avatar">{person.initials}</div>
       <strong>{person.name}</strong>
       <span className="network-meta">
