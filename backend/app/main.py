@@ -15,6 +15,7 @@ from app.rag.store import get_store_status
 # Import all modular APIRouters
 from app.routers.auth_router import router as auth_router
 from app.routers.chat_router import router as chat_router
+from app.routers.chat_citations_router import router as chat_citations_router
 from app.routers.academic_router import router as academic_router
 from app.routers.faculty_router import router as faculty_router
 from app.routers.community_router import router as community_router
@@ -44,6 +45,7 @@ app.add_middleware(
 # Mount Routers
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(chat_citations_router)
 app.include_router(academic_router)
 app.include_router(faculty_router)
 app.include_router(community_router)
