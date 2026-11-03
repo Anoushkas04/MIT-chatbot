@@ -2,8 +2,7 @@
 
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ArrowUpRight, Check, Filter, Heart } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ArrowUpRight, Check, Heart } from 'lucide-react'
 import { discoveries, type DiscoveryCategory } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
@@ -35,9 +34,6 @@ function DiscoverInner() {
           <h1>Find your next thing.</h1>
           <p className="view-sub">Clubs, projects, events and opportunities selected for you.</p>
         </div>
-        <Button variant="outline">
-          <Filter data-icon="inline-start" /> Filter
-        </Button>
       </div>
       <div className="discover-tabs">
         {tabs.map((t) => (
