@@ -7,6 +7,11 @@ import type { CommunityComment, CommunityQuestion } from '@/lib/mock-data'
  * matched topic rank even when they don't share the query's exact words.
  */
 export const TOPIC_VOCAB: Record<string, string[]> = {
+  // Not a Community tag; lets Search map certificate/form queries onto official documents.
+  Documents: [
+    'document', 'certificate', 'bonafide', 'transcript', 'marksheet', 'grade card', 'id card', 'noc', 'letter',
+    'form', 'student affairs', 'regulation', 'migration',
+  ],
   Academics: [
     'academic', 'course', 'subject', 'class', 'lecture', 'professor', 'prof', 'faculty', 'teacher', 'credit',
     'cgpa', 'gpa', 'sgpa', 'grade', 'syllabus', 'elective', 'assignment', 'lab', 'study', 'notes', 'semester',
@@ -19,11 +24,13 @@ export const TOPIC_VOCAB: Record<string, string[]> = {
   Exams: [
     'exam', 'midsem', 'endsem', 'mid sem', 'end sem', 'test', 'quiz', 'paper', 'revision', 'revise', 'prep',
     'prepare', 'preparation', 'marks', 'result', 'makeup', 'supplementary', 'reval', 'revaluation', 'pyq',
-    'question paper', 'sessional', 'study group', 'numerical', 'syllabus',
+    'question paper', 'sessional', 'study group', 'numerical', 'syllabus', 'schedule', 'timetable', 'date sheet',
+    'exam cell', 'examination', 'end semester', 'mid semester', 'hall ticket', 'admit card',
   ],
   Hostel: [
     'hostel', 'room', 'roommate', 'block', 'warden', 'mess', 'food', 'laundry', 'wifi', 'curfew',
-    'accommodation', 'pg', 'stay', 'dorm', 'fc', 'canteen',
+    'accommodation', 'pg', 'stay', 'dorm', 'fc', 'canteen', 'outpass', 'out pass', 'vacation', 'going home',
+    'overnight', 'night out',
   ],
   'Campus Life': [
     'campus', 'life', 'fest', 'revels', 'techtatva', 'cafe', 'canteen', 'sports', 'gym', 'marena', 'friends',
@@ -72,8 +79,8 @@ function termMatches(term: string, text: string, tokenSet: Set<string>): boolean
   return norm.includes(' ') ? ` ${text} `.includes(` ${norm} `) : tokenSet.has(stem(norm))
 }
 
-/** Interest tags the query relates to, strongest first. */
-export function matchTopics(query: string): string[] {
+/** Interest tags the text relates to, strongest first. `partial` also counts half-typed words. */
+export function matchTopics(query: string, partial = true): string[] {
   const text = normalizeText(query)
   const tokenList = tokens(query)
   const tokenSet = new Set(tokenList)
@@ -82,7 +89,7 @@ export function matchTopics(query: string): string[] {
     let score = termMatches(topic, text, tokenSet) ? 2 : 0
     for (const term of vocab) if (termMatches(term, text, tokenSet)) score += 1
     // Partial words while typing ("regis" -> registration).
-    if (score === 0 && tokenList.some((t) => t.length >= 4 && [topic, ...vocab].some((v) => normalizeText(v).startsWith(t)))) {
+    if (partial && score === 0 && tokenList.some((t) => t.length >= 4 && [topic, ...vocab].some((v) => normalizeText(v).startsWith(t)))) {
       score = 0.5
     }
     if (score > 0) hits.push({ topic, score })
@@ -97,28 +104,46 @@ function threadText(comments: CommunityComment[]): string {
 // Scores below this come from a single incidental related word, which reads as noise.
 export const MIN_RELEVANCE = 2
 
-/** Relevance of a question to the query; below MIN_RELEVANCE it should be hidden. */
-export function scoreQuestion(question: CommunityQuestion, query: string, topics: string[]): number {
+/** Fields a searchable item exposes, strongest signal first. */
+export type SearchDoc = { title: string; body: string; extra?: string; tags?: string[] }
+
+/**
+ * Relevance of any item to the query; below MIN_RELEVANCE it should be hidden.
+ * Exact words score by where they appear (title > body > extra). Each topic the
+ * query maps to adds weight if the item is tagged with it (or, untagged, reads
+ * as that topic) and for related campus terms the item mentions.
+ */
+export function scoreDocument(doc: SearchDoc, query: string, topics: string[]): number {
   const queryTokens = [...new Set(tokens(query))]
   if (queryTokens.length === 0) return 0
-  const title = new Set(tokens(question.title))
-  const body = new Set(tokens(question.body))
-  const answersText = threadText(question.answers)
-  const answers = new Set(tokens(answersText))
-  const allText = normalizeText(`${question.title} ${question.body} ${answersText}`)
-  const allTokens = new Set([...title, ...body, ...answers])
+  const title = new Set(tokens(doc.title))
+  const body = new Set(tokens(doc.body))
+  const extra = new Set(tokens(doc.extra ?? ''))
+  const allText = normalizeText(`${doc.title} ${doc.body} ${doc.extra ?? ''}`)
+  const allTokens = new Set([...title, ...body, ...extra])
+  // Untagged items get topics from whole words only; partial matching is for half-typed queries.
+  const docTopics = doc.tags && doc.tags.length > 0 ? doc.tags : matchTopics(`${doc.title} ${doc.body}`, false).slice(0, 2)
 
   let score = 0
   for (const t of queryTokens) {
     if (title.has(t)) score += 3
     else if (body.has(t)) score += 2
-    else if (answers.has(t)) score += 1
+    else if (extra.has(t)) score += 1
   }
   topics.forEach((topic, i) => {
     const weight = i === 0 ? 1 : 0.6
-    if (question.tags.includes(topic)) score += 4 * weight
+    if (docTopics.includes(topic)) score += 4 * weight
     const related = TOPIC_VOCAB[topic].filter((term) => termMatches(term, allText, allTokens)).length
     score += Math.min(related, 3) * weight
   })
   return score
+}
+
+/** Relevance of a community question; answers and replies count as the weakest field. */
+export function scoreQuestion(question: CommunityQuestion, query: string, topics: string[]): number {
+  return scoreDocument(
+    { title: question.title, body: question.body, extra: threadText(question.answers), tags: question.tags },
+    query,
+    topics,
+  )
 }
