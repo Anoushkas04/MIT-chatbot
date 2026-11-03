@@ -3,7 +3,7 @@
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ArrowUpRight, Check, Heart } from 'lucide-react'
-import { discoveries, type DiscoveryCategory } from '@/lib/mock-data'
+import { discoveries, type ClubType, type DiscoveryCategory } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
 const tabs: { label: string; value: DiscoveryCategory | 'all' }[] = [
@@ -14,13 +14,17 @@ const tabs: { label: string; value: DiscoveryCategory | 'all' }[] = [
   { label: 'Opportunities', value: 'opportunity' },
 ]
 
+const clubTypes: ClubType[] = ['Technical', 'Cultural', 'Sports']
+
 function DiscoverInner() {
   const params = useSearchParams()
   const initialTab = (params.get('tab') as DiscoveryCategory | null) ?? 'all'
   const [tab, setTab] = useState<DiscoveryCategory | 'all'>(initialTab)
+  const [clubType, setClubType] = useState<ClubType | 'all'>('all')
   const [saved, setSaved] = useLocalState<string[]>('mitra_saved', [])
 
-  const list = tab === 'all' ? discoveries : discoveries.filter((d) => d.category === tab)
+  const inTab = tab === 'all' ? discoveries : discoveries.filter((d) => d.category === tab)
+  const list = tab === 'club' && clubType !== 'all' ? inTab.filter((d) => d.clubType === clubType) : inTab
 
   function toggleSave(id: string) {
     setSaved((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -42,6 +46,18 @@ function DiscoverInner() {
           </button>
         ))}
       </div>
+      {tab === 'club' && (
+        <div className="tag-picker club-filter" role="group" aria-label="Filter clubs by type">
+          <button className={clubType === 'all' ? 'active' : ''} onClick={() => setClubType('all')}>
+            All
+          </button>
+          {clubTypes.map((t) => (
+            <button key={t} className={clubType === t ? 'active' : ''} onClick={() => setClubType(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="discover-list">
         {list.map((item) => {
           const Icon = item.icon

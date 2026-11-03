@@ -8,9 +8,11 @@ import {
   HelpCircle,
   Lightbulb,
   MapPin,
+  Music,
   Sparkles,
   Trophy,
   Users,
+  Volleyball,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -70,6 +72,8 @@ export const defaultProfile: Profile = {
 
 export type DiscoveryCategory = 'club' | 'project' | 'event' | 'opportunity'
 
+export type ClubType = 'Technical' | 'Cultural' | 'Sports'
+
 export type DiscoveryItem = {
   id: string
   title: string
@@ -79,17 +83,22 @@ export type DiscoveryItem = {
   tone: 'coral' | 'blue' | 'yellow' | 'green'
   icon: LucideIcon
   why: string
+  clubType?: ClubType
 }
 
 export const discoveries: DiscoveryItem[] = [
   { id: 'd1', title: 'Manipal Hackathon 2026', type: 'Competition', category: 'event', meta: 'Oct 25 · Innovation Centre', tone: 'coral', icon: Flame, why: 'Matches your interest in building' },
-  { id: 'd2', title: 'IEEE Student Branch', type: 'Club', category: 'club', meta: '48 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Popular with CSE students' },
+  { id: 'd2', title: 'IEEE Student Branch', type: 'Club', category: 'club', meta: '48 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Popular with CSE students', clubType: 'Technical' },
   { id: 'd3', title: 'Design Thinking Workshop', type: 'Workshop', category: 'event', meta: 'Nov 02 · Student Plaza', tone: 'yellow', icon: Sparkles, why: 'Based on your saved events' },
   { id: 'd4', title: 'Product Lab · Student Innovation Cell', type: 'Project', category: 'project', meta: 'Rolling applications · 6 spots open', tone: 'green', icon: Users, why: 'A new way to explore your interests' },
-  { id: 'd5', title: 'Robotics Club', type: 'Club', category: 'club', meta: '32 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Matches your interest in robotics' },
+  { id: 'd5', title: 'Robotics Club', type: 'Club', category: 'club', meta: '32 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Matches your interest in robotics', clubType: 'Technical' },
   { id: 'd6', title: 'Summer Research Internship — AI Lab', type: 'Internship', category: 'opportunity', meta: 'Apply by Dec 10 · 4 openings', tone: 'coral', icon: Briefcase, why: 'Fits your AI interest' },
   { id: 'd7', title: 'Campus Photography Walk', type: 'Event', category: 'event', meta: 'Nov 08 · Lake Side', tone: 'yellow', icon: CalendarDays, why: 'Based on your saved events' },
   { id: 'd8', title: 'Case Study Competition — Finance Club', type: 'Competition', category: 'opportunity', meta: 'Teams of 3 · Reg closes Nov 15', tone: 'green', icon: Trophy, why: 'Popular with 5th semester students' },
+  { id: 'd9', title: 'Music Club', type: 'Club', category: 'club', meta: '40 active members · Cultural', tone: 'coral', icon: Music, why: 'Weekly jam sessions at Student Plaza', clubType: 'Cultural' },
+  { id: 'd10', title: 'Dramatics Society', type: 'Club', category: 'club', meta: '27 active members · Cultural', tone: 'yellow', icon: Sparkles, why: 'Auditions open for the fest play', clubType: 'Cultural' },
+  { id: 'd11', title: 'Football Club', type: 'Club', category: 'club', meta: '35 active members · Sports', tone: 'green', icon: Trophy, why: 'Evening practice at the main ground', clubType: 'Sports' },
+  { id: 'd12', title: 'Volleyball Club', type: 'Club', category: 'club', meta: '22 active members · Sports', tone: 'green', icon: Volleyball, why: 'Open trials for the inter-college team', clubType: 'Sports' },
 ]
 
 export type SearchResult = {
