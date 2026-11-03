@@ -23,13 +23,28 @@ export function useNetworkPeople() {
     setStatus(id, 'connected')
   }
 
+  // Declining a request shouldn't bounce the person straight back into suggestions.
   function ignore(id: string) {
-    setStatus(id, 'suggested')
+    setStatus(id, 'dismissed')
   }
 
   function dismiss(id: string) {
     setStatus(id, 'dismissed')
   }
 
-  return { people, setPeople, connect, withdraw, accept, ignore, dismiss }
+  function block(id: string) {
+    setStatus(id, 'blocked')
+  }
+
+  function unblock(id: string) {
+    setStatus(id, 'suggested')
+  }
+
+  // Account search results aren't in the list yet; add them on first connect.
+  function connectNew(person: NetworkPerson) {
+    setPeople((prev) => (prev.some((p) => p.id === person.id) ? prev : [...prev, { ...person, status: 'suggested' }]))
+    connect(person.id)
+  }
+
+  return { people, setPeople, connect, withdraw, accept, ignore, dismiss, block, unblock, connectNew }
 }

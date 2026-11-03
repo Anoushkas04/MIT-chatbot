@@ -11,6 +11,8 @@ export function NetworkPersonCard({
   onIgnore,
   onMessage,
   onDismiss,
+  onRemove,
+  removeLabel = 'Remove',
 }: {
   person: NetworkPerson
   onConnect?: () => void
@@ -19,20 +21,33 @@ export function NetworkPersonCard({
   onIgnore?: () => void
   onMessage?: () => void
   onDismiss?: () => void
+  // Remove from any list (suggestions, requests, connections); labelled per context.
+  onRemove?: () => void
+  removeLabel?: string
 }) {
   return (
     <article className="network-card">
-      {person.status === 'suggested' && onDismiss && (
-        <button className="network-dismiss" onClick={onDismiss} aria-label="Remove suggestion">
+      {onRemove ? (
+        <button className="network-dismiss" onClick={onRemove} aria-label={removeLabel} title={removeLabel}>
           <X />
         </button>
+      ) : (
+        person.status === 'suggested' &&
+        onDismiss && (
+          <button className="network-dismiss" onClick={onDismiss} aria-label="Remove suggestion">
+            <X />
+          </button>
+        )
       )}
       <div className="network-avatar">{person.initials}</div>
       <strong>{person.name}</strong>
+      {person.accountId && <span className="account-badge">On MITra</span>}
       <span className="network-meta">
-        {person.branch} · {person.semester}
+        {[person.branch, person.semester].filter(Boolean).join(' · ')}
       </span>
-      <p className="network-caption">Also into {person.sharedInterests.join(', ')}</p>
+      <p className="network-caption">
+        {person.sharedInterests.length > 0 ? `Also into ${person.sharedInterests.join(', ')}` : 'Student at MIT Manipal'}
+      </p>
       {person.status === 'suggested' && (
         <button className="network-action" onClick={onConnect}>
           <UserPlus /> Connect

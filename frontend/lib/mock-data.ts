@@ -316,7 +316,7 @@ export const communityQuestions: CommunityQuestion[] = [
 
 // ---- Network (LinkedIn-style connections) ----
 
-export type NetworkStatus = 'suggested' | 'pending' | 'incoming' | 'connected' | 'dismissed'
+export type NetworkStatus = 'suggested' | 'pending' | 'incoming' | 'connected' | 'dismissed' | 'blocked'
 
 export type NetworkPerson = {
   id: string
@@ -326,6 +326,8 @@ export type NetworkPerson = {
   semester: string
   sharedInterests: string[]
   status: NetworkStatus
+  // Set for people found through account search; their backend user id, used for reports.
+  accountId?: string
 }
 
 export const defaultNetworkPeople: NetworkPerson[] = [

@@ -23,6 +23,7 @@ from app.routers.feedback_router import router as feedback_router
 from app.routers.admin_router import router as admin_router
 from app.routers.rewards_router import router as rewards_router
 from app.routers.search_router import router as search_router
+from app.routers.users_router import router as users_router
 
 app = FastAPI(
     title="MIT CampusOS Platform API",
@@ -51,6 +52,7 @@ app.include_router(feedback_router)
 app.include_router(admin_router)
 app.include_router(rewards_router)
 app.include_router(search_router)
+app.include_router(users_router)
 
 
 @app.on_event("startup")

@@ -1,6 +1,8 @@
 // Client for the MITra FastAPI backend (backend/app/routers). Request/response
 // shapes mirror backend/app/schemas.py.
 
+import { getSession } from '@/lib/session'
+
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 
 export type BackendUser = {
@@ -57,6 +59,27 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T
 }
 
+async function authed<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  const token = getSession()?.token
+  if (!token) throw new Error('Please sign in to do this.')
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  } catch {
+    throw new Error("Couldn't reach the MITra server. Check your connection and try again.")
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const detail = typeof data?.detail === 'string' ? data.detail : null
+    throw new Error(detail ?? `Request failed (${res.status}). Please try again.`)
+  }
+  return data as T
+}
+
 export function registerSendOtp(body: { name: string; registration_number: string; learner_id: string }) {
   return post<OtpSentResponse>('/api/auth/register-send-otp', body)
 }
@@ -85,4 +108,29 @@ export function askMitra(body: {
   semester?: string | null
 }) {
   return post<ChatResponse>('/api/chat', { role: 'student', language: 'en', ...body })
+}
+
+export type PublicUser = {
+  id: string
+  name: string
+  department: string
+  semester: string
+  academic_year: string
+  interests: string[]
+}
+
+export type ReportReason = 'Harassment' | 'Inappropriate content' | 'Spam or scam' | 'Other'
+
+export function searchUsers(q: string) {
+  return authed<{ results: PublicUser[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`)
+}
+
+export function reportUser(body: {
+  reported_user_id?: string
+  reported_name: string
+  reason: ReportReason
+  details?: string
+  recent_messages?: string[]
+}) {
+  return authed<{ status: string; message: string; report_id: number }>('POST', '/api/users/report', body)
 }
