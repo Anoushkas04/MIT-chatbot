@@ -75,7 +75,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
         </nav>
         <div className="sidebar-section">
           <span className="side-label">SAVED</span>
-          <Link href="/discover" onClick={onCloseMobile}>
+          <Link href="/saved" className={pathname === '/saved' ? 'active' : ''} onClick={onCloseMobile}>
             <Heart />
             <span>Saved for later</span>
           </Link>
