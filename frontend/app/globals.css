@@ -258,3 +258,6 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .notification-body time { color: #a4aaa4; font-size: 9px; }
 .unread-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: #e07b64; }
 @media (max-width: 520px) { .notification-row { flex-wrap: wrap; } .notification-row .network-action-row { margin-left: 47px; } }
+/* Pin the sidebar to the viewport so Settings / Sign out stay visible on long pages;
+   if the nav is taller than the screen, the sidebar scrolls on its own. */
+.sidebar { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; }
