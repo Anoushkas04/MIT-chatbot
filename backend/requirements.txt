@@ -1,10 +1,27 @@
-fastapi
-uvicorn[standard]
-google-genai
-pypdf
-python-dotenv
-numpy
-sqlalchemy
+fastapi>=0.119,<1
+uvicorn[standard]>=0.37,<1
+google-genai>=1.52,<2
+pypdf>=6.1,<7
+python-dotenv>=1.1,<2
+numpy>=2.2,<3
+sqlalchemy>=2.0,<3
 PyJWT
 psycopg2-binary
-bcrypt
+
+# Page-aware hybrid RAG.
+PyMuPDF>=1.26,<2
+Pillow>=10,<14
+rank-bm25>=0.2,<0.3
+
+# Interchangeable multimodal generation providers.
+openai>=2,<3
+anthropic>=0.75,<1
+
+# Test runner (fast tests never download model weights).
+pytest>=8,<10
+
+# Not installed: sentence-transformers[image]/peft (ColPali visual RAG) and
+# rapidocr-onnxruntime (scanned-page OCR). Both are lazily imported and
+# gated behind VISUAL_RAG_ENABLED/LOCAL_OCR_ENABLED (see .env.example) —
+# install them and flip the flags on if you want those features; everything
+# else works without them.

@@ -10,11 +10,12 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.seed import seed_database
-from app.rag.store import get_store
+from app.rag.store import get_store_status
 
 # Import all modular APIRouters
 from app.routers.auth_router import router as auth_router
 from app.routers.chat_router import router as chat_router
+from app.routers.chat_citations_router import router as chat_citations_router
 from app.routers.academic_router import router as academic_router
 from app.routers.faculty_router import router as faculty_router
 from app.routers.community_router import router as community_router
@@ -44,6 +45,7 @@ app.add_middleware(
 # Mount Routers
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(chat_citations_router)
 app.include_router(academic_router)
 app.include_router(faculty_router)
 app.include_router(community_router)
@@ -79,10 +81,18 @@ def root():
 
 @app.get("/api/health", tags=["0. System Health"])
 def health():
+    rag = get_store_status()
+    from app.providers import get_provider_status
+    from app.rag.visual_store import get_visual_status
+    visual = get_visual_status()
     return {
         "status": "ok",
         "platform": "MIT CampusOS",
-        "rag_store_ready": True,
+        "rag_store_ready": rag["ready"],
+        "rag_chunk_count": rag["chunk_count"],
+        "rag_error": rag["error"],
+        "visual_rag": visual,
+        "llm": get_provider_status(),
         "docs_url": "http://localhost:8000/docs",
     }
 
