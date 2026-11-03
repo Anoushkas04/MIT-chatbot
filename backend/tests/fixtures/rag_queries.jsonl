@@ -1,0 +1,40 @@
+{"id":"text-01","modality":"text","question":"What is the minimum attendance required to write the end semester examination?","expected_source":"MIT - UG - Hand Book-- 2024 - Revised.pdf"}
+{"id":"text-02","modality":"text","question":"What happens when a student has less than 75 percent attendance?","expected_source":"MIT - UG - Hand Book-- 2024 - Revised.pdf"}
+{"id":"text-03","modality":"text","question":"What are the examination instructions for B.Tech students in April May 2025?","expected_source":"Exam Instructions for  B.TECH & PG Students- April-May  2025.pdf"}
+{"id":"text-04","modality":"text","question":"What are the placement eligibility guidelines?","expected_source":"PLACEMENT GUIDELINES 13 JULY 2024 FINAL_250905_124353.pdf"}
+{"id":"text-05","modality":"text","question":"What is the procedure for a one year seventh semester internship?","expected_source":"SOP - VII Sem - 1 Year Internship - June 2026.pdf"}
+{"id":"text-06","modality":"text","question":"How do students submit OE PE and FC course preferences?","expected_source":"Notification-Submission_of_Preferences_for_OE__PE__and_FC_Courses___Instructions_and_Steps_to_Follow[642].pdf"}
+{"id":"text-07","modality":"text","question":"What is the winter lab registration payment notice?","expected_source":"Notice-053- Payment for Winter Lab registration.pdf"}
+{"id":"text-08","modality":"text","question":"What does the notice say about re-registration of fourth and sixth semester courses?","expected_source":"Notice-049-Re-registration of IV & VI semester courses.pdf"}
+{"id":"text-09","modality":"text","question":"What is required to complete mandatory learning courses in March 2026?","expected_source":"Notification-Completion of Mandatory Learing Courses (MLC) March 2026.pdf"}
+{"id":"text-10","modality":"text","question":"What are the UHV and HRC mandatory learning course requirements for 2026-27?","expected_source":"Notification-Mandatory Learning Courses-UHV & HRC -2026-27.pdf"}
+{"id":"text-11","modality":"text","question":"How does registration for proctored learning work in August 2026?","expected_source":"Notification-Registration for Proctured LearningAug-2026-27 Revised.pdf"}
+{"id":"text-12","modality":"text","question":"What is covered in the BTech CSE 2026 syllabus?","expected_source":"BTech_CSE_Syllabus_2026.pdf"}
+{"id":"text-13","modality":"text","question":"What is covered in the Mathematics and Computing 2025 syllabus?","expected_source":"BTech_MnC_Syllabus_2025.pdf"}
+{"id":"text-14","modality":"text","question":"What topics are in the machine learning course plan?","expected_source":"CP_ML.pdf"}
+{"id":"text-15","modality":"text","question":"What topics are in the deep learning course plan?","expected_source":"CP_DL.pdf"}
+{"id":"text-16","modality":"text","question":"What topics are in the data structures and applications detailed syllabus?","expected_source":"CSE 2152 DATA STRUCTURES AND APPLICATIONS Detailed Syllabus-1.pdf"}
+{"id":"text-17","modality":"text","question":"What is included in the database systems course plan?","expected_source":"DBS plan.pdf"}
+{"id":"text-18","modality":"text","question":"What is included in the operating systems course plan?","expected_source":"OS plan.pdf"}
+{"id":"text-19","modality":"text","question":"What is included in the computer networks course plan?","expected_source":"CN plan.pdf"}
+{"id":"text-20","modality":"text","question":"What is included in the design and analysis of algorithms plan?","expected_source":"DAA plan.pdf"}
+{"id":"text-21","modality":"text","question":"What is included in the bioinformatics course plan?","expected_source":"Bioinformatics - Course Plan.pdf"}
+{"id":"text-22","modality":"text","question":"What guidance is available for Impartus lecture capture students?","expected_source":"Impartus Lecture Capture - Student Guide.pdf"}
+{"id":"text-23","modality":"text","question":"What student exam instructions were issued in November 2025?","expected_source":"INSTRUCTIONS TO students-November 2025.pdf"}
+{"id":"text-24","modality":"text","question":"What are the BTech common counselling round two cutoff ranks for 2026?","expected_source":"BTech_Common_Counseling_2026_Cutoff_Rank_Round_2.pdf"}
+{"id":"text-25","modality":"text","question":"What are the MTech mechanical engineering 2026 cutoff ranks?","expected_source":"MTech ME 2026 Cut off Rank.pdf"}
+{"id":"text-26","modality":"text","question":"What was the BTech lateral entry round one general cutoff?","expected_source":"BTech Lateral Round 1_General.pdf"}
+{"id":"text-27","modality":"text","question":"What was the BTech lateral entry round two SAGES cutoff?","expected_source":"BTech Lateral Round 2_SAGES CUT OFF RANK.pdf"}
+{"id":"text-28","modality":"text","question":"Which student clubs are listed?","expected_source":"clubs.pdf"}
+{"id":"csv-01","modality":"csv","question":"Which cabin is assigned to a School of Computer Engineering faculty member?","expected_source":"manipal_sce_faculty_cabins.csv"}
+{"id":"csv-02","modality":"csv","question":"List faculty in the School of Computer Engineering.","expected_source":"manipal_sce_faculty_cabins.csv"}
+{"id":"csv-03","modality":"csv","question":"What faculty qualifications are listed for MIT Manipal?","expected_source":"mit_manipal_faculty.csv"}
+{"id":"csv-04","modality":"csv","question":"Find a faculty member by department and designation.","expected_source":"mit_manipal_faculty.csv"}
+{"id":"visual-01","modality":"visual","question":"What dates are shown in the 2025-26 academic calendar?","expected_source":"Academic Calendar 25-26_ Final_June30_2025.pdf"}
+{"id":"visual-02","modality":"visual","question":"What dates are shown in the 2026-27 academic calendar?","expected_source":"Academic Calendar 26-27 (1).pdf"}
+{"id":"visual-03","modality":"visual","question":"What are the first year computer science BTech subjects for 2026?","expected_source":"First year CS 2026 B.Tech.pdf"}
+{"id":"visual-04","modality":"visual","question":"What are the first year core BTech subjects for 2026?","expected_source":"First year Core 2026 B.Tech.pdf"}
+{"id":"visual-05","modality":"visual","question":"What do the BTech regulations for 2026 state?","expected_source":"Regulations 2026 B.Tech.pdf"}
+{"id":"visual-06","modality":"visual","question":"What malpractice guidelines apply from academic year 2024-25?","expected_source":"Malpractice guidelines with effect from AY 2024-25 (5).pdf"}
+{"id":"visual-07","modality":"visual","question":"What INR fee information is shown in the MIT attachment?","expected_source":"AttachmentMIT_INR_compressed..pdf"}
+{"id":"visual-08","modality":"visual","question":"What best research performance information is listed for UG and PG students?","expected_source":"Best Research Performance- UG-PG Students.pdf"}
