@@ -119,6 +119,8 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .inline-edit { margin: 6px 0 10px; padding: 0; border: none; background: transparent; }
 .inline-edit input { margin-bottom: 6px; }
 .reply-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 0 10px; padding-left: 14px; border-left: 2px solid #eef0eb; }
+.reply-list.flat { margin-left: -28px; } /* pull back under the parent avatar so deep threads indent slowly */
+.deleted-body { font-style: italic; color: #9aa39b !important; }
 .reply-row { display: flex; gap: 8px; }
 .reply-row p { margin: 3px 0 5px; color: #526058; font-size: 11px; line-height: 1.45; }
 

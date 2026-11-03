@@ -5,30 +5,44 @@ import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Tras
 import {
   communityQuestions as seedQuestions,
   defaultProfile,
-  type CommunityAnswer,
+  type CommunityComment,
   type CommunityQuestion,
-  type CommunityReply,
   type Profile,
 } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
 const VERIFIED_THRESHOLD = 10
+// Past this depth sub-threads stop indenting further so deep chains stay readable.
+const MAX_INDENT_DEPTH = 4
 const tagOptions = ['Academics', 'Attendance', 'Exams', 'Hostel', 'Campus Life', 'Clubs', 'Opportunities', 'Registration']
 
 type SortMode = 'top' | 'new' | 'unanswered'
 type Votes = Record<string, 1 | -1>
 
-function applyDelta(list: CommunityQuestion[], id: string, delta: number): CommunityQuestion[] {
-  return list.map((q) => {
-    if (q.id === id) return { ...q, votes: q.votes + delta }
-    return {
-      ...q,
-      answers: q.answers.map((a) => {
-        if (a.id === id) return { ...a, votes: a.votes + delta }
-        return { ...a, replies: a.replies.map((r) => (r.id === id ? { ...r, votes: r.votes + delta } : r)) }
-      }),
-    }
+// Stored data from before nesting existed has leaf replies without a `replies` array.
+function normalizeComment(c: CommunityComment): CommunityComment {
+  return { ...c, replies: (c.replies ?? []).map(normalizeComment) }
+}
+
+function mapComment(list: CommunityComment[], id: string, fn: (c: CommunityComment) => CommunityComment): CommunityComment[] {
+  return list.map((c) => (c.id === id ? fn(c) : { ...c, replies: mapComment(c.replies ?? [], id, fn) }))
+}
+
+// A comment with replies becomes a placeholder so its sub-thread survives.
+function removeComment(list: CommunityComment[], id: string): CommunityComment[] {
+  return list.flatMap((c) => {
+    const replies = c.replies ?? []
+    if (c.id !== id) return [{ ...c, replies: removeComment(replies, id) }]
+    return replies.length > 0 ? [{ ...c, body: '', deleted: true }] : []
   })
+}
+
+function applyDelta(list: CommunityQuestion[], id: string, delta: number): CommunityQuestion[] {
+  return list.map((q) =>
+    q.id === id
+      ? { ...q, votes: q.votes + delta }
+      : { ...q, answers: mapComment(q.answers, id, (c) => ({ ...c, votes: c.votes + delta })) },
+  )
 }
 
 function VoteControl({ id, votes, myVotes, onVote }: { id: string; votes: number; myVotes: Votes; onVote: (id: string, dir: 1 | -1) => void }) {
@@ -46,8 +60,20 @@ function VoteControl({ id, votes, myVotes, onVote }: { id: string; votes: number
   )
 }
 
-function ReplyBox({ placeholder, onSubmit, onCancel }: { placeholder: string; onSubmit: (text: string) => void; onCancel: () => void }) {
-  const [text, setText] = useState('')
+function ReplyBox({
+  placeholder,
+  initial = '',
+  submitLabel = 'Post',
+  onSubmit,
+  onCancel,
+}: {
+  placeholder: string
+  initial?: string
+  submitLabel?: string
+  onSubmit: (text: string) => void
+  onCancel: () => void
+}) {
+  const [text, setText] = useState(initial)
   return (
     <div className="reply-box">
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} autoFocus />
@@ -63,78 +89,90 @@ function ReplyBox({ placeholder, onSubmit, onCancel }: { placeholder: string; on
             setText('')
           }}
         >
-          Post
+          {submitLabel}
         </button>
       </div>
     </div>
   )
 }
 
-function ReplyRow({ reply, myVotes, onVote }: { reply: CommunityReply; myVotes: Votes; onVote: (id: string, dir: 1 | -1) => void }) {
-  return (
-    <div className="reply-row">
-      <span className="comment-avatar small">{reply.initials}</span>
-      <div>
-        <div className="community-meta">
-          <strong>{reply.author}</strong>
-          <time>{reply.time}</time>
-        </div>
-        <p>{reply.body}</p>
-        <VoteControl id={reply.id} votes={reply.votes} myVotes={myVotes} onVote={onVote} />
-      </div>
-    </div>
-  )
-}
-
-function AnswerRow({
-  questionId,
-  answer,
-  myVotes,
-  onVote,
-  onAddReply,
-}: {
-  questionId: string
-  answer: CommunityAnswer
+type ThreadHandlers = {
+  currentUser: string
   myVotes: Votes
   onVote: (id: string, dir: 1 | -1) => void
-  onAddReply: (questionId: string, answerId: string, body: string) => void
-}) {
+  onReply: (parentId: string, body: string) => void
+  onEdit: (id: string, body: string) => void
+  onDelete: (id: string) => void
+}
+
+function CommentThread({ comment, depth, ...handlers }: { comment: CommunityComment; depth: number } & ThreadHandlers) {
+  const { currentUser, myVotes, onVote, onReply, onEdit, onDelete } = handlers
   const [replyOpen, setReplyOpen] = useState(false)
-  const verified = answer.votes >= VERIFIED_THRESHOLD
+  const [editing, setEditing] = useState(false)
+  const isTop = depth === 0
+  const isOwn = !comment.deleted && comment.author === currentUser
+  const verified = isTop && !comment.deleted && comment.votes >= VERIFIED_THRESHOLD
+
   return (
-    <div className="answer-row">
-      <span className="comment-avatar">{answer.initials}</span>
+    <div className={isTop ? 'answer-row' : 'reply-row'}>
+      <span className={isTop ? 'comment-avatar' : 'comment-avatar small'}>{comment.deleted ? '?' : comment.initials}</span>
       <div className="answer-body">
         <div className="community-meta">
-          <strong>{answer.author}</strong>
-          <time>{answer.time}</time>
+          <strong>{comment.deleted ? '[deleted]' : comment.author}</strong>
+          <time>{comment.time}</time>
+          {comment.edited && !comment.deleted && <span className="edited-tag">edited</span>}
           {verified && (
             <span className="verified-tag">
               <BadgeCheck /> Community verified
             </span>
           )}
+          {isOwn && !editing && (
+            <div className="own-post-actions">
+              <button className="icon-action" onClick={() => setEditing(true)} aria-label="Edit reply" title="Edit">
+                <Pencil size={14} />
+              </button>
+              <button className="icon-action danger" onClick={() => onDelete(comment.id)} aria-label="Delete reply" title="Delete">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          )}
         </div>
-        <p>{answer.body}</p>
+        {editing ? (
+          <ReplyBox
+            placeholder="Edit your reply..."
+            initial={comment.body}
+            submitLabel="Save"
+            onCancel={() => setEditing(false)}
+            onSubmit={(text) => {
+              onEdit(comment.id, text)
+              setEditing(false)
+            }}
+          />
+        ) : (
+          <p className={comment.deleted ? 'deleted-body' : undefined}>{comment.deleted ? 'This reply was deleted.' : comment.body}</p>
+        )}
         <div className="comment-actions">
-          <VoteControl id={answer.id} votes={answer.votes} myVotes={myVotes} onVote={onVote} />
-          <button onClick={() => setReplyOpen((v) => !v)}>
-            <MessageSquare /> Reply
-          </button>
+          <VoteControl id={comment.id} votes={comment.votes} myVotes={myVotes} onVote={onVote} />
+          {!comment.deleted && (
+            <button onClick={() => setReplyOpen((v) => !v)}>
+              <MessageSquare /> Reply
+            </button>
+          )}
         </div>
         {replyOpen && (
           <ReplyBox
-            placeholder={`Reply to ${answer.author}...`}
+            placeholder={`Reply to ${comment.author}...`}
             onCancel={() => setReplyOpen(false)}
             onSubmit={(text) => {
-              onAddReply(questionId, answer.id, text)
+              onReply(comment.id, text)
               setReplyOpen(false)
             }}
           />
         )}
-        {answer.replies.length > 0 && (
-          <div className="reply-list">
-            {answer.replies.map((r) => (
-              <ReplyRow key={r.id} reply={r} myVotes={myVotes} onVote={onVote} />
+        {comment.replies.length > 0 && (
+          <div className={depth + 1 >= MAX_INDENT_DEPTH ? 'reply-list flat' : 'reply-list'}>
+            {comment.replies.map((r) => (
+              <CommentThread key={r.id} comment={r} depth={depth + 1} {...handlers} />
             ))}
           </div>
         )}
@@ -145,20 +183,24 @@ function AnswerRow({
 
 function QuestionCard({
   question,
-  isOwn,
+  currentUser,
   myVotes,
   onVote,
   onAddAnswer,
   onAddReply,
+  onEditComment,
+  onDeleteComment,
   onEdit,
   onDelete,
 }: {
   question: CommunityQuestion
-  isOwn: boolean
+  currentUser: string
   myVotes: Votes
   onVote: (id: string, dir: 1 | -1) => void
   onAddAnswer: (questionId: string, body: string) => void
-  onAddReply: (questionId: string, answerId: string, body: string) => void
+  onAddReply: (questionId: string, parentId: string, body: string) => void
+  onEditComment: (questionId: string, id: string, body: string) => void
+  onDeleteComment: (questionId: string, id: string) => void
   onEdit: (questionId: string, title: string, body: string) => void
   onDelete: (questionId: string) => void
 }) {
@@ -166,6 +208,7 @@ function QuestionCard({
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(question.title)
   const [editBody, setEditBody] = useState(question.body)
+  const isOwn = question.author === currentUser
 
   function handleSaveEdit() {
     if (!editTitle.trim() || !editBody.trim()) return
@@ -244,7 +287,17 @@ function QuestionCard({
         {question.answers.length > 0 && (
           <div className="answer-list">
             {question.answers.map((a) => (
-              <AnswerRow key={a.id} questionId={question.id} answer={a} myVotes={myVotes} onVote={onVote} onAddReply={onAddReply} />
+              <CommentThread
+                key={a.id}
+                comment={a}
+                depth={0}
+                currentUser={currentUser}
+                myVotes={myVotes}
+                onVote={onVote}
+                onReply={(parentId, body) => onAddReply(question.id, parentId, body)}
+                onEdit={(id, body) => onEditComment(question.id, id, body)}
+                onDelete={(id) => onDeleteComment(question.id, id)}
+              />
             ))}
           </div>
         )}
@@ -255,13 +308,15 @@ function QuestionCard({
 
 export default function CommunityPage() {
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
-  const [questions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', seedQuestions)
+  const [storedQuestions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', seedQuestions)
   const [myVotes, setMyVotes] = useLocalState<Votes>('mitra_community_votes', {})
   const [sort, setSort] = useState<SortMode>('top')
   const [composerOpen, setComposerOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newBody, setNewBody] = useState('')
   const [newTags, setNewTags] = useState<string[]>([])
+
+  const questions = storedQuestions.map((q) => ({ ...q, answers: q.answers.map(normalizeComment) }))
 
   function vote(id: string, dir: 1 | -1) {
     const current = myVotes[id] ?? 0
@@ -276,9 +331,9 @@ export default function CommunityPage() {
     setQuestions((prev) => applyDelta(prev, id, delta))
   }
 
-  function addAnswer(questionId: string, body: string) {
-    const answer: CommunityAnswer = {
-      id: `${questionId}-a-${Date.now()}`,
+  function newComment(id: string, body: string): CommunityComment {
+    return {
+      id,
       author: profile.name,
       initials: profile.initials,
       time: 'Just now',
@@ -286,25 +341,28 @@ export default function CommunityPage() {
       votes: 0,
       replies: [],
     }
-    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, answers: [...q.answers, answer] } : q)))
   }
 
-  function addReply(questionId: string, answerId: string, body: string) {
-    const reply: CommunityReply = {
-      id: `${answerId}-r-${Date.now()}`,
-      author: profile.name,
-      initials: profile.initials,
-      time: 'Just now',
-      body: body.trim(),
-      votes: 0,
-    }
-    setQuestions((prev) =>
-      prev.map((q) =>
-        q.id !== questionId
-          ? q
-          : { ...q, answers: q.answers.map((a) => (a.id === answerId ? { ...a, replies: [...a.replies, reply] } : a)) },
-      ),
-    )
+  function updateAnswers(questionId: string, fn: (answers: CommunityComment[]) => CommunityComment[]) {
+    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, answers: fn(q.answers) } : q)))
+  }
+
+  function addAnswer(questionId: string, body: string) {
+    const answer = newComment(`${questionId}-a-${Date.now()}`, body)
+    updateAnswers(questionId, (answers) => [...answers, answer])
+  }
+
+  function addReply(questionId: string, parentId: string, body: string) {
+    const reply = newComment(`${parentId}-r-${Date.now()}`, body)
+    updateAnswers(questionId, (answers) => mapComment(answers, parentId, (c) => ({ ...c, replies: [...(c.replies ?? []), reply] })))
+  }
+
+  function editComment(questionId: string, id: string, body: string) {
+    updateAnswers(questionId, (answers) => mapComment(answers, id, (c) => ({ ...c, body: body.trim(), edited: true })))
+  }
+
+  function deleteComment(questionId: string, id: string) {
+    updateAnswers(questionId, (answers) => removeComment(answers, id))
   }
 
   function postQuestion() {
@@ -400,11 +458,13 @@ export default function CommunityPage() {
           <QuestionCard
             key={q.id}
             question={q}
-            isOwn={q.author === profile.name}
+            currentUser={profile.name}
             myVotes={myVotes}
             onVote={vote}
             onAddAnswer={addAnswer}
             onAddReply={addReply}
+            onEditComment={editComment}
+            onDeleteComment={deleteComment}
             onEdit={editQuestion}
             onDelete={deleteQuestion}
           />

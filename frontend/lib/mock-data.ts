@@ -198,24 +198,21 @@ export const amenities: Amenity[] = [
 
 // ---- Community (Reddit/YouTube-style Q&A) ----
 
-export type CommunityReply = {
+// Answers and replies share one recursive shape so threads can nest indefinitely.
+export type CommunityComment = {
   id: string
   author: string
   initials: string
   time: string
   body: string
   votes: number
+  replies: CommunityComment[]
+  edited?: boolean
+  deleted?: boolean
 }
 
-export type CommunityAnswer = {
-  id: string
-  author: string
-  initials: string
-  time: string
-  body: string
-  votes: number
-  replies: CommunityReply[]
-}
+export type CommunityAnswer = CommunityComment
+export type CommunityReply = CommunityComment
 
 export type CommunityQuestion = {
   id: string
@@ -242,7 +239,7 @@ export const communityQuestions: CommunityQuestion[] = [
     votes: 14,
     answers: [
       { id: 'q1a1', author: 'Sanya Mehta', initials: 'SM', time: '2d ago', body: 'Labs and theory are tracked separately per course code — check the per-course breakup on the portal, not just the overall number.', votes: 19, replies: [
-        { id: 'q1a1r1', author: 'Kavya R.', initials: 'KR', time: '1d ago', body: 'That explains it, thank you!', votes: 2 },
+        { id: 'q1a1r1', author: 'Kavya R.', initials: 'KR', time: '1d ago', body: 'That explains it, thank you!', votes: 2, replies: [] },
       ] },
       { id: 'q1a2', author: 'Rahul Menon', initials: 'RM', time: '1d ago', body: 'Also worth noting condonation forms exist if you drop just below 75% for medical reasons.', votes: 6, replies: [] },
     ],
@@ -259,7 +256,7 @@ export const communityQuestions: CommunityQuestion[] = [
     answers: [
       { id: 'q2a1', author: 'Diya Shetty', initials: 'DS', time: '3d ago', body: 'Gate Smashers playlist on OS plus re-deriving the scheduling numericals by hand helped me more than re-reading notes.', votes: 15, replies: [] },
       { id: 'q2a2', author: 'Varun Kapoor', initials: 'VK', time: '3d ago', body: 'Form a study group and explain deadlock avoidance to each other out loud, it exposes gaps fast.', votes: 11, replies: [
-        { id: 'q2a2r1', author: 'Devansh P.', initials: 'DP', time: '2d ago', body: 'Doing this tonight, thanks!', votes: 1 },
+        { id: 'q2a2r1', author: 'Devansh P.', initials: 'DP', time: '2d ago', body: 'Doing this tonight, thanks!', votes: 1, replies: [] },
       ] },
       { id: 'q2a3', author: 'Kavya R.', initials: 'KR', time: '2d ago', body: 'Professor Saldanha\'s office hours on Thursdays are criminally underused, go ask there.', votes: 4, replies: [] },
     ],
@@ -310,7 +307,7 @@ export const communityQuestions: CommunityQuestion[] = [
     votes: 18,
     answers: [
       { id: 'q6a1', author: 'Diya Shetty', initials: 'DS', time: '4d ago', body: 'Student Innovation Cell has a travel grant form, worth 60–70% reimbursement if you place or even just qualify for finals.', votes: 21, replies: [
-        { id: 'q6a1r1', author: 'Aarav Singh', initials: 'AS', time: '4d ago', body: 'This is huge, didn\'t know this existed.', votes: 3 },
+        { id: 'q6a1r1', author: 'Aarav Singh', initials: 'AS', time: '4d ago', body: 'This is huge, didn\'t know this existed.', votes: 3, replies: [] },
       ] },
       { id: 'q6a2', author: 'Rahul Menon', initials: 'RM', time: '3d ago', body: 'Your department also sometimes has a small discretionary fund, ask your HOD\'s office directly.', votes: 5, replies: [] },
     ],
