@@ -3,13 +3,15 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, Tuple
 from fastapi import HTTPException
-from app.config import SUPABASE_URL, SUPABASE_ANON_KEY, ALLOWED_EMAIL_DOMAINS
+from app.config import SUPABASE_URL, SUPABASE_ANON_KEY, ALLOWED_EMAIL_DOMAINS, ADMIN_EMAILS
 
 
 def validate_email_domain(email: str) -> bool:
     """Validates that the provided email matches one of the allowed student email domains."""
     if not email or "@" not in email:
         return False
+    if email.strip().lower() in ADMIN_EMAILS:
+        return True
     domain = email.split("@")[-1].strip().lower()
     return any(domain == allowed or domain.endswith(f".{allowed}") for allowed in ALLOWED_EMAIL_DOMAINS)
 

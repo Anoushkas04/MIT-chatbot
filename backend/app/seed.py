@@ -384,8 +384,52 @@ def seed_database():
 
             print("✓ Database Seeded: 16 Reddit Community Discussions across ALL 11 categories ingested into DB.")
 
+        _seed_demo_community(db)
+
     finally:
         db.close()
+
+
+def _seed_demo_community(db):
+    """Labelled sample questions for the Community feed, only with SEED_DEMO_COMMUNITY=1."""
+    import datetime
+    import json
+
+    from app.config import SEED_DEMO_COMMUNITY
+    from app.demo_community import DEMO_POSTS
+
+    if not SEED_DEMO_COMMUNITY or db.query(models.CommunityPost).count() > 0:
+        return
+    now = datetime.datetime.utcnow()
+
+    def add_comments(post_id, items, parent_id=None):
+        for item in items:
+            c = models.CommunityComment(
+                post_id=post_id,
+                parent_id=parent_id,
+                author_label=item["author"],
+                body=item["body"],
+                seed_score=item["votes"],
+                created_at=now - datetime.timedelta(days=item["days_ago"]),
+            )
+            db.add(c)
+            db.flush()
+            add_comments(post_id, item["replies"], c.id)
+
+    for p in DEMO_POSTS:
+        post = models.CommunityPost(
+            author_label=p["author"],
+            title=p["title"],
+            body=p["body"],
+            tags_json=json.dumps(p["tags"]),
+            seed_score=p["votes"],
+            created_at=now - datetime.timedelta(days=p["days_ago"]),
+        )
+        db.add(post)
+        db.flush()
+        add_comments(post.id, p["answers"])
+    db.commit()
+    print(f"✓ Demo Community seeded: {len(DEMO_POSTS)} sample questions (SEED_DEMO_COMMUNITY=1).")
 
 
 if __name__ == "__main__":

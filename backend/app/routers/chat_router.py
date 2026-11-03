@@ -1,5 +1,7 @@
 import re
-from fastapi import APIRouter, HTTPException
+import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
 from app.config import HIGH_CONFIDENCE_THRESHOLD, TOP_K, GEMINI_MODEL
 from app.llm import chat, embed_query
 from app.prompts import build_system_prompt
@@ -8,6 +10,7 @@ from app.schemas import ChatRequest, ChatResponse, CitationDetail
 from app.session_memory import add_turn, get_history
 from app.database import SessionLocal
 from app import models
+from app.routers.auth_router import get_current_user
 
 router = APIRouter(prefix="/api/chat", tags=["2. AI Copilot & RAG Retrieval"])
 
@@ -58,44 +61,6 @@ def classify_intent(query: str) -> str:
         return "academic_official"
     else:
         return "community_experience"
-
-
-def search_community_posts(user_query: str, db) -> list:
-    """Searches student community posts with flexible keyword overlap & category matching."""
-    words = [w.lower() for w in re.findall(r'\b\w+\b', user_query) if len(w) >= 3 and w.lower() not in COMMON_STOPWORDS]
-
-    if not words:
-        return []
-
-    results = []
-    posts = db.query(models.StudentPost).order_by(models.StudentPost.id.desc()).limit(100).all()
-
-    for p in posts:
-        post_text = f"{p.title} {p.content} {p.sub_community} {p.tag}".lower()
-        comments_text = " ".join([c.content.lower() for c in p.comments]) if p.comments else ""
-        full_text = f"{post_text} {comments_text}"
-
-        matched_words = [w for w in words if w in full_text]
-        matches_count = len(matched_words)
-
-        if matches_count >= 1:
-            score = round(min(0.98, 0.75 + (matches_count * 0.08)), 2)
-
-            comment_str = ""
-            if p.comments:
-                comment_str = "\nCommunity Answers:\n" + "\n".join(
-                    [f" • {c.author_name} ({'★ Accepted Answer' if c.is_helpful else 'Reply'}): \"{c.content}\"" for c in p.comments]
-                )
-
-            results.append({
-                "source": f"Student Community Discussion: '{p.title.strip()}'",
-                "source_type": "community",
-                "text": f"Community Question by {p.author_name} ({p.sub_community}): \"{p.title.strip()}\"\nQuestion Context: {p.content}{comment_str}",
-                "score": score,
-            })
-
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:3]
 
 
 def detect_query_type(query: str) -> str:
@@ -197,9 +162,15 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
 
 
 @router.post("", response_model=ChatResponse, summary="Query Gemini AI Copilot with RAG grounding")
-def chat_query(req: ChatRequest):
+def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
+        # Conversations belong to one account: another user's session id can't be appended to.
+        if not req.session_id or len(req.session_id) > 64:
+            raise HTTPException(status_code=400, detail="Invalid conversation id.")
+        owner = db.query(models.ChatSession.user_id).filter(models.ChatSession.id == req.session_id).scalar()
+        if owner is not None and owner != me.id:
+            raise HTTPException(status_code=403, detail="That conversation belongs to someone else.")
         intent = classify_intent(req.message)
         query_type = detect_query_type(req.message)
 
@@ -215,7 +186,11 @@ def chat_query(req: ChatRequest):
         relevant_official_matches = filter_chunk_relevance(vector_matches, req.message, query_type)
 
         # 2. Database Search for Community Discussions
-        community_matches = search_community_posts(req.message, db)
+        # Only admin-verified and 50+ upvote Community posts count as knowledge (app/community_knowledge.py).
+        # The legacy student_posts table is no longer used: it was seeded sample content.
+        from app.community_knowledge import search_dataset_posts
+
+        community_matches = search_dataset_posts(req.message, db, limit=4)
         relevant_community_matches = [cm for cm in community_matches if cm["score"] >= 0.50]
 
         # Calculate live community counts dynamically from DB
@@ -357,9 +332,12 @@ def chat_query(req: ChatRequest):
         try:
             session_rec = db.query(models.ChatSession).filter(models.ChatSession.id == req.session_id).first()
             if not session_rec:
-                session_rec = models.ChatSession(id=req.session_id, role=req.role, title=req.message[:40])
+                session_rec = models.ChatSession(id=req.session_id, user_id=me.id, role=req.role, title=req.message[:40])
                 db.add(session_rec)
-                db.commit()
+            elif session_rec.user_id is None:
+                session_rec.user_id = me.id
+            session_rec.updated_at = datetime.datetime.utcnow()  # drives "active this week" on Monitoring
+            db.commit()
 
             msg_user = models.ChatMessage(
                 session_id=req.session_id,
@@ -396,7 +374,10 @@ def chat_query(req: ChatRequest):
             demand_count=demand_count,
             sample_size=sample_size,
         )
+    except HTTPException:
+        raise  # deliberate errors (e.g. 403 for someone else's conversation) keep their status
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail="Something went wrong answering that. Please try again.")
     finally:
         db.close()

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Heart, Lightbulb, MessageSquare, UserCheck, UserPlus, UserX } from 'lucide-react'
-import { buildNotifications, READ_KEY, type AppNotification, type NotificationKind } from '@/lib/notifications'
-import { communityQuestions, defaultProfile, type CommunityQuestion, type Profile } from '@/lib/mock-data'
+import { BadgeCheck, Heart, Lightbulb, MessageSquare, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { buildNotifications, fromServer, READ_KEY, SERVER_KEY, type AppNotification, type NotificationKind } from '@/lib/notifications'
+import { defaultProfile, type CommunityQuestion, type Profile } from '@/lib/mock-data'
+import { communityApi, meApi, type ServerNotification } from '@/lib/api'
 import { useLocalState } from '@/lib/use-local-state'
 import { useNetworkPeople } from '@/lib/use-network'
 
@@ -12,6 +13,7 @@ type Filter = 'all' | NotificationKind
 
 const filters: { label: string; value: Filter }[] = [
   { label: 'All', value: 'all' },
+  { label: 'From MITra', value: 'official' },
   { label: 'Requests', value: 'request' },
   { label: 'Responses', value: 'response' },
   { label: 'Likes', value: 'like' },
@@ -23,27 +25,49 @@ const kindIcon: Record<NotificationKind, typeof Heart> = {
   response: MessageSquare,
   like: Heart,
   recommendation: Lightbulb,
+  official: BadgeCheck,
 }
 
 export default function NotificationsPage() {
   const { people, activity, accept, ignore } = useNetworkPeople()
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
-  const [questions] = useLocalState<CommunityQuestion[]>('mitra_community', communityQuestions)
-  const [myVotes] = useLocalState<Record<string, 1 | -1>>('mitra_community_votes', {})
+  // Cached copy of the backend feed; refreshed below so replies and likes are current.
+  const [questions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', [])
+  const [myVotes, setMyVotes] = useLocalState<Record<string, 1 | -1>>('mitra_community_votes', {})
   const [read, setRead] = useLocalState<string[]>(READ_KEY, [])
+  const [server, setServer] = useLocalState<ServerNotification[]>(SERVER_KEY, [])
   const [filter, setFilter] = useState<Filter>('all')
 
-  const all = buildNotifications({ people, activity, questions, myVotes, me: profile.name })
-  const readSet = new Set(read)
+  useEffect(() => {
+    communityApi
+      .list()
+      .then((feed) => {
+        setQuestions(feed.questions)
+        setMyVotes(feed.myVotes)
+      })
+      .catch(() => {}) // offline: keep showing the cached feed
+    meApi
+      .notifications()
+      .then((res) => setServer(res.notifications))
+      .catch(() => {})
+  }, [setQuestions, setMyVotes, setServer])
+
+  const official = fromServer(server)
+  const serverRead = new Set(official.filter((n) => n.serverRead).map((n) => n.id))
+  // Newest MITra messages first, then the activity built from local and community data.
+  const all: AppNotification[] = [...official, ...buildNotifications({ people, activity, questions, myVotes, me: profile.name })]
+  const readSet = new Set([...read, ...serverRead])
   const unread = all.filter((n) => !readSet.has(n.id))
   const visible = filter === 'all' ? all : all.filter((n) => n.kind === filter)
 
   function markRead(id: string) {
     setRead((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    if (id.startsWith('srv-')) meApi.markRead(id).catch(() => {})
   }
 
   function markAllRead() {
     setRead((prev) => [...new Set([...prev, ...all.map((n) => n.id)])])
+    if (official.some((n) => !n.serverRead)) meApi.markAllRead().catch(() => {})
   }
 
   function respond(n: AppNotification, accepted: boolean) {

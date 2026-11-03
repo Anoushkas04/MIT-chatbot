@@ -16,13 +16,15 @@ import {
   MoreHorizontal,
   Search,
   Settings,
+  ShieldCheck,
   Zap,
 } from 'lucide-react'
 import { Logo } from '@/components/logo'
-import { clearSession } from '@/lib/session'
+import { clearSession, getAdminSession } from '@/lib/session'
 import { useLocalState } from '@/lib/use-local-state'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
-import { countUnreadNotifications } from '@/lib/notifications'
+import { countUnreadNotifications, SERVER_KEY } from '@/lib/notifications'
+import { logoutEverywhere, meApi } from '@/lib/api'
 
 const navItems = [
   { label: 'Home', href: '/home', icon: LayoutDashboard },
@@ -40,13 +42,33 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
   const router = useRouter()
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [unread, setUnread] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // The sidebar stays mounted across pages, so recount from storage on each navigation.
   useEffect(() => {
     setUnread(countUnreadNotifications())
+    // Shortcut only: the admin console has its own sign-in and session.
+    setIsAdmin(getAdminSession() !== null)
+    // Pick up new messages from the MITra team, then recount.
+    let cancelled = false
+    meApi
+      .notifications()
+      .then((res) => {
+        if (cancelled) return
+        try {
+          localStorage.setItem(SERVER_KEY, JSON.stringify(res.notifications))
+        } catch {}
+        setUnread(countUnreadNotifications())
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [pathname])
 
-  function logout() {
+  async function logout() {
+    // Revoke on the server too, so a copied token stops working; sign out locally regardless.
+    await logoutEverywhere().catch(() => {})
     clearSession()
     router.replace('/')
   }
@@ -94,6 +116,12 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
           </Link>
         </div>
         <div className="sidebar-bottom">
+          {isAdmin && (
+            <Link href="/admin/monitoring" className="admin-console-link" onClick={onCloseMobile}>
+              <ShieldCheck />
+              <span>Admin console</span>
+            </Link>
+          )}
           <Link href="/settings" className={pathname === '/settings' ? 'active' : ''} onClick={onCloseMobile}>
             <Settings />
             <span>Settings</span>

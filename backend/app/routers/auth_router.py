@@ -6,14 +6,11 @@ import datetime
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel
 from app.database import SessionLocal
 from app import models
 from app.schemas import (
-    LearnerIDVerifyRequest,
-    OTPVerifyRequest,
-    RegisterCompleteRequest,
-    LoginRequest,
     ProfileUpdateRequest,
     RegisterSendOTPRequest,
     RegisterVerifyOTPRequest,
@@ -26,7 +23,7 @@ from app.supabase_auth import (
     verify_supabase_email_otp,
     validate_email_domain,
 )
-from app.config import SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_SECRET, SESSION_TTL_DAYS, AUTH_DEV_MODE
+from app.config import SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_SECRET, AUTH_DEV_MODE, ADMIN_ACCOUNTS, ADMIN_EMAILS
 
 router = APIRouter(prefix="/api/auth", tags=["1. Authentication & Profile Engine"])
 
@@ -144,9 +141,20 @@ def hash_password(password: str) -> str:
 
 
 def create_session_token(user_id: str) -> str:
+    # No expiry, for students and admins alike: a session lasts until the user signs out.
+    # Signing out (POST /logout or /admin-logout) revokes every token issued before it,
+    # and a disabled or removed account is refused on every request.
     now = datetime.datetime.now(datetime.timezone.utc)
-    payload = {"sub": user_id, "iat": now, "exp": now + datetime.timedelta(days=SESSION_TTL_DAYS)}
-    return jwt.encode(payload, _SESSION_SECRET, algorithm="HS256")
+    return jwt.encode({"sub": user_id, "iat": now}, _SESSION_SECRET, algorithm="HS256")
+
+
+def _token_payload(token: Optional[str]) -> Optional[dict]:
+    if not token:
+        return None
+    try:
+        return jwt.decode(token, _SESSION_SECRET, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
 
 
 def resolve_user_id(token: Optional[str]) -> Optional[str]:
@@ -202,6 +210,12 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> models.User
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user or user.status != "active":
             raise HTTPException(status_code=401, detail="User account not found or disabled.")
+        # "Sign out everywhere": reject tokens issued before the account's revocation time.
+        g = db.query(models.AdminLoginGuard).filter(models.AdminLoginGuard.email == (user.email or "").lower()).first()
+        if g and g.tokens_valid_after:
+            iat = (_token_payload(token_from_header(authorization)) or {}).get("iat", 0)
+            if datetime.datetime.utcfromtimestamp(iat) < g.tokens_valid_after:
+                raise HTTPException(status_code=401, detail="You were signed out. Please sign in again.")
         return user
     finally:
         db.close()
@@ -224,7 +238,7 @@ OTP_RESEND_COOLDOWN = datetime.timedelta(seconds=45)
 OTP_MAX_ATTEMPTS = 5
 # otp_hash markers: Supabase owns the code itself, so there's no local hash to store
 SUPABASE_OTP_MARKER = "supabase-managed"
-# Set once a code is verified; consumed by the two-step legacy /register-complete flow
+# Marks a code as already verified, so it can't be reused
 VERIFIED_OTP_PREFIX = "verified:"
 
 
@@ -329,19 +343,6 @@ def _verify_otp(db, lid: str, otp_code: str) -> None:
     db.commit()
 
 
-def _consume_verified_otp(db, lid: str, otp_code: str) -> None:
-    """Legacy two-step signup: accepts a code that /verify-otp already verified, exactly once."""
-    otp_rec = _latest_otp(db, lid)
-    expected = VERIFIED_OTP_PREFIX + _hash_otp((otp_code or "").strip())
-    if (
-        not otp_rec
-        or not hmac.compare_digest(otp_rec.otp_hash, expected)
-        or datetime.datetime.utcnow() > otp_rec.expires_at
-    ):
-        raise HTTPException(status_code=400, detail="OTP verification token invalid or expired.")
-    otp_rec.otp_hash = "consumed"
-
-
 def _validate_registration_details(name: str, reg_no: str, lid: str) -> dict:
     """Validates signup fields and that the reg-no admission year matches the Learner ID."""
     if not name or len(name) < 2:
@@ -381,6 +382,8 @@ def _ensure_not_registered(db, reg_no: Optional[str], lid: str) -> None:
 
 
 def _find_user_by_identifier(db, ident: str) -> Optional[models.User]:
+    # Admin accounts can only sign in through /admin-send-otp (allowlist, lockout, short
+    # sessions, never a dev-mode code), so the student flows don't see them.
     return (
         db.query(models.User)
         .filter(
@@ -388,6 +391,7 @@ def _find_user_by_identifier(db, ident: str) -> Optional[models.User]:
             | (models.User.learner_id == ident)
             | (models.User.registration_number == ident)
         )
+        .filter(models.User.role != "admin")
         .first()
     )
 
@@ -407,7 +411,10 @@ def register_send_otp(req: RegisterSendOTPRequest):
     db = SessionLocal()
     try:
         _ensure_not_registered(db, reg_no, lid)
+        g = _count_code_sent(db, lid, STUDENT_MAX_CODES_PER_DAY)
         otp = _issue_otp(db, lid, purpose="signup", name=name)
+        g.codes_sent = (g.codes_sent or 0) + 1
+        db.commit()
         return {
             "status": "success",
             "message": f"Verification OTP sent to {lid}.",
@@ -433,7 +440,7 @@ def register_verify_otp(req: RegisterVerifyOTPRequest):
     db = SessionLocal()
     try:
         _ensure_not_registered(db, reg_no, lid)
-        _verify_otp(db, lid, req.otp_code)
+        _verify_guarded(db, lid, req.otp_code)
 
         new_user = models.User(
             id=f"usr_std_{secrets.token_hex(6)}",
@@ -478,11 +485,15 @@ def login_send_otp(req: LoginSendOTPRequest):
                 status_code=404,
                 detail="No account found matching this Learner ID or Registration Number. Please create an account first.",
             )
-        if user.status != "active" or user.is_suspended:
-            raise HTTPException(status_code=403, detail="Account suspended or disabled.")
+        # Suspended students can still sign in (read-only, with a plea); disabled accounts can't.
+        if user.status != "active":
+            raise HTTPException(status_code=403, detail="This account has been disabled.")
 
-        lid = user.learner_id or user.email
+        lid = (user.learner_id or user.email).lower()
+        g = _count_code_sent(db, lid, STUDENT_MAX_CODES_PER_DAY)
         otp = _issue_otp(db, lid, purpose="signin", name=user.name)
+        g.codes_sent = (g.codes_sent or 0) + 1
+        db.commit()
         masked = mask_email(lid)
         return {
             "status": "success",
@@ -508,139 +519,267 @@ def login_verify_otp(req: LoginVerifyOTPRequest):
         user = _find_user_by_identifier(db, ident)
         if not user:
             raise HTTPException(status_code=404, detail="User account not found.")
-        if user.status != "active" or user.is_suspended:
-            raise HTTPException(status_code=403, detail="Account suspended or disabled.")
+        # Suspended students can still sign in (read-only, with a plea); disabled accounts can't.
+        if user.status != "active":
+            raise HTTPException(status_code=403, detail="This account has been disabled.")
 
-        _verify_otp(db, user.learner_id or user.email, req.otp_code)
+        _verify_guarded(db, (user.learner_id or user.email).lower(), req.otp_code)
         return session_response(user)
     finally:
         db.close()
 
 
 # ---------------------------------------------------------------------------
-# Legacy flow (AuthModal): verify Learner ID → verify OTP → complete with password
+# Admin sign-in: the hard-coded admins only (config.ADMIN_ACCOUNTS), same OTP rules as students.
+# Admin accounts are separate from student accounts and named by their owner.
 # ---------------------------------------------------------------------------
 
-@router.post("/verify-learner-id", summary="Validate Learner ID format and email a signup OTP")
-def verify_learner_id(req: LearnerIDVerifyRequest):
-    lid = req.learner_id.strip().lower()
+class AdminSendOTPRequest(BaseModel):
+    email: str
 
-    if not validate_email_domain(lid):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid student email domain. Must be a verified MIT/MAHE email address (e.g., student.mitmpl2023@learner.manipal.edu).",
-        )
 
-    year_match = re.search(r"20[0-9]{2}", lid)
-    admission_year = year_match.group(0) if year_match else "2023"
+class AdminVerifyOTPRequest(BaseModel):
+    email: str
+    otp_code: str
 
+
+# Sign-in throttling, shared by student and admin sign-in (AdminLoginGuard is keyed by email
+# for any account): wrong codes count across codes, so requesting fresh codes can't reset it.
+ADMIN_MAX_FAILED = 5  # wrong codes, across any number of codes, before locking
+ADMIN_FAIL_WINDOW = datetime.timedelta(minutes=30)
+ADMIN_LOCKOUT = datetime.timedelta(minutes=30)
+ADMIN_MAX_CODES_PER_DAY = 10
+STUDENT_MAX_CODES_PER_DAY = 20
+
+
+def _guard(db, email: str) -> models.AdminLoginGuard:
+    g = db.query(models.AdminLoginGuard).filter(models.AdminLoginGuard.email == email).first()
+    if not g:
+        g = models.AdminLoginGuard(email=email, failed_attempts=0, codes_sent=0)
+        db.add(g)
+        db.flush()
+    return g
+
+
+def _check_not_locked(g: models.AdminLoginGuard) -> None:
+    now = datetime.datetime.utcnow()
+    if g.locked_until and now < g.locked_until:
+        mins = int((g.locked_until - now).total_seconds() // 60) + 1
+        raise HTTPException(status_code=429, detail=f"Too many wrong codes. Admin sign-in is locked for {mins} more minute(s).")
+
+
+def _record_failure(db, g: models.AdminLoginGuard) -> None:
+    now = datetime.datetime.utcnow()
+    if not g.window_started_at or now - g.window_started_at > ADMIN_FAIL_WINDOW:
+        g.window_started_at, g.failed_attempts = now, 0
+    g.failed_attempts = (g.failed_attempts or 0) + 1
+    if g.failed_attempts >= ADMIN_MAX_FAILED:
+        g.locked_until, g.failed_attempts, g.window_started_at = now + ADMIN_LOCKOUT, 0, None
+    db.commit()
+
+
+def _count_code_sent(db, email: str, cap: int) -> models.AdminLoginGuard:
+    """Applies the lockout and the daily code cap before a code is emailed."""
+    g = _guard(db, email)
+    _check_not_locked(g)
+    today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    if g.codes_day != today:
+        g.codes_day, g.codes_sent = today, 0
+    if (g.codes_sent or 0) >= cap:
+        raise HTTPException(status_code=429, detail="Daily limit for sign-in codes reached. Try again tomorrow.")
+    return g
+
+
+def _verify_guarded(db, email: str, otp_code: str) -> None:
+    """_verify_otp plus the cross-code lockout: 5 wrong codes lock sign-in for 30 minutes."""
+    g = _guard(db, email)
+    db.commit()
+    _check_not_locked(g)
+    try:
+        _verify_otp(db, email, otp_code)
+    except HTTPException as e:
+        if e.status_code == 400:
+            _record_failure(db, g)
+            if g.locked_until:
+                raise HTTPException(status_code=429, detail="Too many wrong codes. Sign-in is locked for 30 minutes.")
+        raise
+    g.failed_attempts, g.window_started_at = 0, None
+    db.commit()
+
+
+def _require_allowlisted(email: str) -> str:
+    email = (email or "").strip().lower()
+    # Same message whether or not the email exists, so the allowlist can't be probed.
+    if email not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="This email isn't authorised for admin access.")
+    return email
+
+
+@router.post("/admin-send-otp", summary="Email a sign-in OTP to an allowlisted admin email")
+def admin_send_otp(req: AdminSendOTPRequest):
+    email = _require_allowlisted(req.email)
     db = SessionLocal()
     try:
-        existing_user = db.query(models.User).filter(models.User.learner_id == lid).first()
-        if existing_user and existing_user.is_verified:
-            raise HTTPException(
-                status_code=400,
-                detail="This Learner ID is already registered to a verified account. Please proceed to login.",
-            )
-
-        otp = _issue_otp(db, lid)
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if user and user.role != "admin":
+            raise HTTPException(status_code=409, detail="This email belongs to a student account and can't be used for admin access.")
+        if user and user.status != "active":
+            raise HTTPException(status_code=403, detail="This admin account is disabled.")
+        g = _count_code_sent(db, email, ADMIN_MAX_CODES_PER_DAY)
+        _issue_otp(db, email, purpose="signin", name=(user.name if user else ""))
+        g.codes_sent = (g.codes_sent or 0) + 1
+        db.commit()
+        # Never echo the code here, even with AUTH_DEV_MODE: knowing an admin email
+        # must never be enough to sign in. (Without email configured it's only printed
+        # to the backend console.)
         return {
             "status": "success",
-            "learner_id": lid,
-            "admission_year": admission_year,
-            "message": f"Verification OTP code sent to {lid}.",
-            "dev_mode": otp["dev_mode"],
-            "test_otp": otp["test_otp"],
+            "message": f"Verification code sent to {mask_email(email)}",
+            "learner_id": email,
+            "masked_email": mask_email(email),
+            "dev_mode": False,
+            "test_otp": None,
             "expires_in_seconds": int(OTP_TTL.total_seconds()),
         }
     finally:
         db.close()
 
 
-@router.post("/verify-otp", summary="Verify a signup OTP (legacy two-step flow)")
-def verify_otp(req: OTPVerifyRequest):
-    lid = req.learner_id.strip().lower()
+@router.post("/admin-verify-otp", summary="Verify an admin OTP; creates the admin account on first sign-in")
+def admin_verify_otp(req: AdminVerifyOTPRequest):
+    email = _require_allowlisted(req.email)
     db = SessionLocal()
     try:
-        _verify_otp(db, lid, req.otp_code)
-        return {
-            "status": "verified",
-            "learner_id": lid,
-            "message": "OTP verified successfully. Proceed to enter your Registration Number.",
-        }
-    finally:
-        db.close()
-
-
-@router.post("/register-complete", summary="Complete legacy signup with Reg No, password and Terms")
-def register_complete(req: RegisterCompleteRequest):
-    lid = req.learner_id.strip().lower()
-    reg_no = req.registration_number.strip()
-    name = req.name.strip()
-    password = req.password
-
-    year_match = re.search(r"20[0-9]{2}", lid)
-    admission_year = year_match.group(0) if year_match else "2023"
-
-    if not REG_NO_PATTERN.match(reg_no):
-        raise HTTPException(
-            status_code=400,
-            detail="Registration Number must be either 9 digits (e.g. 230962088) or 12 digits (e.g. 261090330156).",
-        )
-    if not password or len(password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters in length.")
-    if not req.agreed_terms:
-        raise HTTPException(
-            status_code=400,
-            detail="You must explicitly accept the Terms & Conditions and Community Guidelines to create an account.",
-        )
-
-    db = SessionLocal()
-    try:
-        _ensure_not_registered(db, reg_no, lid)
-        _consume_verified_otp(db, lid, req.otp_code)
-
-        new_user = models.User(
-            id=f"usr_std_{secrets.token_hex(6)}",
-            email=lid,
-            learner_id=lid,
-            registration_number=reg_no,
-            admission_year=admission_year,
-            password_hash=hash_password(password),
-            name=name if name else "Student",
-            role="student",
-            is_verified=True,
-            account_state="Verified",
-            department=req.department or "Computer Science & Engg",
-            academic_year=req.academic_year or f"3rd Year ({admission_year}-27)",
-            semester=req.semester or "Even Semester (Jan - May)",
-            rewards_points=50,
-            avatar_icon="🎓",
-            agreed_terms=True,
-            terms_version="v1.0-2026",
-            terms_accepted_at=datetime.datetime.utcnow(),
-            status="active",
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        return session_response(new_user)
-    finally:
-        db.close()
-
-
-@router.post("/login", summary="Sign in with Learner ID / Registration Number and password (legacy)")
-def login(req: LoginRequest):
-    identifier = req.email_or_id.strip().lower()
-
-    db = SessionLocal()
-    try:
-        user = _find_user_by_identifier(db, identifier)
-        if not user or not hmac.compare_digest(user.password_hash, hash_password(req.password)):
-            raise HTTPException(status_code=401, detail="Invalid Learner ID / Registration Number or password.")
-        if user.status != "active" or user.is_suspended:
-            raise HTTPException(status_code=403, detail="Account suspended or disabled due to policy violation.")
+        _verify_guarded(db, email, req.otp_code)
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if not user:
+            user = models.User(
+                id=f"usr_adm_{secrets.token_hex(6)}",
+                email=email,
+                password_hash=hash_password(secrets.token_hex(16)),  # OTP-only account
+                name=ADMIN_ACCOUNTS[email],
+                role="admin",
+                is_verified=True,
+                account_state="Verified",
+                agreed_terms=True,
+                status="active",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        elif user.role != "admin":
+            raise HTTPException(status_code=409, detail="This email belongs to a student account.")
+        elif user.name != ADMIN_ACCOUNTS[email]:
+            user.name = ADMIN_ACCOUNTS[email]  # names are fixed in config, not chosen
+            db.commit()
+            db.refresh(user)
         return session_response(user)
+    finally:
+        db.close()
+
+
+def get_current_admin(authorization: Optional[str] = Header(None)) -> models.User:
+    user = get_current_user(authorization)
+    # Only the hard-coded admins: an account not in ADMIN_ACCOUNTS is refused even with a live token.
+    if user.role != "admin" or (user.email or "").lower() not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Access denied: admin privileges required.")
+    return user
+
+
+@router.post("/logout", summary="Sign out on every device (revokes all of this account's tokens)")
+def logout(me: models.User = Depends(get_current_user)):
+    return _revoke_all(me)
+
+
+@router.post("/admin-logout", summary="Sign this admin out on every device (revokes all their tokens)")
+def admin_logout(admin: models.User = Depends(get_current_admin)):
+    return _revoke_all(admin)
+
+
+def _revoke_all(user: models.User) -> dict:
+    db = SessionLocal()
+    try:
+        g = _guard(db, (user.email or "").lower())
+        # iat has 1-second resolution, so revoke everything issued up to the end of this second.
+        g.tokens_valid_after = datetime.datetime.utcnow().replace(microsecond=0) + datetime.timedelta(seconds=1)
+        db.commit()
+        return {"status": "signed_out"}
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Appeals for disabled accounts: they can't sign in, so they prove the learner email
+# with a one-time code (same lockout and daily cap as sign-in) and appeal from here.
+# ---------------------------------------------------------------------------
+
+class AppealCodeRequest(BaseModel):
+    identifier: str
+
+
+class AppealSubmitRequest(BaseModel):
+    identifier: str
+    otp_code: str
+    text: str = ""  # empty: only check the status of an existing appeal
+
+
+def _disabled_student(db, ident: str) -> models.User:
+    user = _find_user_by_identifier(db, (ident or "").strip().lower())
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found matching this Learner ID or Registration Number.")
+    if user.status == "active":
+        raise HTTPException(status_code=400, detail="This account isn't disabled. You can sign in normally.")
+    return user
+
+
+def _appeal_dict(a: Optional[models.AccountAppeal]) -> Optional[dict]:
+    if not a:
+        return None
+    return {"status": a.status, "text": a.text, "decision_note": a.decision_note, "sent_at": a.created_at.isoformat() + "Z" if a.created_at else None}
+
+
+@router.post("/appeal-send-otp", summary="Email a code so a disabled student can appeal")
+def appeal_send_otp(req: AppealCodeRequest):
+    db = SessionLocal()
+    try:
+        user = _disabled_student(db, req.identifier)
+        lid = (user.learner_id or user.email).lower()
+        g = _count_code_sent(db, lid, STUDENT_MAX_CODES_PER_DAY)
+        _issue_otp(db, lid, purpose="signin", name=user.name)
+        g.codes_sent = (g.codes_sent or 0) + 1
+        db.commit()
+        return {"status": "success", "masked_email": mask_email(lid), "expires_in_seconds": int(OTP_TTL.total_seconds())}
+    finally:
+        db.close()
+
+
+@router.post("/appeal", summary="Verify the code, then submit an appeal (or read the latest one's status)")
+def appeal_submit(req: AppealSubmitRequest):
+    text = (req.text or "").strip()
+    if text and len(text) < 20:
+        raise HTTPException(status_code=400, detail="Please explain your side in at least 20 characters.")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="Please keep your appeal under 2000 characters.")
+    db = SessionLocal()
+    try:
+        user = _disabled_student(db, req.identifier)
+        _verify_guarded(db, (user.learner_id or user.email).lower(), req.otp_code)
+        latest = (
+            db.query(models.AccountAppeal)
+            .filter(models.AccountAppeal.user_id == user.id)
+            .order_by(models.AccountAppeal.id.desc())
+            .first()
+        )
+        if not text:
+            return {"status": "checked", "appeal": _appeal_dict(latest)}
+        if latest and latest.status == "pending":
+            raise HTTPException(status_code=409, detail="Your appeal is already with the MITra team. You'll be able to sign in once it's accepted.")
+        appeal = models.AccountAppeal(user_id=user.id, text=text)
+        db.add(appeal)
+        db.commit()
+        db.refresh(appeal)
+        # Show a previously rejected appeal's note alongside the new one.
+        return {"status": "submitted", "appeal": _appeal_dict(appeal), "previous": _appeal_dict(latest)}
     finally:
         db.close()
 
@@ -650,34 +789,16 @@ def login(req: LoginRequest):
 # ---------------------------------------------------------------------------
 
 @router.get("/me", summary="Fetch current authenticated user profile")
-def get_me(authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-    user_id = resolve_user_id(token_from_header(authorization))
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-
-    db = SessionLocal()
-    try:
-        user = db.query(models.User).filter(models.User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User profile not found.")
-        return extract_user_dict(user)
-    finally:
-        db.close()
+def get_me(me: models.User = Depends(get_current_user)):
+    # Shared check: rejects expired, revoked (signed out) and disabled sessions.
+    return extract_user_dict(me)
 
 
 @router.put("/profile", summary="Update permitted profile fields (department, academic year, bio, etc.)")
-def update_profile(req: ProfileUpdateRequest, authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-    user_id = resolve_user_id(token_from_header(authorization))
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-
+def update_profile(req: ProfileUpdateRequest, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter(models.User.id == user_id).first()
+        user = db.query(models.User).filter(models.User.id == me.id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User profile not found.")
 

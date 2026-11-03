@@ -97,7 +97,7 @@ Learner ID (code goes to the stored Learner ID) → `POST /api/auth/login-verify
 Rules (all in `app/routers/auth_router.py`, `_issue_otp` / `_verify_otp`): codes
 expire after 10 minutes, are single-use, allow 5 wrong attempts, and can be
 re-sent after 45 seconds. Session tokens are signed JWTs (`SESSION_SECRET`,
-7-day expiry), so logins survive restarts and serverless deploys.
+no expiry: a session lasts until the user signs out, which revokes it server-side), so logins survive restarts and serverless deploys.
 
 The older password-based endpoints used by `AuthModal` (`verify-learner-id`,
 `verify-otp`, `register-complete`, `login`) still work and share the same OTP checks.

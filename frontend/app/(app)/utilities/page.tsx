@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
   Building2,
+  Download,
   ChevronDown,
   FileText,
   GraduationCap,
@@ -16,13 +17,13 @@ import {
 } from 'lucide-react'
 import {
   amenities,
-  documents,
   gradeOptions,
   helpdeskContacts,
   labs,
   professors,
 } from '@/lib/mock-data'
 import { curriculum } from '@/lib/curriculum'
+import { libraryApi, type LibraryDocument } from '@/lib/api'
 import { useLocalState } from '@/lib/use-local-state'
 
 type Section = 'gpa' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'amenities'
@@ -386,23 +387,55 @@ function LabsSection() {
 
 function DocumentsSection() {
   const [q, setQ] = useState('')
-  const list = useMemo(() => documents.filter((d) => `${d.title} ${d.category}`.toLowerCase().includes(q.toLowerCase())), [q])
+  const [docs, setDocs] = useState<LibraryDocument[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    libraryApi
+      .documents()
+      .then((d) => setDocs(d.documents))
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't load documents."))
+  }, [])
+
+  // The same official documents the MITra team manages and the chatbot answers from.
+  const list = useMemo(
+    () => (docs ?? []).filter((d) => `${d.title} ${d.type}`.toLowerCase().includes(q.toLowerCase())),
+    [docs, q],
+  )
+
+  async function download(name: string) {
+    setError(null)
+    try {
+      await libraryApi.download(name)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Download failed.')
+    }
+  }
+
   return (
     <section>
-      <SearchFilter value={q} onChange={setQ} placeholder="Search regulations, forms, notices" />
+      <SearchFilter value={q} onChange={setQ} placeholder="Search official documents" />
+      {error && <p className="community-error">{error}</p>}
       <div className="directory-list">
+        {docs === null && !error && <p className="view-sub">Loading documents…</p>}
         {list.map((d) => (
-          <article className="directory-row" key={d.id}>
+          <article className="directory-row" key={d.name}>
             <div className="directory-icon">
               <FileText />
             </div>
             <div>
               <strong>{d.title}</strong>
-              <span>{d.category}</span>
+              <span>
+                {d.type} · {d.size}
+              </span>
               <small>Updated {d.updated}</small>
             </div>
+            <button className="icon-ghost directory-download" onClick={() => download(d.name)} aria-label={`Download ${d.title}`} title="Download">
+              <Download />
+            </button>
           </article>
         ))}
+        {docs !== null && list.length === 0 && <p className="view-sub">{q ? 'No documents match.' : 'No documents yet.'}</p>}
       </div>
     </section>
   )

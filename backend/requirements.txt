@@ -7,3 +7,5 @@ numpy
 sqlalchemy
 PyJWT
 psycopg2-binary
+python-multipart
+python-docx

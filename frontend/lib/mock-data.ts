@@ -1,13 +1,8 @@
 import {
   Briefcase,
-  Building2,
   CalendarDays,
-  FileText,
   Flame,
-  GraduationCap,
-  HelpCircle,
   Lightbulb,
-  MapPin,
   Music,
   Sparkles,
   Trophy,
@@ -101,23 +96,6 @@ export const discoveries: DiscoveryItem[] = [
   { id: 'd12', title: 'Volleyball Club', type: 'Club', category: 'club', meta: '22 active members · Sports', tone: 'green', icon: Volleyball, why: 'Open trials for the inter-college team', clubType: 'Sports' },
 ]
 
-export type SearchResult = {
-  id: string
-  title: string
-  kind: string
-  excerpt: string
-  icon: LucideIcon
-}
-
-export const searchResults: SearchResult[] = [
-  { id: 's1', title: 'Academic Regulations 2025–26', kind: 'Official document', excerpt: 'Rules governing attendance, examinations, grading and academic progression.', icon: FileText },
-  { id: 's2', title: 'How do I apply for a bonafide certificate?', kind: 'Campus procedure', excerpt: 'A step-by-step guide from the Student Affairs office, updated Aug 2026.', icon: HelpCircle },
-  { id: 's3', title: 'End semester examination schedule', kind: 'Notice · Examination Cell', excerpt: 'B.Tech III & V semester end semester examinations begin December 01.', icon: CalendarDays },
-  { id: 's4', title: 'Minimum attendance requirement', kind: 'Academic regulation', excerpt: 'Students must maintain at least 75% attendance in each course to be eligible to appear for exams.', icon: GraduationCap },
-  { id: 's5', title: 'Course registration deadlines', kind: 'Notice · Academic Cell', excerpt: 'Elective and credit registration for the even semester closes November 01.', icon: CalendarDays },
-  { id: 's6', title: 'Hostel leave and outpass policy', kind: 'Campus procedure', excerpt: 'How to request an overnight outpass or vacation leave from your hostel warden.', icon: Building2 },
-]
-
 // MIT Manipal 10-point grade scale (Regulations 4.8.1), as offered by the GPA calculator.
 export const gradeOptions: { grade: string; value: number }[] = [
   { grade: 'A+', value: 10 },
@@ -147,17 +125,6 @@ export const labs: Lab[] = [
   { id: 'l3', name: 'Robotics Lab', building: 'AB2', floor: 'Ground floor', room: '02', serves: 'Mechatronics, ECE' },
   { id: 'l4', name: 'VLSI Design Lab', building: 'AB3', floor: '1st floor', room: '112', serves: 'ECE' },
   { id: 'l5', name: 'Thermal Sciences Lab', building: 'AB2', floor: '1st floor', room: '14', serves: 'Mechanical' },
-]
-
-export type Document = { id: string; title: string; category: string; updated: string }
-
-export const documents: Document[] = [
-  { id: 'doc1', title: 'Academic Regulations 2025–26', category: 'Regulation', updated: 'Aug 2026' },
-  { id: 'doc2', title: 'B.Tech Syllabus — CSE', category: 'Syllabus', updated: 'Jul 2026' },
-  { id: 'doc3', title: 'Bonafide certificate request form', category: 'Form', updated: 'Jun 2026' },
-  { id: 'doc4', title: 'Hostel outpass request form', category: 'Form', updated: 'May 2026' },
-  { id: 'doc5', title: 'End semester exam timetable', category: 'Notice', updated: 'Oct 2026' },
-  { id: 'doc6', title: 'Scholarship application guidelines', category: 'Guideline', updated: 'Sep 2026' },
 ]
 
 export type HelpdeskContact = { id: string; role: string; office: string; timings: string }
@@ -193,6 +160,9 @@ export type CommunityComment = {
   replies: CommunityComment[]
   edited?: boolean
   deleted?: boolean
+  // Set by the backend: posted by an admin ("MITra Official"), and whether it's the viewer's own.
+  isOfficial?: boolean
+  isMine?: boolean
 }
 
 export type CommunityAnswer = CommunityComment
@@ -209,6 +179,9 @@ export type CommunityQuestion = {
   votes: number
   answers: CommunityAnswer[]
   edited?: boolean
+  verified?: boolean
+  isOfficial?: boolean
+  isMine?: boolean
 }
 
 export const communityQuestions: CommunityQuestion[] = [

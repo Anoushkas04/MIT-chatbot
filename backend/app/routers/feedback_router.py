@@ -1,8 +1,10 @@
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from app.database import SessionLocal
 from app import models
+from app.routers.admin_router import require_admin_user
+from app.routers.auth_router import get_current_user
 
 router = APIRouter(prefix="/api/feedback", tags=["7. Feedback & Learning Signals"])
 
@@ -55,10 +57,11 @@ DEFAULT_FEEDBACK_LOGS = [
 
 
 @router.post("", summary="Submit universal crowdsourced feedback & learning signal")
-def submit_feedback(req: UniversalFeedbackRequest):
+def submit_feedback(req: UniversalFeedbackRequest, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
         feedback = models.SystemFeedback(
+            user_id=me.id,
             feedback_type=f"[{req.category}] {req.issue_type}",
             message=f"{req.message} (Suggested Info: {req.suggested_info or 'N/A'})",
             rating=req.rating,
@@ -84,7 +87,7 @@ def submit_feedback(req: UniversalFeedbackRequest):
 
 
 @router.post("/learning-signals", summary="Record AI explicit user learning signal")
-def record_learning_signal(req: LearningSignalRequest):
+def record_learning_signal(req: LearningSignalRequest, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
         signal = models.LearningSignal(
@@ -100,7 +103,7 @@ def record_learning_signal(req: LearningSignalRequest):
         db.close()
 
 
-@router.get("/telemetry", summary="Get aggregated feedback telemetry & learning signals stats for Admin Console")
+@router.get("/telemetry", summary="Get aggregated feedback telemetry & learning signals stats for Admin Console", dependencies=[Depends(require_admin_user)])
 def get_feedback_telemetry():
     return {
         "positive_satisfaction_pct": 92.4,

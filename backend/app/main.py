@@ -1,3 +1,4 @@
+import os
 import sys
 
 # Windows' console defaults stdout/stderr to a non-UTF-8 codepage, which crashes
@@ -17,13 +18,18 @@ from app.routers.auth_router import router as auth_router
 from app.routers.chat_router import router as chat_router
 from app.routers.academic_router import router as academic_router
 from app.routers.faculty_router import router as faculty_router
-from app.routers.community_router import router as community_router
 from app.routers.notifications_router import router as notifications_router
 from app.routers.feedback_router import router as feedback_router
 from app.routers.admin_router import router as admin_router
 from app.routers.rewards_router import router as rewards_router
-from app.routers.search_router import router as search_router
+from app.routers.library_router import router as library_router
 from app.routers.users_router import router as users_router
+from app.routers.community_v2 import router as community_v2_router
+from app.routers.admin_community import router as admin_community_router
+from app.routers.me_router import router as me_router
+from app.routers.admin_safety import router as admin_safety_router
+from app.routers.admin_dataset import router as admin_dataset_router
+from app.routers.admin_insights import router as admin_insights_router
 
 app = FastAPI(
     title="MIT CampusOS Platform API",
@@ -33,10 +39,17 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Only the MITra frontend may call the API from a browser. Auth is a Bearer token, not a
+# cookie, so credentials aren't needed. Add other origins (e.g. a LAN address or the
+# deployed site) with CORS_ORIGINS=https://a.example,http://192.168.1.5:3000
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()] or [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -46,13 +59,19 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(academic_router)
 app.include_router(faculty_router)
-app.include_router(community_router)
+# Legacy /api/posts (unauthenticated, author from the request body) is retired; Community is /api/community.
 app.include_router(notifications_router)
 app.include_router(feedback_router)
 app.include_router(admin_router)
 app.include_router(rewards_router)
-app.include_router(search_router)
+app.include_router(library_router)  # real search + documents (replaces the hard-coded search_router)
 app.include_router(users_router)
+app.include_router(community_v2_router)
+app.include_router(admin_community_router)
+app.include_router(me_router)
+app.include_router(admin_safety_router)
+app.include_router(admin_dataset_router)
+app.include_router(admin_insights_router)
 
 
 @app.on_event("startup")
@@ -62,6 +81,26 @@ def on_startup():
         print("✓ MIT CampusOS Database initialized and seeded.")
     except Exception as e:
         print(f"Warning: Database seeding error: {e}")
+    _build_index_if_missing()
+
+
+def _build_index_if_missing():
+    """Without an index the chatbot can't search any document, so build one on first start."""
+    from app import audit
+    from app.config import DOCS_DIR
+    from app.database import SessionLocal
+    from app.rag import index
+
+    if index.exists() or not DOCS_DIR.exists() or not any(p.is_file() for p in DOCS_DIR.iterdir()):
+        return
+    if index.rebuild_in_background():
+        print("ℹ️  No chatbot index found: building it in the background.")
+        db = SessionLocal()
+        try:
+            audit.record(db, None, "dataset.rebuild", "Started building the chatbot index automatically (none existed)", "index", None)
+            db.commit()
+        finally:
+            db.close()
 
 
 @app.get("/", tags=["0. System Health"])

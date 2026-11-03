@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { Menu } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { Sidebar } from '@/components/sidebar'
-import { getSession } from '@/lib/session'
+import { SuspensionBanner } from '@/components/suspension-banner'
+import { ApiError, currentUser } from '@/lib/api'
+import { clearSession, getSession } from '@/lib/session'
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -18,6 +20,14 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       return
     }
     setChecked(true)
+    // The stored token may have expired or been revoked (signed out elsewhere, account
+    // disabled): confirm with the server and send the student back to sign-in if so.
+    currentUser().catch((e) => {
+      if (e instanceof ApiError && e.status === 401) {
+        clearSession()
+        router.replace('/login')
+      }
+    })
   }, [router])
 
   if (!checked) return null
@@ -32,6 +42,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
             <Menu />
           </button>
         </div>
+        <SuspensionBanner />
         {children}
       </div>
     </main>

@@ -1,28 +1,29 @@
 import datetime
 from typing import Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.database import SessionLocal
 from app import models
 from app.calendar_engine import get_personalized_notifications
+from app.routers.auth_router import get_current_user
 
 router = APIRouter(prefix="/api/notifications", tags=["6. Notifications & Alerts"])
 
 
 @router.get("", summary="Get intelligent personalized notifications driven by canonical academic timeline")
 def get_notifications(
-    user_id: str = "guest",
     role: str = "student",
     dept: Optional[str] = None,
-    year: Optional[str] = None
+    year: Optional[str] = None,
+    me: models.User = Depends(get_current_user),
 ):
-    return get_personalized_notifications(user_id=user_id, role=role, department=dept, academic_year=year)
+    return get_personalized_notifications(user_id=me.id, role=role, department=dept, academic_year=year)
 
 
 @router.post("/{state_id}/read", summary="Mark a single notification as read")
-def mark_notification_read(state_id: int):
+def mark_notification_read(state_id: int, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        state = db.query(models.UserNotificationState).filter(models.UserNotificationState.id == state_id).first()
+        state = db.query(models.UserNotificationState).filter(models.UserNotificationState.id == state_id, models.UserNotificationState.user_id == me.id).first()
         if state:
             state.is_read = True
             state.read_at = datetime.datetime.utcnow()
@@ -34,10 +35,10 @@ def mark_notification_read(state_id: int):
 
 
 @router.post("/{state_id}/dismiss", summary="Dismiss a notification from drawer")
-def dismiss_notification(state_id: int):
+def dismiss_notification(state_id: int, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        state = db.query(models.UserNotificationState).filter(models.UserNotificationState.id == state_id).first()
+        state = db.query(models.UserNotificationState).filter(models.UserNotificationState.id == state_id, models.UserNotificationState.user_id == me.id).first()
         if state:
             state.is_dismissed = True
             state.dismissed_at = datetime.datetime.utcnow()
@@ -49,10 +50,10 @@ def dismiss_notification(state_id: int):
 
 
 @router.post("/{state_id}/dismiss-popup", summary="Dismiss popup toast alert so it does not reappear")
-def dismiss_popup_notification(state_id: int):
+def dismiss_popup_notification(state_id: int, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        state = db.query(models.UserNotificationState).filter(models.UserNotificationState.id == state_id).first()
+        state = db.query(models.UserNotificationState).filter(models.UserNotificationState.id == state_id, models.UserNotificationState.user_id == me.id).first()
         if state:
             state.is_popup_dismissed = True
             db.commit()
@@ -63,11 +64,11 @@ def dismiss_popup_notification(state_id: int):
 
 
 @router.post("/dismiss-all-popups", summary="Dismiss all active popup toast alerts for a user so no old popups reappear after visiting notification center")
-def dismiss_all_popups(user_id: str = "guest"):
+def dismiss_all_popups(me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
         db.query(models.UserNotificationState).filter(
-            models.UserNotificationState.user_id == user_id,
+            models.UserNotificationState.user_id == me.id,
             models.UserNotificationState.is_popup_dismissed == False
         ).update({
             "is_popup_dismissed": True
@@ -79,11 +80,11 @@ def dismiss_all_popups(user_id: str = "guest"):
 
 
 @router.post("/read-all", summary="Mark all notifications as read for a user")
-def mark_all_read(user_id: str = "guest"):
+def mark_all_read(me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
         db.query(models.UserNotificationState).filter(
-            models.UserNotificationState.user_id == user_id,
+            models.UserNotificationState.user_id == me.id,
             models.UserNotificationState.is_read == False
         ).update({
             "is_read": True,

@@ -4,3 +4,6 @@ __pycache__/
 .env
 data/embeddings.npy
 data/chunks.json
+data/index_meta.json
+data/*.tmp*
+data/doc_history/

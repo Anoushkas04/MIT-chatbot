@@ -3,7 +3,10 @@
 import type { AuthResponse, BackendUser } from '@/lib/api'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
 
+// Student and admin sign-ins are separate identities (a learner ID vs a personal admin
+// email), so each has its own session and signing in to one never replaces the other.
 const KEY = 'mitra_session'
+const ADMIN_KEY = 'mitra_admin_session'
 const PROFILE_KEY = 'mitra_profile'
 
 export type Session = {
@@ -14,10 +17,10 @@ export type Session = {
   user: BackendUser
 }
 
-export function getSession(): Session | null {
+function read(key: string): Session | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(key)
     const session = raw ? (JSON.parse(raw) as Session) : null
     // Sessions saved by the old demo login have no token — treat them as signed out
     return session?.token ? session : null
@@ -26,12 +29,33 @@ export function getSession(): Session | null {
   }
 }
 
+/** The student session used by the MITra app. */
+export function getSession(): Session | null {
+  const s = read(KEY)
+  // Before the split, an admin sign-in was stored here; it isn't a student session.
+  return s && s.user.role !== 'admin' ? s : null
+}
+
 export function setSession(session: Session) {
   localStorage.setItem(KEY, JSON.stringify(session))
 }
 
 export function clearSession() {
   localStorage.removeItem(KEY)
+}
+
+/** The admin session used only by the admin console. */
+export function getAdminSession(): Session | null {
+  const s = read(ADMIN_KEY)
+  return s && s.user.role === 'admin' ? s : null
+}
+
+export function startAdminSession({ access_token, user }: AuthResponse) {
+  localStorage.setItem(ADMIN_KEY, JSON.stringify({ learnerId: user.email, name: user.name, token: access_token, user }))
+}
+
+export function clearAdminSession() {
+  localStorage.removeItem(ADMIN_KEY)
 }
 
 function initials(name: string) {

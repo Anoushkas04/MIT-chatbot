@@ -58,85 +58,66 @@ def evaluate_community_content(title: str, content: str) -> Tuple[bool, str, str
 
 
 def process_user_strike_and_suspension(db, user_identifier: str, user_name: str, violation_cat: str, snippet: str) -> Dict[str, Any]:
-    """Records a community violation, increments user strike count, and enforces 7-day suspension upon 5th strike."""
+    """Records a guideline violation; the 5th strike suspends the account for 7 days."""
+    from app import safety
+
     user = None
     if user_identifier:
-        user = db.query(models.User).filter((models.User.id == user_identifier) | (models.User.name == user_name)).first()
+        user = db.query(models.User).filter(models.User.id == user_identifier).first()
 
-    # Create demo student user if not found in db
-    if not user:
-        clean_id = f"user_{hash(user_name) % 10000}"
-        user = models.User(
-            id=clean_id,
-            email=f"{clean_id}@manipal.edu",
-            password_hash="demo_hash",
-            name=user_name,
-            role="student",
-            strike_count=0,
-            is_suspended=False,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    current_strikes = 0
+    if user:
+        user.strike_count = (user.strike_count or 0) + 1
+        current_strikes = user.strike_count
+        if current_strikes >= 5 and safety.active_suspension(db, user.id) is None:
+            safety.suspend(db, user.id, f"{current_strikes} Community Guidelines violations ({violation_cat})", 7, None, "auto_strikes")
 
-    # Increment Strike Count
-    user.strike_count += 1
-    current_strikes = user.strike_count
-
-    # Check 5th Strike Suspension Rule (7 Days)
-    is_suspended_now = False
-    suspended_until = None
-    if user.strike_count >= 5:
-        user.is_suspended = True
-        user.suspended_at = datetime.datetime.utcnow()
-        user.suspended_until = datetime.datetime.utcnow() + datetime.timedelta(days=7)
-        is_suspended_now = True
-        suspended_until = user.suspended_until
-
-    # Record Violation in DB
-    violation = models.CommunityViolation(
-        user_id=user.id,
+    db.add(models.CommunityViolation(
+        user_id=user.id if user else None,
         user_name=user_name,
         violation_category=violation_cat,
         prohibited_content_snippet=snippet[:300],
         moderation_result="Blocked Pre-Publish & Strike Recorded",
         strike_number=current_strikes,
         admin_review_status="Pending Admin Review",
-    )
-    db.add(violation)
+    ))
     db.commit()
-    db.refresh(user)
-
+    if user:
+        db.refresh(user)
     return {
-        "user_id": user.id,
+        "user_id": user.id if user else None,
         "strike_count": current_strikes,
-        "is_suspended": user.is_suspended,
-        "suspended_until": user.suspended_until,
+        "is_suspended": bool(user and user.is_suspended),
+        "suspended_until": user.suspended_until if user else None,
     }
 
 
 def check_user_suspension_status(db, user_identifier: str) -> Tuple[bool, str, Any]:
-    """Checks if a user is currently suspended and automatically restores access after 7 days."""
+    """(is_suspended, message, ends_at) for an account id. Expired suspensions lift themselves."""
+    from app import safety
+
     if not user_identifier:
         return False, "", None
-
-    user = db.query(models.User).filter((models.User.id == user_identifier) | (models.User.name == user_identifier)).first()
-    if not user or not user.is_suspended:
+    user = db.query(models.User).filter(models.User.id == user_identifier).first()
+    if not user:
+        # Legacy /api/posts routes pass a display name instead of an id.
+        user = db.query(models.User).filter(models.User.name == user_identifier).first()
+    if not user:
         return False, "", None
 
-    now = datetime.datetime.utcnow()
+    s = safety.active_suspension(db, user.id)
+    if s:
+        return True, f"⚠️ {safety.suspension_message(s)}", s.ends_at
 
-    # Automatic Restoration Rule after 7 Days Expiry
-    if user.suspended_until and now >= user.suspended_until:
-        user.is_suspended = False
-        user.suspended_until = None
-        user.suspended_at = None
-        db.commit()
-        return False, "Suspension expired. Community access automatically restored.", None
-
-    until_str = user.suspended_until.strftime("%b %d, %Y") if user.suspended_until else "7 days"
-    msg = f"⚠️ Your account is currently suspended from community posting until {until_str} due to repeated guideline violations."
-    return True, msg, user.suspended_until
+    # Older suspensions stored only on the user row (before the suspensions table).
+    if user.is_suspended:
+        if user.suspended_until and datetime.datetime.utcnow() >= user.suspended_until:
+            user.is_suspended, user.suspended_until, user.suspended_at = False, None, None
+            db.commit()
+            return False, "", None
+        until = user.suspended_until.strftime("%b %d, %Y") if user.suspended_until else "further notice"
+        return True, f"⚠️ Your account is suspended from posting until {until}.", user.suspended_until
+    return False, "", None
 
 
 def get_reported_items() -> List[Dict[str, Any]]:

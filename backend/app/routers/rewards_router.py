@@ -19,8 +19,13 @@ def get_user_rewards(authorization: Optional[str] = Header(None)):
             "activity_log": [],
         }
 
-    from app.routers.auth_router import resolve_user_id, token_from_header
-    user_id = resolve_user_id(token_from_header(authorization))
+    from app.routers.auth_router import get_current_user
+
+    # Shared check, so expired, revoked or disabled sessions fall back to the guest view.
+    try:
+        user_id = get_current_user(authorization).id
+    except HTTPException:
+        user_id = None
 
     db = SessionLocal()
     try:
