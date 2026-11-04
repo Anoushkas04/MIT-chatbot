@@ -21,7 +21,7 @@ cp .env.example .env               # then fill in the variables below
 | Variable | Required | Purpose |
 |---|---|---|
 | `SESSION_SECRET` | Yes | Signs sign-in tokens. Without it, everyone is signed out on every restart. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | For real email | Sends sign-in codes (e.g. Gmail + App Password). **Without SMTP or Supabase, codes are only printed in the backend console and nobody receives an email.** |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | For real email | Sends sign-in codes (e.g. Gmail + App Password). **Without SMTP or Supabase, sending a code fails with an error; with `AUTH_DEV_MODE=true` (local testing) the code is printed in the backend console instead.** |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Alternative to SMTP | Supabase Auth sends and checks the codes instead. |
 | `LLM_PROVIDER` + one of `GEMINI_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | For AI answers | `auto` picks OpenAI → Anthropic → Gemini → local. With no key, answers are extractive quotes from the documents. |
 | `GEMINI_EMBEDDINGS_ENABLED` | No | `true` embeds with Gemini (needs a key); otherwise a local hash embedder is used. Rebuild the index after switching. |

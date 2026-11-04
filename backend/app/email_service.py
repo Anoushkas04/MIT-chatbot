@@ -6,6 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 
+from app.config import AUTH_DEV_MODE
 from app.email_templates import render_otp_email
 
 logger = logging.getLogger("email_service")
@@ -36,11 +37,23 @@ def send_otp_email(to_email: str, otp_code: str, purpose: str = "signup", name: 
     """
     config = get_smtp_config()
 
+    if not is_smtp_configured() and not AUTH_DEV_MODE:
+        # A deployed server with no email provider must fail loudly: reporting the code as
+        # sent while it only went to the console leaves students waiting for an email
+        # that never comes.
+        logger.error(
+            f"No email provider configured — cannot send OTP to {to_email}. Set SUPABASE_URL + "
+            f"SUPABASE_ANON_KEY or SMTP_HOST/SMTP_USER/SMTP_PASSWORD (or AUTH_DEV_MODE=true locally)."
+        )
+        return {
+            "delivered": False,
+            "error_type": "EMAIL_NOT_CONFIGURED",
+            "message": "No email provider is configured on the server.",
+        }
+
     if not is_smtp_configured():
-        # Local-development fallback: no SMTP provider configured, so the OTP can't be
-        # emailed. Log it to the console instead of blocking sign-up entirely. This path
-        # is only reachable when SMTP_* is unset, so it can never fire once a real
-        # provider is configured for production.
+        # Local-development fallback (AUTH_DEV_MODE): no SMTP provider configured, so log
+        # the OTP to the console instead of blocking sign-up entirely.
         logger.warning(f"SMTP not configured — logging OTP for {to_email} to console (dev mode).")
         print(f"\n=======================================================")
         print(f"[DEV MODE — SMTP NOT CONFIGURED]")
