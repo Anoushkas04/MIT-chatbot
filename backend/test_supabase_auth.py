@@ -103,7 +103,7 @@ if phase == "main":
         r = requests.post(f"{A}/{path}", json={})
         check(f"legacy /{path} removed", r.status_code in (404, 405), r.text)
 
-    r = requests.get(f"{B}/api/admin/analytics", headers={"Authorization": f"Bearer {token}"})
+    r = requests.get(f"{B}/api/admin/monitoring", headers={"Authorization": f"Bearer {token}"})
     check("student token cannot reach admin", r.status_code == 403, r.text)
 
 else:  # after restart

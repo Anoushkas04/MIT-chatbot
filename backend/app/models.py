@@ -38,33 +38,10 @@ class User(Base):
 
     # Relationships
     sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
-    posts = relationship("StudentPost", back_populates="author", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     violations = relationship("CommunityViolation", back_populates="user", cascade="all, delete-orphan")
 
 
-class AuthorizedStudent(Base):
-    __tablename__ = "authorized_students"
-
-    learner_id = Column(String, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    email = Column(String, nullable=False)
-    department = Column(String, default="Computer Science & Engg")
-    academic_year = Column(String, default="3rd Year (2023-27)")
-    mobile = Column(String, default="+91 98******42")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-
-class Department(Base):
-    __tablename__ = "departments"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    code = Column(String, unique=True, index=True, nullable=False)
-    name = Column(String, nullable=False)
-    school = Column(String, default="School of Computing")
-    building = Column(String, default="Academic Block 5 (AB5)")
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class OTPRecord(Base):
@@ -96,42 +73,6 @@ class CommunityViolation(Base):
     user = relationship("User", back_populates="violations")
 
 
-class AcademicEvent(Base):
-    __tablename__ = "academic_events"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    category = Column(String, default="Exams")  # Exams, Deadlines, Academic, Holidays, Clubs, Workshops, Hackathons, Placements, Financial, General
-    start_datetime = Column(DateTime, nullable=False)
-    end_datetime = Column(DateTime, nullable=False)
-    notification_offsets = Column(Text, default="[10080, 4320, 1440, 60, 0]")  # Offset thresholds in minutes (7d, 3d, 24h, 1h, 0m)
-    target_audience = Column(String, default="all")  # all, student, faculty, parent, admin
-    department = Column(String, default="all")  # all or specific department name/code
-    academic_year = Column(String, default="all")  # all or 1st Year (2025-29), 2nd Year (2024-28), 3rd Year (2023-27), 4th Year (2022-26)
-    semester = Column(String, default="all")  # all, Odd Semester (Jul - Dec), Even Semester (Jan - May)
-    priority = Column(String, default="NORMAL")  # NORMAL, HIGH, URGENT
-    source = Column(String, default="Official MIT Academic Calendar")
-    status = Column(String, default="published")  # published, draft
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-
-class UserNotificationState(Base):
-    __tablename__ = "user_notification_states"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String, index=True, nullable=False)
-    event_id = Column(Integer, ForeignKey("academic_events.id"), nullable=False)
-    offset_minutes = Column(Integer, nullable=False)
-    is_read = Column(Boolean, default=False)
-    is_dismissed = Column(Boolean, default=False)
-    is_popup_dismissed = Column(Boolean, default=False)
-    read_at = Column(DateTime, nullable=True)
-    dismissed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    event = relationship("AcademicEvent")
 
 
 class Notification(Base):
@@ -205,58 +146,6 @@ class MessageCitation(Base):
     message = relationship("ChatMessage", back_populates="citations")
 
 
-class StudentPost(Base):
-    __tablename__ = "student_posts"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    author_id = Column(String, ForeignKey("users.id"), nullable=True)
-    author_name = Column(String, nullable=False)
-    sub_community = Column(String, default="Hostel & Mess")
-    tag = Column(String, default="General")
-    title = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
-    upvotes = Column(Integer, default=1)
-    downvotes = Column(Integer, default=0)
-    verified = Column(Boolean, default=False)
-    time = Column(String, default="Just now")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    author = relationship("User", back_populates="posts")
-    comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
-
-
-class PostComment(Base):
-    __tablename__ = "post_comments"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("student_posts.id"), nullable=False)
-    author_name = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
-    is_helpful = Column(Boolean, default=False)
-    upvotes = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    post = relationship("StudentPost", back_populates="comments")
-
-
-class PostUpvote(Base):
-    __tablename__ = "post_upvotes"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("student_posts.id"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-
-
-class UserBadge(Base):
-    __tablename__ = "user_badges"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    badge_name = Column(String, nullable=False)
-    badge_icon = Column(String, default="🏆")
-    description = Column(String, nullable=False)
-    awarded_at = Column(DateTime, default=datetime.datetime.utcnow)
-
 
 class SystemFeedback(Base):
     __tablename__ = "system_feedback"
@@ -268,16 +157,6 @@ class SystemFeedback(Base):
     rating = Column(Integer, default=5)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-
-class ModerationRecord(Base):
-    __tablename__ = "moderation_records"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    post_id = Column(Integer, nullable=True)
-    admin_id = Column(String, nullable=False)
-    action = Column(String, nullable=False)  # approved, rejected, flagged
-    reason = Column(String, nullable=True)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class LearningSignal(Base):

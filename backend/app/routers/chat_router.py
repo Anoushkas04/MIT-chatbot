@@ -1,16 +1,18 @@
-import re
 import datetime
-
+import re
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException
-from app.config import HIGH_CONFIDENCE_THRESHOLD, TOP_K, GEMINI_MODEL
-from app.llm import chat, embed_query
+from app.answer_verifier import verify_answer
+from app.community_knowledge import search_dataset_posts
+from app.faculty_directory import lookup_faculty
 from app.prompts import build_system_prompt
-from app.rag.store import get_store
+from app.providers import GenerationRequest, GenerationResult, generate_answer
+from app.rag.hybrid import hybrid_search
+from app.routers.auth_router import get_current_user
 from app.schemas import ChatRequest, ChatResponse, CitationDetail
 from app.session_memory import add_turn, get_history
 from app.database import SessionLocal
 from app import models
-from app.routers.auth_router import get_current_user
 
 router = APIRouter(prefix="/api/chat", tags=["2. AI Copilot & RAG Retrieval"])
 
@@ -30,7 +32,8 @@ COMMON_STOPWORDS = {
     "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who",
     "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll",
     "you're", "you've", "your", "yours", "yourself", "yourselves", "tell", "show", "give", "list", "please",
-    "available", "right", "now"
+    "available", "right", "now", "official", "mit", "manipal", "mahe", "campus", "university",
+    "institution", "institutional", "policy", "information", "details"
 }
 
 ACADEMIC_KEYWORDS = {
@@ -141,7 +144,14 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
 
     filtered = []
     for m in vector_matches:
-        text = m.get("text", "").lower()
+        text = " ".join(str(value) for value in (
+            m.get("source", ""),
+            m.get("department_code", ""),
+            m.get("department", ""),
+            m.get("academic_year", ""),
+            m.get("retrieval_text", ""),
+            m.get("text", ""),
+        )).lower()
         score = float(m.get("score", 0.0))
 
         # Check keyword/entity match count
@@ -152,16 +162,34 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
             if not any(b in q for b in ["book", "author", "textbook", "reference"]):
                 score *= 0.5
 
-        if match_count >= 1 or score > 0.35:
+        if match_count >= 1:
             m_copy = dict(m)
-            m_copy["score"] = score + (match_count * 0.05)
+            m_copy["score"] = min(1.0, score + (match_count * 0.05))
             filtered.append(m_copy)
 
     filtered.sort(key=lambda x: x["score"], reverse=True)
-    return filtered[:4] if filtered else vector_matches[:3]
+    return filtered[:4]
 
 
-@router.post("", response_model=ChatResponse, summary="Query Gemini AI Copilot with RAG grounding")
+def merge_evidence(
+    official_matches: list[dict],
+    community_matches: list[dict],
+    *,
+    prefer_community: bool,
+    limit: int = 4,
+) -> list[dict]:
+    """Keep both knowledge partitions represented without crowding out sources."""
+    if official_matches and community_matches:
+        if prefer_community:
+            merged = community_matches[:2] + official_matches[:2]
+        else:
+            merged = official_matches[:3] + community_matches[:1]
+    else:
+        merged = official_matches or community_matches
+    return merged[:limit]
+
+
+@router.post("", response_model=ChatResponse, summary="Query the configured AI provider with RAG grounding")
 def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
@@ -171,26 +199,45 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         owner = db.query(models.ChatSession.user_id).filter(models.ChatSession.id == req.session_id).scalar()
         if owner is not None and owner != me.id:
             raise HTTPException(status_code=403, detail="That conversation belongs to someone else.")
+
         intent = classify_intent(req.message)
         query_type = detect_query_type(req.message)
+        faculty_lookup = lookup_faculty(req.message)
 
-        # 1. Vector Search for Official University Documents
-        query_embedding = embed_query(req.message)
-        try:
-            vector_matches = get_store().search(query_embedding, raw_query=req.message, k=TOP_K)
-        except Exception as e:
-            print("Vector search error:", e)
-            vector_matches = []
+        # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
+        if faculty_lookup:
+            vector_matches = [faculty_lookup["evidence"]]
+        else:
+            try:
+                vector_matches = hybrid_search(
+                    req.message,
+                    department=req.department,
+                    academic_year=req.academic_year,
+                    semester=req.semester,
+                )
+            except Exception as e:
+                print("Vector search error:", e)
+                vector_matches = []
 
         # Filter & Rerank Vector Matches
-        relevant_official_matches = filter_chunk_relevance(vector_matches, req.message, query_type)
+        relevance_query = " ".join(
+            value for value in (
+                req.message,
+                req.department,
+                req.academic_year,
+                req.semester,
+            )
+            if value
+        )
+        relevant_official_matches = (
+            vector_matches
+            if faculty_lookup
+            else filter_chunk_relevance(vector_matches, relevance_query, query_type)
+        )
 
-        # 2. Database Search for Community Discussions
-        # Only admin-verified and 50+ upvote Community posts count as knowledge (app/community_knowledge.py).
-        # The legacy student_posts table is no longer used: it was seeded sample content.
-        from app.community_knowledge import search_dataset_posts
-
-        community_matches = search_dataset_posts(req.message, db, limit=4)
+        # 2. Database search for Community Q&A — only admin-verified, high-upvote posts
+        # that have actually been promoted into the dataset (app/community_knowledge.py).
+        community_matches = [] if faculty_lookup else search_dataset_posts(req.message, db, limit=4)
         relevant_community_matches = [cm for cm in community_matches if cm["score"] >= 0.50]
 
         # Calculate live community counts dynamically from DB
@@ -198,8 +245,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         response_count = 0
         for cm in relevant_community_matches:
             text_str = cm.get("text", "")
-            if "Community Answers:" in text_str:
-                replies_part = text_str.split("Community Answers:")[1]
+            if "Answers:" in text_str:
+                replies_part = text_str.split("Answers:")[1]
                 response_count += len([line for line in replies_part.split("\n") if line.strip().startswith("•")])
 
         demand_count = question_count
@@ -207,14 +254,14 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         # 3. Intent-Aware Source Prioritization
         has_community_query_signal = any(w in req.message.lower() for w in ["student", "students", "reddit", "say", "saying", "opinion", "review", "recommend", "advice", "peer", "experience", "best", "quietest", "fastest", "review"])
-        if relevant_community_matches and (has_community_query_signal or intent == "community_experience"):
-            all_matches = relevant_community_matches + relevant_official_matches
-        elif intent == "academic_official":
-            all_matches = relevant_official_matches + relevant_community_matches
-        else:
-            all_matches = relevant_community_matches + relevant_official_matches
-
-        all_matches = all_matches[:4]
+        all_matches = merge_evidence(
+            relevant_official_matches,
+            relevant_community_matches,
+            prefer_community=(
+                has_community_query_signal
+                or intent == "community_experience"
+            ),
+        )
 
         # Evaluate Confidence
         from app.hallucination_guard import evaluate_confidence
@@ -284,13 +331,29 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         )
 
         history = get_history(req.session_id)
-        reply_text = chat(system_prompt, history, req.message)
-        add_turn(req.session_id, req.message, reply_text)
+        if faculty_lookup:
+            generation = GenerationResult(
+                text=faculty_lookup["answer"],
+                provider="local",
+                model="structured-faculty-directory-v1",
+            )
+        else:
+            generation = generate_answer(GenerationRequest(
+                question=req.message,
+                system_prompt=system_prompt,
+                evidence=all_matches,
+                history=history,
+            ))
+        reply_text, verification_warnings = verify_answer(generation.text, all_matches)
 
         citations = []
         sources = []
         for m in all_matches:
-            src = m.get("source", "Institutional Knowledge Base")
+            src = (
+                m.get("source_file")
+                or m.get("source")
+                or "Institutional Knowledge Base"
+            )
             if src not in sources:
                 sources.append(src)
             citations.append(
@@ -298,6 +361,14 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
                     source=src,
                     snippet=m.get("text", "")[:280] + ("..." if len(m.get("text", "")) > 280 else ""),
                     score=round(float(m.get("score", 0.0)), 3),
+                    document_id=m.get("document_id"),
+                    page_number=m.get("page_number"),
+                    retrieval_method=m.get("retrieval_method"),
+                    source_url=(
+                        f"/api/search/page/{quote(str(m['document_id']))}/{int(m['page_number'])}"
+                        if m.get("document_id") and m.get("page_number")
+                        else None
+                    ),
                 )
             )
 
@@ -308,25 +379,10 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         elif fallback_suffix:
             reply_text += fallback_suffix
 
+        # Follow-up suggestions are intentionally empty until they can be generated
+        # and verified against the same evidence set.
         followups = []
-        if req.role == "student":
-            followups = [
-                "When do end-semester exam results get published?",
-                "What is the minimum attendance requirement for theory labs?",
-                "How do I apply for re-evaluation or make-up exams?",
-            ]
-        elif req.role in ["prospective", "parent"]:
-            followups = [
-                "What was the round 2 cutoff rank for CSE and AIML?",
-                "Can you break down the tuition and hostel fees for 1st year?",
-                "What documents are required during physical reporting?",
-            ]
-        elif req.role == "faculty":
-            followups = [
-                "How do I locate Dr. Radhika Pai's cabin?",
-                "What are the upcoming deadlines for seed grant applications?",
-                "Show me the departmental academic calendar schedule.",
-            ]
+        add_turn(req.session_id, req.message, reply_text)
 
         # Save session & message to SQLite DB
         try:
@@ -357,6 +413,15 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
                 timestamp="Just now",
             )
             db.add(msg_ai)
+            db.flush()
+            for citation in citations:
+                page_suffix = f"#page={citation.page_number}" if citation.page_number else ""
+                db.add(models.MessageCitation(
+                    message_id=msg_ai.id,
+                    source_name=f"{citation.source}{page_suffix}",
+                    snippet=citation.snippet,
+                    similarity_score=citation.score,
+                ))
             db.commit()
         except Exception as e:
             db.rollback()
@@ -373,6 +438,9 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             response_count=response_count,
             demand_count=demand_count,
             sample_size=sample_size,
+            provider=generation.provider,
+            model=generation.model,
+            verification_warnings=verification_warnings,
         )
     except HTTPException:
         raise  # deliberate errors (e.g. 403 for someone else's conversation) keep their status

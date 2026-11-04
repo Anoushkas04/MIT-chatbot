@@ -40,7 +40,7 @@ def search(q: str = Query(..., min_length=2, max_length=200), me: models.User = 
     for h in hits:
         if h["score"] < MIN_SCORE:
             continue
-        f = h.get("file") or h["source"]
+        f = h.get("source_file") or h.get("file") or h["source"]  # file name; "source" may be a CSV label
         if f not in best or h["score"] > best[f]["score"]:
             best[f] = h
     results = [

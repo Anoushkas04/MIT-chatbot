@@ -50,7 +50,7 @@ export default function AdminDatasetPage() {
       setBusy(file.name)
       try {
         const res = await opsApi.upload(file, replace)
-        setNotice(`${res.status === 'replaced' ? 'Replaced' : 'Added'} "${res.name}" (${res.chunks} chunk${res.chunks === 1 ? '' : 's'}). The chatbot can use it now.`)
+        setNotice(`${res.status === 'replaced' ? 'Replaced' : 'Added'} "${res.name}". Indexing in the background; the chatbot will use it in a minute.`)
       } catch (e) {
         handleError(e)
       }
@@ -65,7 +65,7 @@ export default function AdminDatasetPage() {
     setBusy(name)
     try {
       const res = await opsApi.remove(name)
-      setNotice(`Removed "${name}" (${res.chunks_removed} chunks). A copy is kept in the backend's data/doc_history folder.`)
+      setNotice(`Removed "${name}" (${res.chunks_removed} chunks). Reindexing in the background; a copy is kept in the backend's data/doc_history folder.`)
     } catch (e) {
       handleError(e)
     }

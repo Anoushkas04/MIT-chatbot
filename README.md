@@ -86,37 +86,23 @@ graph TD
 
 ```
 .
-├── backend/                       # FastAPI backend & RAG pipeline
+├── backend/                       # FastAPI backend & RAG pipeline (see backend/README.md)
 │   ├── app/
-│   │   ├── analytics_engine.py    # Real SQL database analytics aggregator
-│   │   ├── calendar_engine.py     # Academic calendar milestone & notification parser
-│   │   ├── database.py            # SQLite database engine & SQLAlchemy session
-│   │   ├── hallucination_guard.py # 4-tier confidence evaluator & disclaimers
-│   │   ├── knowledge_loop.py      # 11-stage closed-loop architecture telemetry
-│   │   ├── llm.py                 # Google Gemini client (Chat & text-embedding-004)
-│   │   ├── main.py                # FastAPI app endpoints, CORS & startup seed
-│   │   ├── models.py              # DB ORM models (Users, Posts, Comments, Feedback)
-│   │   ├── moderation_engine.py   # AI spam filter, toxicity scanner & outdated banners
-│   │   ├── personalization_engine.py # Branch & year recommendations engine
-│   │   ├── prompts.py             # System prompts & preserved campus terminology
-│   │   ├── verification_engine.py # 7-State knowledge lifecycle taxonomy
-│   │   ├── rag/
-│   │   │   ├── chunker.py         # Text chunking with sliding window overlap
-│   │   │   ├── ingest.py          # PDF/CSV document vector embedder
-│   │   │   ├── loaders.py         # PyPDF & CSV loaders
-│   │   │   └── store.py           # FAISS cosine similarity vector store
-│   │   └── routers/
-│   │       ├── academic_router.py
-│   │       ├── admin_router.py    # Analytics & Document Manager
-│   │       ├── auth_router.py     # Authentication & Role RBAC
-│   │       ├── chat_router.py     # Grounded AI Copilot endpoints
-│   │       ├── community_router.py# Student Corner Q&A & Comments
-│   │       ├── faculty_router.py  # Cabin directory & research grants
-│   │       ├── feedback_router.py # Crowdsourced signals logger
-│   │       ├── notifications_router.py # 5-category notification center
-│   │       ├── rewards_router.py  # Campus Points & Leaderboards
-│   │       └── search_router.py   # Global Cmd+K multi-domain search
-│   ├── campus_os.db               # SQLite database file
+│   │   ├── main.py                # FastAPI app, CORS, startup (tables + first index build)
+│   │   ├── config.py              # Settings from .env; hard-coded ADMIN_ACCOUNTS
+│   │   ├── database.py · models.py · schemas.py
+│   │   ├── audit.py · safety.py · moderation_engine.py   # Admin audit log, reports & suspensions
+│   │   ├── community_knowledge.py # Verified / 50+ upvote Community posts the chatbot may cite
+│   │   ├── email_service.py · supabase_auth.py           # Sign-in code delivery
+│   │   ├── llm.py · prompts.py · providers/              # Gemini, OpenAI, Anthropic, local
+│   │   ├── answer_verifier.py · hallucination_guard.py   # Citation checks, confidence
+│   │   ├── faculty_directory.py   # Structured faculty/cabin lookup
+│   │   ├── rag/                   # Page-aware ingest, dense + BM25 (+ optional visual) hybrid search,
+│   │   │                          # background rebuild jobs (jobs.py), admin index adapter (index.py)
+│   │   └── routers/               # auth, chat, library (search/documents), community_v2, users, me,
+│   │                              # admin_router, admin_community, admin_safety, admin_dataset, admin_insights
+│   ├── tests/                     # pytest suite (python -m pytest tests -q)
+│   ├── CHATBOT.md                 # How retrieval and answering work
 │   └── requirements.txt           # Python dependencies
 │
 ├── frontend/                      # Next.js (App Router) + TypeScript + Tailwind frontend

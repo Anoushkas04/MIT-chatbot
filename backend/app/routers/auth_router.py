@@ -5,13 +5,13 @@ import hashlib
 import datetime
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from app.database import SessionLocal
 from app import models
 from app.schemas import (
-    ProfileUpdateRequest,
     RegisterSendOTPRequest,
     RegisterVerifyOTPRequest,
     LoginSendOTPRequest,
@@ -137,7 +137,7 @@ else:
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def create_session_token(user_id: str) -> str:
@@ -792,36 +792,3 @@ def appeal_submit(req: AppealSubmitRequest):
 def get_me(me: models.User = Depends(get_current_user)):
     # Shared check: rejects expired, revoked (signed out) and disabled sessions.
     return extract_user_dict(me)
-
-
-@router.put("/profile", summary="Update permitted profile fields (department, academic year, bio, etc.)")
-def update_profile(req: ProfileUpdateRequest, me: models.User = Depends(get_current_user)):
-    db = SessionLocal()
-    try:
-        user = db.query(models.User).filter(models.User.id == me.id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User profile not found.")
-
-        # Update permitted fields only
-        if req.department is not None:
-            user.department = req.department
-        if req.academic_year is not None:
-            user.academic_year = req.academic_year
-        if req.semester is not None:
-            user.semester = req.semester
-        if req.avatar_icon is not None:
-            user.avatar_icon = req.avatar_icon
-        if req.bio is not None:
-            user.bio = req.bio
-        if req.skills is not None:
-            user.skills = req.skills
-        if req.interests is not None:
-            user.interests = req.interests
-        if req.activities is not None:
-            user.activities = req.activities
-
-        db.commit()
-        db.refresh(user)
-        return extract_user_dict(user)
-    finally:
-        db.close()

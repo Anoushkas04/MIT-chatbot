@@ -1,160 +1,120 @@
-# MIT CampusOS — Backend
+# MITra — Backend
 
-FastAPI backend for the MAHE MIT CampusOS platform (`../frontend`): RAG-grounded
-AI copilot, Learner-ID/OTP student authentication, student community, faculty/
-admin/rewards/notifications APIs, all backed by SQLite.
+FastAPI backend for MITra (`../frontend`): a RAG-grounded campus chatbot, email-code
+(OTP) sign-in for students and admins, the student Community, safety (reports,
+suspensions, pleas, appeals) and the admin console. SQLite locally, Postgres when
+`DATABASE_URL` is set.
+
+How the chatbot retrieves and answers is documented in [CHATBOT.md](CHATBOT.md).
 
 ## Setup
 
 ```bash
-# Create virtual environment
 python3 -m venv .venv
-
-# Activate virtual environment
-# macOS/Linux:
-source .venv/bin/activate
-# Windows:
-# .venv\Scripts\activate
-
-# Install dependencies
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env   # then fill in the variables below
+cp .env.example .env               # then fill in the variables below
 ```
 
-### Required / optional environment variables (`backend/.env`)
+### Environment variables (`backend/.env`)
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Google Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)) for chat generation and embeddings. |
-| `GEMINI_MODEL` / `CHAT_MODEL` | No | Overrides the chat model (default `gemini-flash-latest`). |
-| `EMBEDDING_MODEL` | No | Overrides the embedding model (default `gemini-embedding-001`). |
-| `TOP_K`, `HIGH_CONFIDENCE_THRESHOLD`, `MAX_HISTORY_TURNS` | No | RAG/chat tuning knobs, see `app/config.py`. |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | For real email | Supabase Auth sends and verifies OTP codes. See **Authentication** below. |
-| `SESSION_SECRET` | Yes (deployed) | Signs login tokens; without it, logins end on every restart. |
-| `DATABASE_URL` | For deployment | Postgres URL (Supabase). Empty = local SQLite `campus_os.db`. |
-| `AUTH_DEV_MODE` | No | `true` returns the OTP in the API response when Supabase is unset (local testing). |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | No | Direct SMTP OTP delivery when Supabase isn't used. |
+| `SESSION_SECRET` | Yes | Signs sign-in tokens. Without it, everyone is signed out on every restart. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | For real email | Sends sign-in codes (e.g. Gmail + App Password). **Without SMTP or Supabase, codes are only printed in the backend console and nobody receives an email.** |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Alternative to SMTP | Supabase Auth sends and checks the codes instead. |
+| `LLM_PROVIDER` + one of `GEMINI_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | For AI answers | `auto` picks OpenAI → Anthropic → Gemini → local. With no key, answers are extractive quotes from the documents. |
+| `GEMINI_EMBEDDINGS_ENABLED` | No | `true` embeds with Gemini (needs a key); otherwise a local hash embedder is used. Rebuild the index after switching. |
+| `LOCAL_OCR_ENABLED` | No | On by default: reads scanned PDFs (calendars, regulations) with offline OCR. |
+| `VISUAL_RAG_ENABLED` | No | Off by default: visual page search (needs `sentence-transformers[image]`, `peft`). |
+| `DATABASE_URL` | For deployment | Postgres URL (e.g. Supabase pooler). Empty = local SQLite `campus_os.db`. |
+| `CORS_ORIGINS` | For deployment | Browser origins allowed to call the API. Default `http://localhost:3000`. |
+| `AUTH_DEV_MODE` | No | Local testing only: returns the code in the API response when no email is set up. |
+| `SEED_DEMO_COMMUNITY` | No | `1` adds 6 labelled sample questions with answers to the Community feed, once, alongside real posts. |
 
-Never commit real values for any of the above — `.env` is gitignored; only
-`.env.example` (with empty values) is tracked.
-
-## Build the knowledge base
-
-Run this once, and again any time files are added to `../minor_project_docs`:
-
-```
-python -m app.rag.ingest
-```
-
-This reads every PDF/CSV in `minor_project_docs`, chunks and embeds the text via
-Gemini, and writes `data/chunks.json` + `data/embeddings.npy`. If the Gemini
-embedding quota is exhausted (free tier is 1000 requests/day) it falls back to
-a local deterministic hash embedding so the app keeps working — retrieval
-quality is noticeably lower in that mode; re-run ingest once quota resets.
+Admins are fixed in `app/config.py` (`ADMIN_ACCOUNTS`); there is no admin setting in `.env`.
+Never commit `.env`: it is gitignored, and only `.env.example` is tracked.
 
 ## Run
 
-```
+```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-The database (`campus_os.db`, SQLite) is created and seeded automatically on
-startup (19 official departments, sample academic-calendar events, knowledge
-document metadata — no fake users or posts). `GET /api/health` for a liveness
-check; interactive API docs at `http://localhost:8000/docs`.
+On first start the database tables are created and, if there is no chatbot index yet,
+one is built from `../minor_project_docs` in the background. API docs are at
+`http://localhost:8000/docs`; `GET /api/health` is the liveness check.
+
+To rebuild the index from the command line instead: `python -m app.rag.ingest`.
 
 ### Routers
 
-| Prefix | Router | Covers |
+| Prefix | Router | Used by |
 |---|---|---|
-| `/api/auth` | `auth_router.py` | Learner-ID/OTP signup, login, profile |
-| `/api/chat` | `chat_router.py` | RAG copilot chat, source citations |
-| `/api/academic` | `academic_router.py` | Academic calendar, timeline, cutoff ranks |
-| `/api/faculty` | `faculty_router.py` | Faculty & cabin directory |
-| `/api/posts` | `community_router.py` | Student community posts, votes, comments |
-| `/api/notifications` | `notifications_router.py` | Notification center, popups |
-| `/api/feedback` | `feedback_router.py` | Crowdsourced feedback / learning signals |
-| `/api/admin` | `admin_router.py` | Admin console (analytics, users, moderation, events) |
-| `/api/rewards` | `rewards_router.py` | Student reputation, badges, leaderboard |
-| `/api/search` | `search_router.py` | Global multi-domain search |
+| `/api/auth` | `auth_router.py` | Student sign-up/sign-in, admin sign-in, sign-out, disabled-account appeals |
+| `/api/chat` | `chat_router.py` | Chatbot |
+| `/api/search`, `/api/documents` | `library_router.py` | Search page: document search, list and download |
+| `/api/community` | `community_v2.py` | Community feed, replies, votes |
+| `/api/users` | `users_router.py` | Network: people search, reporting |
+| `/api/me` | `me_router.py` | Notifications, suspension status, pleas |
+| `/api/admin/community`, `/api/admin/audit` | `admin_community.py` | Admin Community moderation, audit log |
+| `/api/admin/reports`, `suspensions`, `pleas`, `appeals` | `admin_safety.py` | Admin safety |
+| `/api/admin/dataset` | `admin_dataset.py` | Admin dataset manager |
+| `/api/admin/monitoring`, `insights`, `accounts` | `admin_insights.py` | Admin overview pages |
+| `/api/admin/users/toggle-status` | `admin_router.py` | Disable / re-enable an account; also the shared admin check |
 
-## Authentication: Learner ID → email OTP (no passwords)
+### Dataset changes
 
-A student's **Learner ID is their institutional email address**
-(e.g. `student.mitmpl2023@learner.manipal.edu`); the OTP is sent there.
+Adding, replacing or removing a document in the admin Dataset page saves the change at
+once, then rebuilds the whole index **in the background** (the chunking is page-aware, so
+there is no cheap single-file update). The page shows progress and the new chunk counts
+when the build finishes. A change made while a build is running queues one more build,
+so the index always ends up matching the documents. Removed and replaced files are kept
+in `data/doc_history/`.
 
-**Register** (`AuthPage`): `POST /api/auth/register-send-otp` with name +
-registration number + Learner ID (validates the reg-no format and that its
-admission year matches the Learner ID, rejects already-registered details, emails
-a 6-digit code) → `POST /api/auth/register-verify-otp` with the code → account is
-created and a session token returned.
+## Authentication: email codes, no passwords
 
-**Sign in**: `POST /api/auth/login-send-otp` with the registration number *or*
-Learner ID (code goes to the stored Learner ID) → `POST /api/auth/login-verify-otp`.
+A student's **Learner ID is their institutional email** (e.g.
+`student.mitmpl2023@learner.manipal.edu`); codes are sent there.
 
-Rules (all in `app/routers/auth_router.py`, `_issue_otp` / `_verify_otp`): codes
-expire after 10 minutes, are single-use, allow 5 wrong attempts, and can be
-re-sent after 45 seconds. Session tokens are signed JWTs (`SESSION_SECRET`,
-no expiry: a session lasts until the user signs out, which revokes it server-side), so logins survive restarts and serverless deploys.
+- **Register:** `POST /api/auth/register-send-otp` (name, registration number, Learner ID)
+  → `POST /api/auth/register-verify-otp` with the code.
+- **Sign in:** `POST /api/auth/login-send-otp` with the registration number or Learner ID
+  → `POST /api/auth/login-verify-otp`.
+- **Admins:** `POST /api/auth/admin-send-otp` / `admin-verify-otp`, only for the emails in
+  `ADMIN_ACCOUNTS`. Admin and student sessions are separate and don't affect each other.
 
-The older password-based endpoints used by `AuthModal` (`verify-learner-id`,
-`verify-otp`, `register-complete`, `login`) still work and share the same OTP checks.
+Codes are 6 digits, expire after 10 minutes, are single-use and can be re-sent after
+45 seconds. Five wrong codes lock sign-in for 30 minutes. Sessions don't time out: they
+last until the person signs out, which ends every session for that account.
 
-### Who sends and checks the codes
+### One-time Supabase + Gmail setup (optional)
 
-| Setup | Behaviour |
-|---|---|
-| `SUPABASE_URL` + `SUPABASE_ANON_KEY` set | Supabase Auth generates, emails and verifies the code. |
-| Supabase unset, `SMTP_*` set | Backend generates the code and emails it over SMTP. |
-| Neither set | Code is printed to the uvicorn console. With `AUTH_DEV_MODE=true` it is also returned as `test_otp`, which the sign-in page displays. Local testing only. |
+1. **Gmail:** turn on 2-Step Verification, then create an App Password.
+2. **Supabase** → new project → **Authentication**:
+   - **Emails → SMTP Settings:** host `smtp.gmail.com`, port `465`, your Gmail address
+     and App Password. Set the minimum interval between emails to 45 seconds or less.
+   - **Emails → Templates:** put `{{ .Token }}` in **Magic Link** and **Confirm signup**,
+     or students get a link instead of a code.
+   - **Providers → Email:** OTP length 6, expiry 600 seconds.
+3. Copy the Project URL and anon key into `SUPABASE_URL` / `SUPABASE_ANON_KEY`.
 
-### One-time Supabase + Gmail setup (free, no domain needed)
+University mail servers can flag Gmail senders, so check spam on the first test.
 
-1. **Gmail**: turn on 2-Step Verification, then create an App Password
-   (Google Account → Security → App passwords).
-2. **Supabase** → create a free project, then under **Authentication**:
-   - **Emails → SMTP Settings**: enable custom SMTP. Host `smtp.gmail.com`, port
-     `465`, username = your Gmail address, password = the App Password, sender
-     email = the same Gmail address. Set "Minimum interval between emails" to
-     45 seconds or less (the sign-in page allows a resend after 45s).
-   - **Emails → Templates**: in both **Magic Link** and **Confirm signup**, put
-     the code in the body, e.g. `Your MIT CampusOS code is {{ .Token }}`.
-     Without `{{ .Token }}` students get a link instead of a code.
-   - **Providers → Email**: email OTP length 6, expiry 600 seconds.
-   - **Rate limits**: raise "emails sent per hour" (the default is low).
-3. Copy **Project URL** and **anon key** (Project Settings → API) into
-   `SUPABASE_URL` / `SUPABASE_ANON_KEY`, and set `SESSION_SECRET`.
-4. For deployment (e.g. Vercel), set `DATABASE_URL` to the Supabase Postgres
-   pooler connection string so accounts persist; tables are created on startup.
+## Tests
 
-University mail servers can flag Gmail senders, so check spam/quarantine on the
-first test. **Switching to Resend later** (once you own a domain): verify the
-domain in Resend, then change only the Supabase SMTP settings to host
-`smtp.resend.com`, port `465`, username `resend`, password = Resend API key,
-sender `noreply@yourdomain`. No code changes.
-
-## Self-check
-
-```
-python test_rag.py
+```bash
+python -m pytest tests -q
 ```
 
-## Notes / known limitations
+Covers the chatbot API contract, citations, retrieval and providers without calling any
+paid API. The L2 corpus tests in `tests/test_chatbot_l2.py` run against the built index
+(`data/`) and are skipped if there is none or OCR is off. `test_supabase_auth.py` is a manual
+sign-in smoke test against a running server.
 
-- Vector store is a plain numpy cosine-similarity search over the whole corpus,
-  persisted to disk — no FAISS/Pinecone service. Fine at this corpus size;
-  revisit only if the knowledge base grows into the tens of thousands of chunks.
-- Cutoff-rank PDFs are tabular; `pypdf` text extraction is naive and may mangle
-  columns. Swap `rag/loaders.py`'s PDF path for `pdfplumber` if retrieval quality
-  on those specific documents turns out to matter.
-- Chat conversation history is in-memory and resets when the server restarts
-  (`app/session_memory.py`). Login sessions are signed tokens and are not affected.
-- Password hashing (`hash_password` in `auth_router.py`) uses unsalted
-  SHA-256, consistent with this codebase's existing conventions — swap for
-  `bcrypt`/`argon2` before any real production deployment.
-- Windows note: `app/main.py`, `app/rag/ingest.py`, and `app/seed.py` force
-  UTF-8 stdout/stderr on startup, since Windows' default console codepage
-  can't encode the emoji used throughout this codebase's log/print output and
-  would otherwise crash with `UnicodeEncodeError`.
+## Notes
+
+- Chat history used for follow-up questions is kept in memory and resets on restart
+  (`app/session_memory.py`); sign-in sessions are not affected.
+- Windows: `app/main.py`, `app/rag/ingest.py` and `app/seed.py` force UTF-8 console
+  output, since the default codepage can't print the emoji in log lines.

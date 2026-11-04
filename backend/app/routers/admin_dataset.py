@@ -6,6 +6,7 @@ recorded in the audit log. Replaced and removed files are kept in data/doc_histo
 import datetime
 import io
 import re
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from app import audit, models
 from app.config import DATA_DIR, DOCS_DIR
 from app.database import SessionLocal
 from app.rag import index
-from app.rag.loaders import SUPPORTED_EXTENSIONS, UnsupportedDocument
+from app.rag.loaders import SUPPORTED_EXTENSIONS, has_readable_text
 from app.routers.admin_router import require_admin_user
 from app.routers.community_v2 import _relative
 
@@ -72,15 +73,15 @@ def _archive(path: Path) -> Path:
     return dest
 
 
-def _record_document(db, path: Path, chunks: int) -> None:
+def _record_document(db, path: Path) -> None:
     row = db.query(models.KnowledgeDocument).filter(models.KnowledgeDocument.filename == path.name).first()
     if not row:
         row = models.KnowledgeDocument(filename=path.name)
         db.add(row)
     row.file_type = path.suffix.lstrip(".").upper()
     row.file_size = _human(path.stat().st_size)
-    row.chunks_count = chunks
-    row.status = "Indexed" if chunks else "No readable text"
+    row.chunks_count = 0  # known once the background rebuild finishes (see list_dataset)
+    row.status = "Indexing"
     row.uploaded_at = datetime.datetime.utcnow()
 
 
@@ -156,37 +157,38 @@ async def upload(file: UploadFile = File(...), replace: bool = Form(False), admi
     if replace and not existed:
         raise HTTPException(status_code=404, detail=f'"{name}" isn\'t in the dataset, so there\'s nothing to replace.')
 
+    # A DOCX, CSV or text file with no text is refused here, before the dataset changes.
+    # (Scanned PDFs pass: the rebuild can still read them with OCR or visual retrieval.)
+    probe = HISTORY_DIR.parent / f".upload-check-{uuid.uuid4().hex}{ext}"
+    probe.parent.mkdir(parents=True, exist_ok=True)
+    probe.write_bytes(data)
+    try:
+        readable = has_readable_text(probe)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Couldn't read that file: {e}")
+    finally:
+        probe.unlink(missing_ok=True)
+    if not readable:
+        raise HTTPException(status_code=400, detail="No readable text was found in that file. Nothing was changed.")
+
     archived = _archive(path) if existed else None
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
-    try:
-        chunks = index.upsert_file(path)
-    except (UnsupportedDocument, index.NeedsFullRebuild, Exception) as e:
-        # Put things back the way they were so a bad upload never breaks the dataset.
-        path.unlink(missing_ok=True)
-        if archived:
-            archived.replace(path)
-        msg = str(e) if isinstance(e, (UnsupportedDocument, index.NeedsFullRebuild)) else f"Couldn't read that file: {e}"
-        raise HTTPException(status_code=400, detail=msg)
-    if chunks == 0:
-        index.remove_source(name)
-        path.unlink(missing_ok=True)
-        if archived:
-            archived.replace(path)
-            index.upsert_file(path)
-        raise HTTPException(status_code=400, detail="No readable text was found (is it a scanned PDF?). Nothing was changed.")
+    # The full-corpus rebuild runs in the background (or is queued behind one already
+    # running); the Dataset page polls index.rebuild and shows the chunk count when done.
+    index.rebuild_in_background()
 
     db = SessionLocal()
     try:
-        _record_document(db, path, chunks)
+        _record_document(db, path)
         action = "dataset.replace" if existed else "dataset.upload"
         audit.record(
             db, admin, action,
-            f'{"Replaced" if existed else "Added"} "{name}" ({_human(len(data))}, {chunks} chunks)',
-            "file", name, {"size": len(data), "chunks": chunks, "previous_version": archived.name if archived else None},
+            f'{"Replaced" if existed else "Added"} "{name}" ({_human(len(data))}); reindexing in the background',
+            "file", name, {"size": len(data), "previous_version": archived.name if archived else None},
         )
         db.commit()
-        return {"status": "replaced" if existed else "added", "name": name, "chunks": chunks}
+        return {"status": "replaced" if existed else "added", "name": name, "indexing": True}
     finally:
         db.close()
 
@@ -196,8 +198,10 @@ def remove(name: str, admin: models.User = Depends(require_admin_user)):
     path = _doc_path(name)
     if not path.exists():
         raise HTTPException(status_code=404, detail="That file isn't in the dataset.")
-    removed = index.remove_source(name)
+    removed = index.chunk_count(name) or 0
+    # Move the file out BEFORE rebuilding, or the rebuild re-indexes the document being removed.
     archived = _archive(path)
+    index.rebuild_in_background()
     db = SessionLocal()
     try:
         row = db.query(models.KnowledgeDocument).filter(models.KnowledgeDocument.filename == name).first()
@@ -205,19 +209,19 @@ def remove(name: str, admin: models.User = Depends(require_admin_user)):
             db.delete(row)
         audit.record(db, admin, "dataset.remove", f'Removed "{name}" ({removed} chunks)', "file", name, {"archived_as": archived.name, "chunks": removed})
         db.commit()
-        return {"status": "removed", "name": name, "chunks_removed": removed}
+        return {"status": "removed", "name": name, "chunks_removed": removed, "indexing": True}
     finally:
         db.close()
 
 
 @router.post("/rebuild", summary="Rebuild the whole chatbot index from every document (runs in the background)")
 def rebuild(admin: models.User = Depends(require_admin_user)):
-    if not index.rebuild_in_background():
-        raise HTTPException(status_code=409, detail="A rebuild is already running.")
+    already_running = index.rebuild_state["running"]
+    index.rebuild_in_background()  # queued behind the running build if there is one
     db = SessionLocal()
     try:
         audit.record(db, admin, "dataset.rebuild", "Started a full rebuild of the chatbot index", "index", None, {"embedder": index.current_embedder()})
         db.commit()
     finally:
         db.close()
-    return {"status": "started"}
+    return {"status": "queued" if already_running else "started"}

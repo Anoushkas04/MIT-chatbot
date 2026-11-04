@@ -11,17 +11,12 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.seed import seed_database
-from app.rag.store import get_store
+from app.rag.store import get_store_status
 
 # Import all modular APIRouters
 from app.routers.auth_router import router as auth_router
 from app.routers.chat_router import router as chat_router
-from app.routers.academic_router import router as academic_router
-from app.routers.faculty_router import router as faculty_router
-from app.routers.notifications_router import router as notifications_router
-from app.routers.feedback_router import router as feedback_router
 from app.routers.admin_router import router as admin_router
-from app.routers.rewards_router import router as rewards_router
 from app.routers.library_router import router as library_router
 from app.routers.users_router import router as users_router
 from app.routers.community_v2 import router as community_v2_router
@@ -57,14 +52,8 @@ app.add_middleware(
 # Mount Routers
 app.include_router(auth_router)
 app.include_router(chat_router)
-app.include_router(academic_router)
-app.include_router(faculty_router)
-# Legacy /api/posts (unauthenticated, author from the request body) is retired; Community is /api/community.
-app.include_router(notifications_router)
-app.include_router(feedback_router)
 app.include_router(admin_router)
-app.include_router(rewards_router)
-app.include_router(library_router)  # real search + documents (replaces the hard-coded search_router)
+app.include_router(library_router)
 app.include_router(users_router)
 app.include_router(community_v2_router)
 app.include_router(admin_community_router)
@@ -118,33 +107,17 @@ def root():
 
 @app.get("/api/health", tags=["0. System Health"])
 def health():
+    rag = get_store_status()
+    from app.providers import get_provider_status
+    from app.rag.visual_store import get_visual_status
+    visual = get_visual_status()
     return {
         "status": "ok",
         "platform": "MIT CampusOS",
-        "rag_store_ready": True,
+        "rag_store_ready": rag["ready"],
+        "rag_chunk_count": rag["chunk_count"],
+        "rag_error": rag["error"],
+        "visual_rag": visual,
+        "llm": get_provider_status(),
         "docs_url": "http://localhost:8000/docs",
     }
-
-
-@app.get("/api/departments", tags=["0. System Health"])
-def get_departments():
-    from app.database import SessionLocal
-    from app import models
-    db = SessionLocal()
-    try:
-        depts = db.query(models.Department).filter(models.Department.is_active == True).all()
-        return {
-            "count": len(depts),
-            "departments": [
-                {
-                    "id": d.id,
-                    "code": d.code,
-                    "name": d.name,
-                    "school": d.school,
-                    "building": d.building,
-                }
-                for d in depts
-            ],
-        }
-    finally:
-        db.close()

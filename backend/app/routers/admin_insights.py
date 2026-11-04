@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, text
 
 from app import models, safety
-from app.config import ADMIN_ACCOUNTS, AUTH_DEV_MODE, GEMINI_API_KEY, SESSION_SECRET, SUPABASE_ANON_KEY, SUPABASE_URL
+from app.config import ADMIN_ACCOUNTS, AUTH_DEV_MODE, DOCS_DIR, GEMINI_API_KEY, SESSION_SECRET, SUPABASE_ANON_KEY, SUPABASE_URL
 from app.database import SessionLocal
 from app.email_service import is_smtp_configured
 from app.llm import is_valid_key
@@ -102,7 +102,7 @@ def monitoring():
                 ),
             },
             "dataset": {
-                "files": len([p for p in index.DOCS_DIR.iterdir() if p.is_file() and not p.name.startswith(".")]) if index.DOCS_DIR.exists() else 0,
+                "files": len([p for p in DOCS_DIR.iterdir() if p.is_file() and not p.name.startswith(".")]) if DOCS_DIR.exists() else 0,
                 "chunks": m.get("total_chunks"),
                 "built_at": m.get("built_at"),
                 "embedder": m.get("embedder"),

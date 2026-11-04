@@ -585,9 +585,9 @@ export const opsApi = {
     const form = new FormData()
     form.append('file', file)
     form.append('replace', String(replace))
-    return authedUpload<{ status: 'added' | 'replaced'; name: string; chunks: number }>('/api/admin/dataset/upload', form)
+    return authedUpload<{ status: 'added' | 'replaced'; name: string; indexing: boolean }>('/api/admin/dataset/upload', form)
   },
-  remove: (name: string) => authed<{ status: string; chunks_removed: number }>('DELETE', `/api/admin/dataset/files/${encodeURIComponent(name)}`),
+  remove: (name: string) => authed<{ status: string; chunks_removed: number; indexing: boolean }>('DELETE', `/api/admin/dataset/files/${encodeURIComponent(name)}`),
   rebuild: () => authed<{ status: string }>('POST', '/api/admin/dataset/rebuild'),
   monitoring: () => authed<Monitoring>('GET', '/api/admin/monitoring'),
   toggleDisabled: (userId: string) =>
