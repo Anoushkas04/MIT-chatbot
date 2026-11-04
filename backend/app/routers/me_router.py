@@ -1,13 +1,43 @@
-"""The signed-in user's own server-side data: notifications from the MITra team."""
+"""The signed-in user's own server-side data: notifications from the MITra team, public profile."""
+import json
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app import models, safety
 from app.database import SessionLocal
+from app.public_profile import clean_entries, public_profile
 from app.routers.auth_router import get_current_user
 from app.routers.community_v2 import _relative
 
 router = APIRouter(prefix="/api/me", tags=["1. Authentication & Profile Engine"])
+
+
+class ProfileEntry(BaseModel):
+    name: str
+    role: str = ""
+
+
+class PublicProfileUpdate(BaseModel):
+    clubs: List[ProfileEntry] = []
+    projects: List[ProfileEntry] = []
+
+
+@router.put("/profile", summary="Update the clubs and student projects on my public profile")
+def update_profile(req: PublicProfileUpdate, me: models.User = Depends(get_current_user)):
+    clubs = clean_entries(req.clubs, "clubs")
+    projects = clean_entries(req.projects, "student projects")
+    db = SessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.id == me.id).first()
+        user.clubs = json.dumps(clubs)
+        user.projects = json.dumps(projects)
+        db.commit()
+        db.refresh(user)
+        return public_profile(user)
+    finally:
+        db.close()
 
 
 @router.get("/notifications", summary="My notifications from MITra (official replies, moderation, verification)")

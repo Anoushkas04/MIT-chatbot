@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Check, Clock, MessageCircle, UserCheck, UserMinus, UserPlus, UserX, X } from 'lucide-react'
 import type { NetworkPerson } from '@/lib/mock-data'
 
@@ -31,15 +32,17 @@ export function NetworkPersonCard({
           <X />
         </button>
       )}
-      <div className="network-avatar">{person.initials}</div>
-      <strong>{person.name}</strong>
-      {person.accountId && <span className="account-badge">On MITra</span>}
-      <span className="network-meta">
-        {[person.branch, person.semester].filter(Boolean).join(' · ')}
-      </span>
-      <p className="network-caption">
-        {person.sharedInterests.length > 0 ? `Also into ${person.sharedInterests.join(', ')}` : 'Student at MIT Manipal'}
-      </p>
+      <Link href={`/network/${encodeURIComponent(person.id)}`} className="network-card-link" aria-label={`View ${person.name}'s profile`}>
+        <div className="network-avatar">{person.initials}</div>
+        <strong>{person.name}</strong>
+        {person.accountId && <span className="account-badge">On MITra</span>}
+        <span className="network-meta">
+          {[person.branch, person.semester].filter(Boolean).join(' · ')}
+        </span>
+        <p className="network-caption">
+          {person.sharedInterests.length > 0 ? `Also into ${person.sharedInterests.join(', ')}` : 'Student at MIT Manipal'}
+        </p>
+      </Link>
       {person.status === 'suggested' && (
         <button className="network-action" onClick={onConnect}>
           <UserPlus /> Connect

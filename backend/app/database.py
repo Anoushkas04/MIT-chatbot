@@ -40,6 +40,24 @@ def get_db():
         db.close()
 
 
+# Columns added after the first release. create_all only creates missing tables, so
+# existing databases (e.g. Supabase in production) get these added here.
+_ADDED_COLUMNS = {"users": {"clubs": "TEXT", "projects": "TEXT"}}
+
+
+def _add_missing_columns():
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table, columns in _ADDED_COLUMNS.items():
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, sql_type in columns.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+
+
 def init_db():
     from app import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()

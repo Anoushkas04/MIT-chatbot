@@ -136,6 +136,11 @@ export type PublicUser = {
   interests: string[]
 }
 
+/** A club or student project on someone's public profile; role is optional ("" when unset). */
+export type ProfileEntry = { name: string; role: string }
+
+export type PublicProfile = PublicUser & { clubs: ProfileEntry[]; projects: ProfileEntry[] }
+
 // Must match backend app/safety.py REPORT_REASONS.
 export const REPORT_REASONS = [
   'Harassment or bullying',
@@ -151,6 +156,10 @@ export type ReportReason = (typeof REPORT_REASONS)[number]
 
 export function searchUsers(q: string) {
   return authed<{ results: PublicUser[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`)
+}
+
+export function getPublicProfile(userId: string) {
+  return authed<PublicProfile>('GET', `/api/users/${encodeURIComponent(userId)}`)
 }
 
 export function reportUser(body: {
@@ -318,6 +327,7 @@ export const meApi = {
   notifications: () => authed<{ notifications: ServerNotification[] }>('GET', '/api/me/notifications'),
   markRead: (id: string) => authed<{ status: string }>('POST', `/api/me/notifications/${id}/read`),
   markAllRead: () => authed<{ status: string }>('POST', '/api/me/notifications/read-all'),
+  updateProfile: (body: { clubs: ProfileEntry[]; projects: ProfileEntry[] }) => authed<PublicProfile>('PUT', '/api/me/profile', body),
 }
 
 // ---- Admin: community moderation and audit log ----
@@ -601,7 +611,7 @@ export const opsApi = {
 
 /** Confirms the stored token is still valid (throws ApiError 401 if it expired or was revoked). */
 export function currentUser() {
-  return authed<BackendUser & { role: string }>('GET', '/api/auth/me')
+  return authed<BackendUser & { role: string; clubs: ProfileEntry[]; projects: ProfileEntry[] }>('GET', '/api/auth/me')
 }
 
 /** Signs out on every device by revoking this account's tokens on the server. */

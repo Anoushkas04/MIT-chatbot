@@ -1,7 +1,31 @@
 'use client'
 
+import type { PublicUser } from './api'
 import { useLocalState } from './use-local-state'
 import { defaultActivity, defaultNetworkPeople, type ActivityEvent, type NetworkPerson, type NetworkStatus } from './mock-data'
+
+export function initialsOf(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('')
+}
+
+/** A registered student from account search, as a network person (id `acc-<user id>`). */
+export function accountToPerson(u: PublicUser): NetworkPerson {
+  return {
+    id: `acc-${u.id}`,
+    accountId: u.id,
+    name: u.name,
+    initials: initialsOf(u.name),
+    branch: u.department,
+    semester: u.semester ? `Sem ${u.semester}` : u.academic_year,
+    sharedInterests: u.interests,
+    status: 'suggested',
+  }
+}
 
 export function useNetworkPeople() {
   const [people, setPeople] = useLocalState<NetworkPerson[]>('mitra_network', defaultNetworkPeople)

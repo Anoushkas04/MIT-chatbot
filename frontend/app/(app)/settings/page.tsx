@@ -1,9 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowUpRight, Lock } from 'lucide-react'
+import { ProfileEntriesEditor } from '@/components/profile-entries-editor'
+import { currentUser, meApi, type ProfileEntry } from '@/lib/api'
+import { mitClubs } from '@/lib/clubs'
 import { avatarChoices, defaultProfile, interestOptions, type Profile } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
+
+// Clubs and projects live on the server (other students see them); this is a cached copy.
+type PublicDetails = { clubs: ProfileEntry[]; projects: ProfileEntry[] }
 
 type SettingsFlags = {
   personalization: boolean
@@ -30,6 +36,17 @@ export default function SettingsPage() {
   const [customInterest, setCustomInterest] = useState('')
   const [resetMessage, setResetMessage] = useState('')
   const [confirmingReset, setConfirmingReset] = useState(false)
+  const [details, setDetails] = useLocalState<PublicDetails>('mitra_public_details', { clubs: [], projects: [] })
+  const [draftClubs, setDraftClubs] = useState<ProfileEntry[]>([])
+  const [draftProjects, setDraftProjects] = useState<ProfileEntry[]>([])
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  useEffect(() => {
+    currentUser()
+      .then((u) => setDetails({ clubs: u.clubs ?? [], projects: u.projects ?? [] }))
+      .catch(() => {}) // offline: keep the cached copy
+  }, [setDetails])
 
   function toggle(key: keyof SettingsFlags) {
     setFlags((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -39,6 +56,9 @@ export default function SettingsPage() {
     setDraftAvatar(profile.avatar)
     setDraftInterests(profile.interests)
     setCustomInterest('')
+    setDraftClubs(details.clubs)
+    setDraftProjects(details.projects)
+    setSaveError('')
     setEditing(true)
   }
 
@@ -53,9 +73,19 @@ export default function SettingsPage() {
     setCustomInterest('')
   }
 
-  function saveProfile() {
-    setProfile((prev) => ({ ...prev, avatar: draftAvatar, interests: draftInterests }))
-    setEditing(false)
+  async function saveProfile() {
+    setSaving(true)
+    setSaveError('')
+    try {
+      const saved = await meApi.updateProfile({ clubs: draftClubs, projects: draftProjects })
+      setDetails({ clubs: saved.clubs, projects: saved.projects })
+      setProfile((prev) => ({ ...prev, avatar: draftAvatar, interests: draftInterests }))
+      setEditing(false)
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Could not save your profile. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function resetInterests() {
@@ -98,6 +128,10 @@ export default function SettingsPage() {
                       </span>
                     ))}
                   </div>
+                )}
+                {details.clubs.length > 0 && <small>Clubs: {details.clubs.map((c) => c.name).join(', ')}</small>}
+                {details.projects.length > 0 && (
+                  <small>Student projects: {details.projects.map((p) => p.name).join(', ')}</small>
                 )}
               </div>
               <button onClick={startEditing}>
@@ -157,6 +191,28 @@ export default function SettingsPage() {
               </div>
 
               <div className="profile-edit-section">
+                <strong>Clubs</strong>
+                <ProfileEntriesEditor
+                  entries={draftClubs}
+                  onChange={setDraftClubs}
+                  suggestions={mitClubs}
+                  namePlaceholder="Club name, e.g. IECSE"
+                  rolePlaceholder="Your role (optional)"
+                />
+              </div>
+
+              <div className="profile-edit-section">
+                <strong>Student projects</strong>
+                <ProfileEntriesEditor
+                  entries={draftProjects}
+                  onChange={setDraftProjects}
+                  namePlaceholder="Project or team, e.g. Formula Manipal"
+                  rolePlaceholder="Your role (optional)"
+                />
+                <small>Clubs and student projects are shown on your public profile to other MITra students.</small>
+              </div>
+
+              <div className="profile-edit-section">
                 <strong>
                   <Lock /> Fixed details
                 </strong>
@@ -181,12 +237,13 @@ export default function SettingsPage() {
                 <small>These are set by your institutional record and can&apos;t be edited here.</small>
               </div>
 
+              {saveError && <p className="field-error">{saveError}</p>}
               <div className="composer-actions">
                 <button className="text-button" onClick={() => setEditing(false)}>
                   Cancel
                 </button>
-                <button className="community-ask-btn small" onClick={saveProfile}>
-                  Save changes
+                <button className="community-ask-btn small" onClick={saveProfile} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
             </div>

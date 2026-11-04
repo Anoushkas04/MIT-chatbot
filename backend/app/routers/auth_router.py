@@ -18,6 +18,7 @@ from app.schemas import (
     LoginVerifyOTPRequest,
 )
 from app.email_service import send_otp_email
+from app.public_profile import parse_entries
 from app.supabase_auth import (
     send_supabase_email_otp,
     verify_supabase_email_otp,
@@ -191,6 +192,8 @@ def extract_user_dict(user: models.User) -> dict:
         "skills": user.skills or "",
         "interests": user.interests or "",
         "activities": user.activities or "",
+        "clubs": parse_entries(user.clubs),
+        "projects": parse_entries(user.projects),
         "agreed_terms": user.agreed_terms,
         "terms_version": user.terms_version,
         "terms_accepted_at": user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,

@@ -5,6 +5,7 @@ from sqlalchemy import or_
 from app.database import SessionLocal
 from app import models
 from app.routers.auth_router import get_current_user
+from app.public_profile import public_profile
 
 router = APIRouter(prefix="/api/users", tags=["6. Student Network & Safety"])
 
@@ -52,6 +53,27 @@ def search_users(q: str = Query(..., min_length=2, max_length=80), current_user:
                 for u in users
             ]
         }
+    finally:
+        db.close()
+
+
+@router.get("/{user_id}", summary="A student's public profile (details, interests, clubs and projects)")
+def get_public_profile(user_id: str, current_user: models.User = Depends(get_current_user)):
+    db = SessionLocal()
+    try:
+        user = (
+            db.query(models.User)
+            .filter(
+                models.User.id == user_id,
+                models.User.role != "admin",
+                models.User.status == "active",
+                models.User.is_suspended.is_(False),
+            )
+            .first()
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="This profile isn't available.")
+        return public_profile(user)
     finally:
         db.close()
 

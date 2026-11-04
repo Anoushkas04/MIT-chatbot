@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Ban, Flag, Lock, MoreHorizontal, Search, Send, X } from 'lucide-react'
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog'
 import { NetworkPersonCard } from '@/components/network-person-card'
-import { useNetworkPeople } from '@/lib/use-network'
+import { accountToPerson, useNetworkPeople } from '@/lib/use-network'
 import { defaultMessages, type DirectMessage, type NetworkPerson } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 import { REPORT_REASONS, reportUser, searchUsers, type PublicUser, type ReportReason } from '@/lib/api'
@@ -12,28 +12,6 @@ import { getSession } from '@/lib/session'
 
 type Tab = 'suggested' | 'requests' | 'connections'
 
-
-function initialsOf(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('')
-}
-
-function accountToPerson(u: PublicUser): NetworkPerson {
-  return {
-    id: `acc-${u.id}`,
-    accountId: u.id,
-    name: u.name,
-    initials: initialsOf(u.name),
-    branch: u.department,
-    semester: u.semester ? `Sem ${u.semester}` : u.academic_year,
-    sharedInterests: u.interests,
-    status: 'suggested',
-  }
-}
 
 function matchesPerson(p: NetworkPerson, q: string) {
   return `${p.name} ${p.branch} ${p.semester} ${p.sharedInterests.join(' ')}`.toLowerCase().includes(q)
@@ -193,6 +171,15 @@ export default function NetworkPage() {
     .map(accountToPerson)
     .filter((p) => !known.has(p.id) && !blockedAccountIds.has(p.accountId) && !localNames.has(p.name.toLowerCase()))
   const results = [...localResults, ...accountResults]
+
+  // Profile pages send "Message" here as /network?chat=<id>; open that chat once, then tidy the URL.
+  useEffect(() => {
+    const chatId = new URLSearchParams(window.location.search).get('chat')
+    // people starts as the defaults and then loads from storage, so retry until the person appears
+    if (!chatId || !people.some((p) => p.id === chatId && p.status === 'connected')) return
+    setActiveChat(chatId)
+    window.history.replaceState(null, '', '/network')
+  }, [people])
 
   function closeChat() {
     setActiveChat(null)
