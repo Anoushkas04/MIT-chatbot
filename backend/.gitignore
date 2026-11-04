@@ -12,3 +12,6 @@ data/visual_manifest.json
 data/visual_model_ready.json
 data/ocr_cache/
 data/calendar_events.json
+data/index_meta.json
+data/*.tmp*
+data/doc_history/

@@ -7,6 +7,8 @@ numpy>=2.2,<3
 sqlalchemy>=2.0,<3
 PyJWT
 psycopg2-binary
+python-multipart
+python-docx
 
 # Page-aware hybrid RAG.
 PyMuPDF>=1.26,<2

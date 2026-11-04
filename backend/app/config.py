@@ -62,12 +62,25 @@ ALLOWED_EMAIL_DOMAINS = [d.strip().lower() for d in _domains_raw.split(",") if d
 # Database: Postgres URL (e.g. Supabase pooler) in production, local SQLite file when unset
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
-# Signed session tokens (HS256). Without a fixed secret, a random one is generated per
-# process, so tokens stop working when the server restarts — always set it when deployed.
+# Signed session tokens (HS256), valid until the user signs out. Without a fixed secret, a
+# random one is generated per process, so tokens stop working when the server restarts —
+# always set it when deployed.
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
-SESSION_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "7"))
 
 # Local-only testing: when Supabase isn't configured, return the generated OTP in the
 # API response so it can be entered without an email provider. Ignored if Supabase is set.
 AUTH_DEV_MODE = os.environ.get("AUTH_DEV_MODE", "").strip().lower() in ("1", "true", "yes")
+
+# The official MITra admins, fixed in code: no other account can ever be an admin, and
+# the ADMIN_EMAILS environment variable is ignored. Change this list (and redeploy) to
+# add or remove an admin. Names are what the audit log shows.
+ADMIN_ACCOUNTS = {
+    "anoushkas154@gmail.com": "Anoushka",
+    "tejasrasoju@gmail.com": "Tejas",
+    "186.dev.tated@gmail.com": "Dev",
+}
+ADMIN_EMAILS = frozenset(ADMIN_ACCOUNTS)  # exempt from the student email-domain rule
+
+# Opt-in demo content for the Community feed (labelled samples, no fake accounts).
+SEED_DEMO_COMMUNITY = os.environ.get("SEED_DEMO_COMMUNITY", "").strip().lower() in ("1", "true", "yes")
 
