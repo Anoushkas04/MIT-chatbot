@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -9,6 +9,7 @@ class User(Base):
 
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
     role = Column(String, default="student")  # student, faculty, parent, admin
     learner_id = Column(String, unique=True, index=True, nullable=True)
@@ -319,3 +320,165 @@ class QueryAnalyticsLog(Base):
     confidence = Column(String, default="high")
     source_type = Column(String, default="official")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AdminAuditLog(Base):
+    """Every admin write, attributed to the named admin, so changes can be traced."""
+    __tablename__ = "admin_audit_log"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    admin_id = Column(String, index=True, nullable=True)  # None for automatic system actions
+    admin_name = Column(String, nullable=False)
+    action = Column(String, index=True, nullable=False)  # e.g. community.delete_post, dataset.upload
+    target_type = Column(String, nullable=True)
+    target_id = Column(String, nullable=True)
+    summary = Column(Text, nullable=False)
+    details_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+
+class CommunityPost(Base):
+    __tablename__ = "community_posts"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    author_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    author_label = Column(String, nullable=True)  # display name for seeded demo posts with no account
+    title = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    tags_json = Column(Text, default="[]")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    edited_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String, nullable=True)
+    delete_reason = Column(String, nullable=True)
+    verified = Column(Boolean, default=False)
+    verified_by = Column(String, nullable=True)
+    verified_at = Column(DateTime, nullable=True)
+    in_dataset = Column(Boolean, default=False)
+    seed_score = Column(Integer, default=0)  # display-only starting score for demo posts
+
+    author = relationship("User")
+    comments = relationship("CommunityComment", back_populates="post", cascade="all, delete-orphan")
+
+
+class CommunityComment(Base):
+    __tablename__ = "community_comments"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    post_id = Column(Integer, ForeignKey("community_posts.id"), nullable=False, index=True)
+    parent_id = Column(Integer, ForeignKey("community_comments.id"), nullable=True, index=True)
+    author_id = Column(String, ForeignKey("users.id"), nullable=True)
+    author_label = Column(String, nullable=True)
+    body = Column(Text, nullable=False)
+    is_official = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    edited_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String, nullable=True)
+    delete_reason = Column(String, nullable=True)
+    seed_score = Column(Integer, default=0)
+
+    post = relationship("CommunityPost", back_populates="comments")
+    author = relationship("User")
+
+
+class CommunityVote(Base):
+    __tablename__ = "community_votes"
+    __table_args__ = (UniqueConstraint("user_id", "target_type", "target_id", name="uq_vote_once"),)
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    target_type = Column(String, nullable=False)  # post | comment
+    target_id = Column(Integer, nullable=False, index=True)
+    value = Column(Integer, nullable=False)  # +1 / -1
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AdminLoginGuard(Base):
+    """Per-admin-email sign-in throttling and server-side session revocation."""
+    __tablename__ = "admin_login_guards"
+
+    email = Column(String, primary_key=True)
+    failed_attempts = Column(Integer, default=0)
+    window_started_at = Column(DateTime, nullable=True)
+    locked_until = Column(DateTime, nullable=True)
+    codes_day = Column(String, nullable=True)  # YYYY-MM-DD the counter below applies to
+    codes_sent = Column(Integer, default=0)
+    tokens_valid_after = Column(DateTime, nullable=True)  # tokens issued before this are rejected
+
+
+class UserReport(Base):
+    """A report about an account, filed from a private chat. Holds the reporter's reason
+    and optional note only; chat contents are never sent or stored (privacy)."""
+    __tablename__ = "user_reports"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    reporter_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    reported_user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)  # None: person without an account
+    reported_name = Column(String, nullable=False)
+    reason = Column(String, nullable=False)
+    note = Column(Text, nullable=True)
+    status = Column(String, default="open", index=True)  # open | dismissed | actioned
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    decided_by = Column(String, nullable=True)
+    decision = Column(String, nullable=True)  # innocent | warn | suspend
+    decided_at = Column(DateTime, nullable=True)
+
+
+class AccountWarning(Base):
+    __tablename__ = "account_warnings"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    template_key = Column(String, nullable=True)
+    text = Column(Text, nullable=False)
+    admin_id = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class Suspension(Base):
+    """Community suspension. ends_at=None means until an admin lifts it (used for auto-suspensions)."""
+    __tablename__ = "suspensions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    source = Column(String, nullable=False)  # auto_reports | admin
+    reason = Column(Text, nullable=False)
+    starts_at = Column(DateTime, default=datetime.datetime.utcnow)
+    ends_at = Column(DateTime, nullable=True)
+    status = Column(String, default="active", index=True)  # active | lifted | expired
+    reviewed = Column(Boolean, default=False)  # auto-suspensions start unreviewed
+    admin_id = Column(String, nullable=True)
+    lifted_by = Column(String, nullable=True)
+    lifted_at = Column(DateTime, nullable=True)
+
+
+class Plea(Base):
+    """A suspended student's appeal. One per suspension."""
+    __tablename__ = "pleas"
+    __table_args__ = (UniqueConstraint("suspension_id", name="uq_one_plea_per_suspension"),)
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    suspension_id = Column(Integer, ForeignKey("suspensions.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    status = Column(String, default="pending", index=True)  # pending | accepted | rejected
+    admin_id = Column(String, nullable=True)
+    decision_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    decided_at = Column(DateTime, nullable=True)
+
+
+class AccountAppeal(Base):
+    """A disabled student's appeal. Sent from the sign-in page after proving the learner
+    email with a one-time code, since a disabled account can't sign in."""
+    __tablename__ = "account_appeals"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    status = Column(String, default="pending", index=True)  # pending | accepted | rejected
+    admin_id = Column(String, nullable=True)
+    decision_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    decided_at = Column(DateTime, nullable=True)
