@@ -38,7 +38,6 @@ class User(Base):
 
     # Relationships
     sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
-    posts = relationship("StudentPost", back_populates="author", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     violations = relationship("CommunityViolation", back_populates="user", cascade="all, delete-orphan")
 
@@ -203,48 +202,6 @@ class MessageCitation(Base):
     similarity_score = Column(Float, default=0.0)
 
     message = relationship("ChatMessage", back_populates="citations")
-
-
-class StudentPost(Base):
-    __tablename__ = "student_posts"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    author_id = Column(String, ForeignKey("users.id"), nullable=True)
-    author_name = Column(String, nullable=False)
-    sub_community = Column(String, default="Hostel & Mess")
-    tag = Column(String, default="General")
-    title = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
-    upvotes = Column(Integer, default=1)
-    downvotes = Column(Integer, default=0)
-    verified = Column(Boolean, default=False)
-    time = Column(String, default="Just now")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    author = relationship("User", back_populates="posts")
-    comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
-
-
-class PostComment(Base):
-    __tablename__ = "post_comments"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("student_posts.id"), nullable=False)
-    author_name = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
-    is_helpful = Column(Boolean, default=False)
-    upvotes = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    post = relationship("StudentPost", back_populates="comments")
-
-
-class PostUpvote(Base):
-    __tablename__ = "post_upvotes"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("student_posts.id"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
 
 
 class UserBadge(Base):

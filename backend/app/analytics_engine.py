@@ -11,7 +11,7 @@ def get_database_analytics() -> Dict[str, Any]:
     db = SessionLocal()
     try:
         total_queries = db.query(models.ChatMessage).filter(models.ChatMessage.sender_role == "assistant").count()
-        total_posts = db.query(models.StudentPost).count()
+        total_posts = db.query(models.CommunityPost).count()
         feedback_count = db.query(models.SystemFeedback).count()
         users_count = db.query(models.User).count()
         docs_count = db.query(models.KnowledgeDocument).count()
