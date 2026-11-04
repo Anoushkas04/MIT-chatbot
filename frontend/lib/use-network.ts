@@ -45,9 +45,11 @@ function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPer
     seen.add(p.accountId)
     const s = server.get(p.accountId)
     if (s) return s.status === p.status ? p : { ...p, status: s.status }
-    // No relationship on the server any more: they removed, declined or withdrew
-    if (p.status === 'connected') return { ...p, status: 'dismissed' as const }
-    if (p.status === 'pending' || p.status === 'incoming' || p.status === 'blocked') return { ...p, status: 'suggested' as const }
+    // No relationship on the server: they removed, declined or withdrew, or it was only ever
+    // on this device (connections made before they were stored on the server). Offer Connect again.
+    if (p.status === 'connected' || p.status === 'pending' || p.status === 'incoming' || p.status === 'blocked') {
+      return { ...p, status: 'suggested' as const }
+    }
     return p
   })
   for (const [id, s] of server) {
