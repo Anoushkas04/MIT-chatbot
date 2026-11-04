@@ -163,7 +163,7 @@ function AppealInner() {
       <form onSubmit={sendCode}>
         <label>
           Learner ID or registration number
-          <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="e.g. rasoju.mitmpl2023@learner.manipal.edu" autoComplete="username" />
+          <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="MAHE Email ID or Registration Number" autoComplete="username" />
         </label>
         {error && <p className="field-error">{error}</p>}
         <Button className="auth-submit" size="lg" type="submit" disabled={loading}>

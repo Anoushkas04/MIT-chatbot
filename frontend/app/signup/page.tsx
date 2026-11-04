@@ -149,7 +149,7 @@ export default function SignupPage() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Ananya Rao"
+            placeholder="Your Name"
             autoComplete="name"
           />
         </label>
@@ -158,7 +158,7 @@ export default function SignupPage() {
           <input
             value={learnerId}
             onChange={(e) => setLearnerId(e.target.value)}
-            placeholder="name.mitmpl2023@learner.manipal.edu"
+            placeholder="MAHE Email ID"
             autoComplete="username"
           />
         </label>
@@ -167,7 +167,7 @@ export default function SignupPage() {
           <input
             value={regNumber}
             onChange={(e) => setRegNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            placeholder="e.g. 220905123"
+            placeholder="Registration Number"
             inputMode="numeric"
           />
         </label>

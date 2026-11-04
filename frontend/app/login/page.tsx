@@ -131,7 +131,7 @@ export default function LoginPage() {
           <input
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="e.g. rasoju.mitmpl2023@learner.manipal.edu"
+            placeholder="MAHE Email ID or Registration Number"
             autoComplete="username"
           />
         </label>
