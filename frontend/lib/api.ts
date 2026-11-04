@@ -166,6 +166,7 @@ export type NetworkSnapshot = {
   outgoing: PublicUser[]
   unread: Record<string, number> // sender's user id -> unread message count
   blocked: string[] // user ids I've blocked
+  suggested?: PublicUser[] // students with no relationship to me yet, best matches first
 }
 
 export type ServerMessage = { id: number; from: 'me' | 'them'; text: string; time: string; at: string }
@@ -185,6 +186,22 @@ export const messagesApi = {
   thread: (userId: string, after?: number) =>
     authed<{ messages: ServerMessage[] }>('GET', `/api/messages/${userId}${after !== undefined ? `?after=${after}` : ''}`),
   send: (userId: string, text: string) => authed<ServerMessage>('POST', `/api/messages/${userId}`, { text }),
+}
+
+// Official faculty directory (mit_manipal_faculty.csv merged with the SCE cabin list by email).
+// Missing fields come back empty, never guessed.
+export type FacultyMember = {
+  id: string
+  name: string
+  designation: string
+  department: string
+  qualification: string
+  email: string
+  cabin: string | null
+}
+
+export function getFacultyDirectory() {
+  return authed<{ faculty: FacultyMember[]; sources: string[] }>('GET', '/api/directory/faculty')
 }
 
 export function getPublicProfile(userId: string) {

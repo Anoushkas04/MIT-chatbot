@@ -102,9 +102,47 @@ def my_network(me: models.User = Depends(get_current_user)):
         ):
             unread[sender_id] = unread.get(sender_id, 0) + 1
         blocked = [b.blocked_id for b in db.query(models.UserBlock).filter(models.UserBlock.blocker_id == me.id)]
-        return {"connections": connections, "incoming": incoming, "outgoing": outgoing, "unread": unread, "blocked": blocked}
+        suggested = [_summary(u) for u in _suggestions(db, me, other_ids | set(blocked))]
+        return {
+            "connections": connections,
+            "incoming": incoming,
+            "outgoing": outgoing,
+            "unread": unread,
+            "blocked": blocked,
+            "suggested": suggested,
+        }
     finally:
         db.close()
+
+
+MAX_SUGGESTIONS = 12
+
+
+def _suggestions(db, me: models.User, exclude: set) -> list:
+    """Registered students you have no relationship with, sharing your department or interests first."""
+    blocked_me = db.query(models.UserBlock.blocker_id).filter(models.UserBlock.blocked_id == me.id)
+    candidates = (
+        db.query(models.User)
+        .filter(
+            models.User.id != me.id,
+            models.User.role == "student",
+            models.User.status == "active",
+            models.User.is_suspended.is_(False),
+            ~models.User.id.in_(blocked_me),
+        )
+        .order_by(models.User.name)
+        .limit(200)
+        .all()
+    )
+    mine = {i.strip().lower() for i in (me.interests or "").split(",") if i.strip()}
+
+    def score(u: models.User) -> int:
+        theirs = {i.strip().lower() for i in (u.interests or "").split(",") if i.strip()}
+        same_dept = bool(me.department) and (u.department or "").lower() == me.department.lower()
+        return 2 * same_dept + len(mine & theirs)
+
+    ranked = sorted((u for u in candidates if u.id not in exclude), key=score, reverse=True)
+    return ranked[:MAX_SUGGESTIONS]
 
 
 @router.post("/requests/{user_id}", summary="Send a connection request (accepts theirs if they already asked)")

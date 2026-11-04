@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,7 +13,7 @@ import {
   type AcademicEvent,
   type AcademicEventKind,
 } from '@/lib/academic-calendar'
-import { defaultPlannerTasks, type PlannerTask } from '@/lib/mock-data'
+import { defaultPlannerTasks, withoutSampleTasks, type PlannerTask } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
 const weekLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -52,6 +52,9 @@ function mondayFirstIndex(date: Date) {
 
 export default function PlannerPage() {
   const [tasks, setTasks] = useLocalState<PlannerTask[]>('mitra_planner_tasks', defaultPlannerTasks)
+  useEffect(() => {
+    setTasks((prev) => (withoutSampleTasks(prev).length === prev.length ? prev : withoutSampleTasks(prev)))
+  }, [setTasks])
   const today = new Date()
   const todayIso = today.toISOString().slice(0, 10)
   const [viewMonth, setViewMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))

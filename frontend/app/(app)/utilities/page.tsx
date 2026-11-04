@@ -15,22 +15,16 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import {
-  amenities,
-  gradeOptions,
-  helpdeskContacts,
-  labs,
-  professors,
-} from '@/lib/mock-data'
+import { gradeOptions } from '@/lib/mock-data'
 import { curriculum } from '@/lib/curriculum'
-import { libraryApi, type LibraryDocument } from '@/lib/api'
+import { getFacultyDirectory, libraryApi, type FacultyMember, type LibraryDocument } from '@/lib/api'
 import { useLocalState } from '@/lib/use-local-state'
 
 type Section = 'gpa' | 'professors' | 'labs' | 'documents' | 'helpdesk' | 'amenities'
 
 const hubCards: { id: Section; title: string; subtitle: string; icon: typeof GraduationCap }[] = [
   { id: 'gpa', title: 'GPA Calculator', subtitle: 'GPA, CGPA & aggregate %', icon: GraduationCap },
-  { id: 'professors', title: 'Professors', subtitle: 'Find your professors on campus', icon: Users },
+  { id: 'professors', title: 'Professors', subtitle: 'Official faculty directory', icon: Users },
   { id: 'labs', title: 'Labs', subtitle: 'Locate department labs', icon: Building2 },
   { id: 'documents', title: 'Documents', subtitle: 'Regulations, forms & notices', icon: FileText },
   { id: 'helpdesk', title: 'Academic Helpdesk', subtitle: 'Who to contact, and when', icon: HelpCircle },
@@ -332,57 +326,107 @@ function GpaSection() {
   )
 }
 
+const FACULTY_PAGE = 60
+const SCHOOL_SHORT: Record<string, string> = {
+  'School of Computer Engineering': 'Computer',
+  'School of Electrical Engineering': 'Electrical',
+  'School of Mechanical Engineering': 'Mechanical',
+  'School of Civil & Chemical Engineering': 'Civil & Chemical',
+  'School of Basic Sciences, Humanities & Management': 'Basic Sciences & HM',
+}
+
 function ProfessorsSection() {
   const [q, setQ] = useState('')
-  const list = useMemo(
-    () => professors.filter((p) => `${p.name} ${p.dept}`.toLowerCase().includes(q.toLowerCase())),
-    [q],
-  )
+  const [school, setSchool] = useState<string>('all')
+  const [shown, setShown] = useState(FACULTY_PAGE)
+  const [faculty, setFaculty] = useState<FacultyMember[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getFacultyDirectory()
+      .then((d) => setFaculty(d.faculty))
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't load the faculty directory."))
+  }, [])
+
+  const schools = useMemo(() => [...new Set((faculty ?? []).map((f) => f.department).filter(Boolean))].sort(), [faculty])
+  const list = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    return (faculty ?? []).filter(
+      (f) =>
+        (school === 'all' || f.department === school) &&
+        (!term || `${f.name} ${f.department} ${f.designation} ${f.qualification} ${f.email}`.toLowerCase().includes(term)),
+    )
+  }, [faculty, q, school])
+
+  useEffect(() => setShown(FACULTY_PAGE), [q, school])
+
   return (
     <section>
-      <SearchFilter value={q} onChange={setQ} placeholder="Search professors by name or department" />
+      <SearchFilter value={q} onChange={setQ} placeholder="Search by name, school, designation or email" />
+      {schools.length > 0 && (
+        <div className="tag-picker directory-filters" role="group" aria-label="Filter by school">
+          <button className={school === 'all' ? 'active' : ''} onClick={() => setSchool('all')}>
+            All schools
+          </button>
+          {schools.map((s) => (
+            <button key={s} className={school === s ? 'active' : ''} onClick={() => setSchool(s)}>
+              {SCHOOL_SHORT[s] ?? s}
+            </button>
+          ))}
+        </div>
+      )}
+      {error && <p className="community-error">{error}</p>}
+      {faculty !== null && (
+        <p className="directory-count">
+          {list.length} of {faculty.length} faculty · from the official MIT faculty directory
+        </p>
+      )}
       <div className="directory-list">
-        {list.map((p) => (
-          <article className="directory-row" key={p.id}>
+        {faculty === null && !error && <p className="view-sub">Loading faculty…</p>}
+        {list.slice(0, shown).map((f) => (
+          <article className="directory-row" key={f.id}>
             <div className="directory-icon">
               <Users />
             </div>
             <div>
-              <strong>{p.name}</strong>
-              <span>{p.dept}</span>
-              <small>{p.cabin} · {p.email}</small>
+              <strong>{f.name}</strong>
+              <span>{[f.designation, f.department].filter(Boolean).join(' · ')}</span>
+              {f.qualification && <small>{f.qualification}</small>}
+              <small>
+                <a href={`mailto:${f.email}`}>{f.email}</a>
+                {' · '}
+                {f.cabin ? `Cabin: ${f.cabin}` : <span className="muted">Cabin not listed</span>}
+              </small>
             </div>
           </article>
         ))}
+        {list.length > shown && (
+          <button className="text-button directory-more" onClick={() => setShown((n) => n + FACULTY_PAGE)}>
+            Show more ({list.length - shown} left)
+          </button>
+        )}
+        {faculty !== null && list.length === 0 && <p className="view-sub">No faculty match.</p>}
       </div>
     </section>
   )
 }
 
-function LabsSection() {
-  const [q, setQ] = useState('')
-  const list = useMemo(() => labs.filter((l) => `${l.name} ${l.serves}`.toLowerCase().includes(q.toLowerCase())), [q])
+// Shown where no official source exists yet, instead of made-up rooms, timings or contacts.
+function PendingSource({ what, ask }: { what: string; ask: string }) {
   return (
-    <section>
-      <SearchFilter value={q} onChange={setQ} placeholder="Search labs by name or department" />
-      <div className="directory-list">
-        {list.map((l) => (
-          <article className="directory-row" key={l.id}>
-            <div className="directory-icon">
-              <Building2 />
-            </div>
-            <div>
-              <strong>{l.name}</strong>
-              <span>
-                {l.building} · {l.floor} · Room {l.room}
-              </span>
-              <small>Serves {l.serves}</small>
-            </div>
-          </article>
-        ))}
+    <div className="directory-notice">
+      <HelpCircle />
+      <div>
+        <strong>The official {what} isn&apos;t in MITra yet.</strong>
+        MITra only shows details from official MIT sources, so nothing is listed here until the MITra team adds the
+        official {what}. Until then, {ask}
       </div>
-    </section>
+    </div>
   )
+}
+
+function LabsSection() {
+  return <PendingSource what="labs and facilities directory" ask="ask your department office or course coordinator where a lab is." />
 }
 
 function DocumentsSection() {
@@ -442,39 +486,11 @@ function DocumentsSection() {
 }
 
 function HelpdeskSection() {
-  return (
-    <section className="directory-list">
-      {helpdeskContacts.map((h) => (
-        <article className="directory-row" key={h.id}>
-          <div className="directory-icon">
-            <HelpCircle />
-          </div>
-          <div>
-            <strong>{h.role}</strong>
-            <span>{h.office}</span>
-            <small>{h.timings}</small>
-          </div>
-        </article>
-      ))}
-    </section>
-  )
+  return <PendingSource what="office contact directory" ask="you can reach the Academic Section at ada.mit@manipal.edu or +91 820 2924014 (from MIT notices)." />
 }
 
 function AmenitiesSection() {
-  return (
-    <section className="people-grid">
-      {amenities.map((a) => (
-        <article className="people-card" key={a.id}>
-          <div className="directory-icon">
-            <MapPin />
-          </div>
-          <strong>{a.name}</strong>
-          <span>{a.category}</span>
-          <small>{a.location}</small>
-        </article>
-      ))}
-    </section>
-  )
+  return <PendingSource what="campus amenities directory" ask="ask MITra in chat, which answers from the official documents it has." />
 }
 
 const sectionComponents: Record<Section, () => React.ReactElement> = {

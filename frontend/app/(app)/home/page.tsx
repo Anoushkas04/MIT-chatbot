@@ -9,7 +9,8 @@ import { NetworkPersonCard } from '@/components/network-person-card'
 import { useLocalState } from '@/lib/use-local-state'
 import { useNetworkPeople } from '@/lib/use-network'
 import { countUnseenNotifications } from '@/lib/notifications'
-import { defaultPlannerTasks, defaultProfile, discoveries, type PlannerTask, type Profile } from '@/lib/mock-data'
+import { defaultPlannerTasks, defaultProfile, withoutSampleTasks, type PlannerTask, type Profile } from '@/lib/mock-data'
+import { forYou } from '@/lib/discover-data'
 
 export default function HomePage() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function HomePage() {
     .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     .toUpperCase()
 
-  const upNext = tasks
+  const upNext = withoutSampleTasks(tasks)
     .filter((t) => !t.done)
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 3)
@@ -137,7 +138,7 @@ export default function HomePage() {
         </Link>
       </div>
       <div className="discovery-grid">
-        {discoveries.slice(0, 3).map((item) => (
+        {forYou(profile.interests).slice(0, 3).map((item) => (
           <DiscoveryCard key={item.id} item={item} saved={saved.includes(item.id)} onToggleSave={() => toggleSave(item.id)} />
         ))}
       </div>

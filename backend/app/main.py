@@ -26,6 +26,7 @@ from app.routers.admin_safety import router as admin_safety_router
 from app.routers.admin_dataset import router as admin_dataset_router
 from app.routers.admin_insights import router as admin_insights_router
 from app.routers.network_router import messages_router, router as network_router
+from app.routers.directory_router import router as directory_router
 
 app = FastAPI(
     title="MIT CampusOS Platform API",
@@ -64,6 +65,7 @@ app.include_router(admin_dataset_router)
 app.include_router(admin_insights_router)
 app.include_router(network_router)
 app.include_router(messages_router)
+app.include_router(directory_router)
 
 
 @app.on_event("startup")

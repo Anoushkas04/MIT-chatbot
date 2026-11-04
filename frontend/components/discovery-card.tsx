@@ -2,7 +2,7 @@
 
 import { Check, Heart } from 'lucide-react'
 import { Sparkles } from 'lucide-react'
-import type { DiscoveryItem } from '@/lib/mock-data'
+import type { DiscoveryItem } from '@/lib/discover-data'
 
 export function DiscoveryCard({
   item,

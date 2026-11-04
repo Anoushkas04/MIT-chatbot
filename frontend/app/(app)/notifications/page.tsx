@@ -109,7 +109,7 @@ export default function NotificationsPage() {
         <div>
           <p className="section-kicker">NOTIFICATIONS</p>
           <h1>What&apos;s new.</h1>
-          <p className="view-sub">Requests, responses, likes and threads picked for you from the community.</p>
+          <p className="view-sub">Official academic dates, requests, responses, likes and threads picked for you from the community.</p>
         </div>
         {unread.length > 0 && (
           <button className="text-button" onClick={markAllRead}>

@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { BadgeCheck, Check, Compass, Download, FileText, MessageSquare, Search as SearchIcon, X } from 'lucide-react'
-import { discoveries, type CommunityQuestion, type DiscoveryItem } from '@/lib/mock-data'
+import type { CommunityQuestion } from '@/lib/mock-data'
+import { discoveries, type DiscoveryItem } from '@/lib/discover-data'
 import { MIN_RELEVANCE, matchTopics, scoreDocument, scoreQuestion } from '@/lib/community-search'
 import { communityApi, libraryApi, type LibraryDocument, type LibraryHit } from '@/lib/api'
 
@@ -74,7 +75,7 @@ export default function SearchPage() {
     () =>
       searching
         ? discoveries
-            .map((d) => ({ d, score: scoreDocument({ title: d.title, body: `${d.meta}. ${d.why}.`, extra: d.clubType ? `${d.type} ${d.clubType}` : d.type }, query, topics) }))
+            .map((d) => ({ d, score: scoreDocument({ title: d.title, body: `${d.meta}. ${d.why}. ${d.details ?? ''}`, extra: d.clubType ? `${d.type} ${d.clubType}` : d.type }, query, topics) }))
             .filter((x) => x.score >= MIN_RELEVANCE)
             .sort((a, b) => b.score - a.score)
             .slice(0, 5)
@@ -207,7 +208,7 @@ export default function SearchPage() {
               <d.icon />
             </span>
             <div>
-              <span className="result-kind">{d.clubType ? `${d.type} · ${d.clubType}` : d.type}</span>
+              <span className="result-kind">{d.clubType ? `${d.clubType} club` : d.type}</span>
               <h3>{d.title}</h3>
               <p>
                 {d.meta}. {d.why}.

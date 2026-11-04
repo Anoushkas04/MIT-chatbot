@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowUpRight, Check } from 'lucide-react'
-import { discoveries } from '@/lib/mock-data'
+import { discoveries } from '@/lib/discover-data'
 import { useLocalState } from '@/lib/use-local-state'
 
 export default function SavedPage() {
@@ -24,7 +24,7 @@ export default function SavedPage() {
         <div>
           <p className="section-kicker">SAVED</p>
           <h1>Saved for later.</h1>
-          <p className="view-sub">Clubs, projects, events and opportunities you&apos;ve saved.</p>
+          <p className="view-sub">Clubs, events and opportunities you&apos;ve saved.</p>
         </div>
       </div>
       <div className="discover-list saved-list">

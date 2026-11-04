@@ -31,7 +31,8 @@ export function accountToPerson(u: PublicUser): NetworkPerson {
   }
 }
 
-/** Applies the server's view of my connections to the local list. Demo people are untouched. */
+/** Applies the server's view of my connections to the local list. People without an account
+ * (demo entries from earlier versions) are dropped; new suggestions are added. */
 function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPerson[] {
   const server = new Map<string, { user?: PublicUser; status: NetworkStatus }>()
   for (const u of snap.connections) server.set(u.id, { user: u, status: 'connected' })
@@ -40,10 +41,9 @@ function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPer
   for (const id of snap.blocked) server.set(id, { status: 'blocked' })
 
   const seen = new Set<string>()
-  const next = prev.map((p) => {
-    if (!p.accountId) return p
-    seen.add(p.accountId)
-    const s = server.get(p.accountId)
+  const next = prev.filter((p) => p.accountId).map((p) => {
+    seen.add(p.accountId!)
+    const s = server.get(p.accountId!)
     if (s) return s.status === p.status ? p : { ...p, status: s.status }
     // No relationship on the server: they removed, declined or withdrew, or it was only ever
     // on this device (connections made before they were stored on the server). Offer Connect again.
@@ -54,6 +54,10 @@ function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPer
   })
   for (const [id, s] of server) {
     if (!seen.has(id) && s.user) next.push({ ...accountToPerson(s.user), status: s.status })
+  }
+  // Suggestions you haven't dismissed yet; ones already in the list keep their status.
+  for (const u of snap.suggested ?? []) {
+    if (!seen.has(u.id) && !server.has(u.id)) next.push(accountToPerson(u))
   }
   return next
 }
@@ -105,7 +109,7 @@ export function useNetworkPeople() {
     setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)))
   }
 
-  /** Runs a server action for registered students; demo people only change locally. */
+  /** Runs a server action, then updates the local status. */
   async function serverAction(id: string, action: (accountId: string) => Promise<unknown>, nextStatus: NetworkStatus) {
     const person = people.find((p) => p.id === id)
     if (person?.accountId) {
@@ -121,15 +125,7 @@ export function useNetworkPeople() {
   }
 
   async function sendRequest(person: NetworkPerson) {
-    if (!person.accountId) {
-      // Demo people aren't real accounts, so their acceptance is simulated
-      setStatus(person.id, 'pending')
-      setTimeout(() => {
-        setStatus(person.id, 'connected')
-        setActivity((prev) => [{ id: `act-${Date.now()}`, kind: 'accepted', personId: person.id, at: Date.now() }, ...prev])
-      }, 1600)
-      return
-    }
+    if (!person.accountId) return
     try {
       setError(null)
       const res = await networkApi.request(person.accountId)
@@ -165,7 +161,8 @@ export function useNetworkPeople() {
   }
 
   return {
-    people,
+    // Only registered students; demo entries saved by earlier versions are hidden until the next sync drops them
+    people: people.filter((p) => p.accountId),
     setPeople,
     activity,
     unread,

@@ -1,4 +1,5 @@
 import type { NetworkSnapshot, ServerNotification } from '@/lib/api'
+import { academicEvents, academicKindLabels, ACADEMIC_YEAR_LABEL } from '@/lib/academic-calendar'
 import { matchTopics } from '@/lib/community-search'
 import {
   defaultActivity,
@@ -54,6 +55,12 @@ export function fromServer(list: ServerNotification[]): (AppNotification & { ser
 
 type Votes = Record<string, 1 | -1>
 
+const CALENDAR_LOOKAHEAD_DAYS = 7
+
+function shortDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 function relativeTime(at?: number, fallback?: string): string | undefined {
   if (!at) return fallback
   const mins = Math.round((Date.now() - at) / 60000)
@@ -93,7 +100,27 @@ export function buildNotifications({
   unreadMessages?: Record<string, number> // network person id -> unread private messages
 }): AppNotification[] {
   const out: AppNotification[] = []
+  // Registered students only; demo people saved by earlier versions don't notify
+  people = people.filter((p) => p.accountId)
   const byId = new Map(people.map((p) => [p.id, p]))
+
+  // Official dates from the academic calendar that are on now or in the next week. One per
+  // calendar entry (the id is the entry's), so the same milestone never alerts twice.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+  const horizon = new Date(`${today}T00:00:00Z`)
+  horizon.setUTCDate(horizon.getUTCDate() + CALENDAR_LOOKAHEAD_DAYS)
+  const until = horizon.toISOString().slice(0, 10)
+  for (const e of academicEvents) {
+    if (e.start > until || (e.end ?? e.start) < today) continue
+    const when = e.start <= today ? (e.end && e.end > today ? `On now, until ${shortDate(e.end)}` : 'Today') : shortDate(e.start)
+    out.push({
+      id: `cal-${e.id}`,
+      kind: 'official',
+      title: `${academicKindLabels[e.kind]}: ${e.title}`,
+      detail: [when, e.note, `Academic Calendar ${ACADEMIC_YEAR_LABEL}`].filter(Boolean).join(' · '),
+      href: '/planner',
+    })
+  }
 
   // New private messages. The count is in the id, so another message makes it new again.
   for (const [personId, count] of Object.entries(unreadMessages)) {

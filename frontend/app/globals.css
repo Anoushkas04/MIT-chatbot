@@ -531,3 +531,28 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .profile-missing { margin-top: 24px; }
 @media (max-width: 850px) { .person-hero { flex-wrap: wrap; } .person-grid { grid-template-columns: 1fr; } }
 .dm-error { margin: 0 14px 6px; }
+
+/* ---- Discover: expandable source-backed rows ---- */
+.discover-row.expandable { flex-direction: column; align-items: stretch; gap: 0; }
+.discover-main { display: flex; align-items: center; gap: 15px; }
+.discover-row.past { opacity: .7; }
+.discover-info .pill.status { margin-left: 6px; background: #fff; color: #a35d4a; }
+.discover-toggle svg { transition: transform .2s; }
+.discover-toggle.open svg { transform: rotate(180deg); }
+.discover-details { margin: 14px 0 0 49px; padding-top: 12px; border-top: 1px solid #0000000f; }
+.discover-details p { margin: 0 0 9px; color: #4f5f56; font-size: 12px; line-height: 1.6; }
+.discover-details small { display: block; margin-top: 10px; color: #7d8a81; font-size: 10px; }
+.discover-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.discover-links a, .discover-links button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; border-radius: 8px; background: #fff9; color: #234f4a; font-size: 11px; font-family: inherit; cursor: pointer; }
+.discover-links svg { width: 13px; }
+@media (max-width: 520px) { .discover-details { margin-left: 0; } }
+
+/* ---- Utilities: faculty directory ---- */
+.directory-filters { margin-top: 14px; }
+.directory-count { margin: 14px 0 0; color: #8a918a; font-size: 11px; }
+.directory-row a { color: #53766f; }
+.directory-row .muted { color: #b0b6b0; }
+.directory-more { align-self: center; margin-top: 6px; }
+.directory-notice { display: flex; gap: 12px; margin-top: 30px; padding: 18px; border: 1px dashed #d6ddd3; border-radius: 12px; background: #fff; color: #6f7a72; font-size: 12px; line-height: 1.6; }
+.directory-notice svg { flex: 0 0 18px; width: 18px; color: #53766f; }
+.directory-notice strong { display: block; margin-bottom: 4px; color: #234f4a; }

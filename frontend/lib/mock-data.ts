@@ -1,19 +1,6 @@
-import {
-  Briefcase,
-  CalendarDays,
-  Flame,
-  Lightbulb,
-  Music,
-  Sparkles,
-  Trophy,
-  Users,
-  Volleyball,
-  type LucideIcon,
-} from 'lucide-react'
-
-// All data in this file is clearly-fictional placeholder/demo content, not
-// real MIT Manipal records. It seeds local mock state (see use-local-state.ts)
-// until a real backend exists to replace it.
+// Shared types and empty defaults for local state (see use-local-state.ts). The community
+// threads and the signed-out profile below are placeholders; campus data (clubs, events,
+// faculty, calendar) lives in its own source-backed modules.
 
 export const interestOptions = [
   'Artificial Intelligence',
@@ -65,37 +52,6 @@ export const defaultProfile: Profile = {
   interests: ['Artificial Intelligence', 'Robotics', 'Design'],
 }
 
-export type DiscoveryCategory = 'club' | 'project' | 'event' | 'opportunity'
-
-export type ClubType = 'Technical' | 'Cultural' | 'Sports'
-
-export type DiscoveryItem = {
-  id: string
-  title: string
-  type: string
-  category: DiscoveryCategory
-  meta: string
-  tone: 'coral' | 'blue' | 'yellow' | 'green'
-  icon: LucideIcon
-  why: string
-  clubType?: ClubType
-}
-
-export const discoveries: DiscoveryItem[] = [
-  { id: 'd1', title: 'Manipal Hackathon 2026', type: 'Competition', category: 'event', meta: 'Oct 25 · Innovation Centre', tone: 'coral', icon: Flame, why: 'Matches your interest in building' },
-  { id: 'd2', title: 'IEEE Student Branch', type: 'Club', category: 'club', meta: '48 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Popular with CSE students', clubType: 'Technical' },
-  { id: 'd3', title: 'Design Thinking Workshop', type: 'Workshop', category: 'event', meta: 'Nov 02 · Student Plaza', tone: 'yellow', icon: Sparkles, why: 'Based on your saved events' },
-  { id: 'd4', title: 'Product Lab · Student Innovation Cell', type: 'Project', category: 'project', meta: 'Rolling applications · 6 spots open', tone: 'green', icon: Users, why: 'A new way to explore your interests' },
-  { id: 'd5', title: 'Robotics Club', type: 'Club', category: 'club', meta: '32 active members · Technical', tone: 'blue', icon: Lightbulb, why: 'Matches your interest in robotics', clubType: 'Technical' },
-  { id: 'd6', title: 'Summer Research Internship — AI Lab', type: 'Internship', category: 'opportunity', meta: 'Apply by Dec 10 · 4 openings', tone: 'coral', icon: Briefcase, why: 'Fits your AI interest' },
-  { id: 'd7', title: 'Campus Photography Walk', type: 'Event', category: 'event', meta: 'Nov 08 · Lake Side', tone: 'yellow', icon: CalendarDays, why: 'Based on your saved events' },
-  { id: 'd8', title: 'Case Study Competition — Finance Club', type: 'Competition', category: 'opportunity', meta: 'Teams of 3 · Reg closes Nov 15', tone: 'green', icon: Trophy, why: 'Popular with 5th semester students' },
-  { id: 'd9', title: 'Music Club', type: 'Club', category: 'club', meta: '40 active members · Cultural', tone: 'coral', icon: Music, why: 'Weekly jam sessions at Student Plaza', clubType: 'Cultural' },
-  { id: 'd10', title: 'Dramatics Society', type: 'Club', category: 'club', meta: '27 active members · Cultural', tone: 'yellow', icon: Sparkles, why: 'Auditions open for the fest play', clubType: 'Cultural' },
-  { id: 'd11', title: 'Football Club', type: 'Club', category: 'club', meta: '35 active members · Sports', tone: 'green', icon: Trophy, why: 'Evening practice at the main ground', clubType: 'Sports' },
-  { id: 'd12', title: 'Volleyball Club', type: 'Club', category: 'club', meta: '22 active members · Sports', tone: 'green', icon: Volleyball, why: 'Open trials for the inter-college team', clubType: 'Sports' },
-]
-
 // MIT Manipal 10-point grade scale (Regulations 4.8.1), as offered by the GPA calculator.
 export const gradeOptions: { grade: string; value: number }[] = [
   { grade: 'A+', value: 10 },
@@ -105,46 +61,6 @@ export const gradeOptions: { grade: string; value: number }[] = [
   { grade: 'D', value: 6 },
   { grade: 'E', value: 5 },
   { grade: 'F', value: 0 },
-]
-
-export type Professor = { id: string; name: string; dept: string; cabin: string; email: string }
-
-export const professors: Professor[] = [
-  { id: 'p1', name: 'Dr. Meera Kulkarni', dept: 'Computer Science & Engineering', cabin: 'AB4 · 2nd floor · 214', email: 'meera.kulkarni@manipal.edu' },
-  { id: 'p2', name: 'Dr. Rohan Saldanha', dept: 'Computer Science & Engineering', cabin: 'AB4 · 2nd floor · 221', email: 'rohan.saldanha@manipal.edu' },
-  { id: 'p3', name: 'Dr. Priya Nair', dept: 'Electronics & Communication', cabin: 'AB3 · 1st floor · 108', email: 'priya.nair@manipal.edu' },
-  { id: 'p4', name: 'Dr. Ashwin Rao', dept: 'Mechanical Engineering', cabin: 'AB2 · Ground floor · 05', email: 'ashwin.rao@manipal.edu' },
-  { id: 'p5', name: 'Dr. Leela Bhat', dept: 'Mathematics', cabin: 'AB1 · 3rd floor · 310', email: 'leela.bhat@manipal.edu' },
-]
-
-export type Lab = { id: string; name: string; building: string; floor: string; room: string; serves: string }
-
-export const labs: Lab[] = [
-  { id: 'l1', name: 'AI & Data Science Lab', building: 'AB4', floor: '3rd floor', room: '305', serves: 'CSE, AIML' },
-  { id: 'l2', name: 'Networks Lab', building: 'AB4', floor: '2nd floor', room: '208', serves: 'CSE, ECE' },
-  { id: 'l3', name: 'Robotics Lab', building: 'AB2', floor: 'Ground floor', room: '02', serves: 'Mechatronics, ECE' },
-  { id: 'l4', name: 'VLSI Design Lab', building: 'AB3', floor: '1st floor', room: '112', serves: 'ECE' },
-  { id: 'l5', name: 'Thermal Sciences Lab', building: 'AB2', floor: '1st floor', room: '14', serves: 'Mechanical' },
-]
-
-export type HelpdeskContact = { id: string; role: string; office: string; timings: string }
-
-export const helpdeskContacts: HelpdeskContact[] = [
-  { id: 'h1', role: 'Academic Cell', office: 'Admin Block · Room 12', timings: 'Mon–Fri, 9:30–4:30' },
-  { id: 'h2', role: 'Examination Cell', office: 'Admin Block · Room 18', timings: 'Mon–Fri, 10:00–4:00' },
-  { id: 'h3', role: 'Student Affairs Office', office: 'Admin Block · Room 05', timings: 'Mon–Sat, 9:00–5:00' },
-  { id: 'h4', role: 'Scholarship Cell', office: 'Admin Block · Room 21', timings: 'Tue & Thu, 11:00–2:00' },
-  { id: 'h5', role: 'International Relations Office', office: 'Admin Block · Room 30', timings: 'Mon–Fri, 9:30–4:30' },
-]
-
-export type Amenity = { id: string; name: string; category: string; location: string }
-
-export const amenities: Amenity[] = [
-  { id: 'am1', name: 'Food Court', category: 'Food', location: 'Student Plaza' },
-  { id: 'am2', name: 'Health Centre', category: 'Medical', location: 'Near AB1' },
-  { id: 'am3', name: 'Sports Complex', category: 'Sports', location: 'Behind AB2' },
-  { id: 'am4', name: 'Central Library', category: 'Academic', location: 'Library Block' },
-  { id: 'am5', name: 'ATM & Bank', category: 'Services', location: 'Near Main Gate' },
 ]
 
 // ---- Community (Reddit/YouTube-style Q&A) ----
@@ -287,41 +203,18 @@ export type NetworkPerson = {
   accountId?: string
 }
 
-export const defaultNetworkPeople: NetworkPerson[] = [
-  { id: 'n1', name: 'Tanvi Rao', initials: 'TR', branch: 'CSE', semester: '5th sem', sharedInterests: ['Artificial Intelligence', 'Research'], status: 'suggested' },
-  { id: 'n2', name: 'Karan Bhatt', initials: 'KB', branch: 'ECE', semester: '5th sem', sharedInterests: ['Robotics'], status: 'suggested' },
-  { id: 'n3', name: 'Nisha Pillai', initials: 'NP', branch: 'CSE', semester: '3rd sem', sharedInterests: ['Design', 'Web Development'], status: 'connected' },
-  { id: 'n4', name: 'Arjun Verma', initials: 'AV', branch: 'Mechanical', semester: '7th sem', sharedInterests: ['Entrepreneurship'], status: 'suggested' },
-  { id: 'n5', name: 'Fatima Sheikh', initials: 'FS', branch: 'CSE', semester: '5th sem', sharedInterests: ['Artificial Intelligence', 'Competitive Programming'], status: 'connected' },
-  { id: 'n6', name: 'Rohit Dsouza', initials: 'RD', branch: 'ECE', semester: '5th sem', sharedInterests: ['Design'], status: 'suggested' },
-  { id: 'n7', name: 'Ananya Iyer', initials: 'AI', branch: 'CSE', semester: '5th sem', sharedInterests: ['Research', 'Public Speaking'], status: 'suggested' },
-  { id: 'n8', name: 'Sameer Khan', initials: 'SK', branch: 'CSE', semester: '5th sem', sharedInterests: ['Robotics', 'Artificial Intelligence'], status: 'pending' },
-  { id: 'n9', name: 'Priyanka Das', initials: 'PD', branch: 'CSE', semester: '5th sem', sharedInterests: ['Competitive Programming'], status: 'incoming' },
-  { id: 'n10', name: 'Yusuf Ali', initials: 'YA', branch: 'ECE', semester: '5th sem', sharedInterests: ['Music'], status: 'incoming' },
-]
+// Network only shows registered students from the backend (see use-network.ts).
+export const defaultNetworkPeople: NetworkPerson[] = []
 
 // A thing someone else did that concerns you. `at` is a timestamp for live events;
 // seeded demo events carry a display `time` instead.
 export type ActivityEvent = { id: string; kind: 'accepted'; personId: string; at?: number; time?: string }
 
-export const defaultActivity: ActivityEvent[] = [
-  { id: 'act-seed-1', kind: 'accepted', personId: 'n5', time: '1d ago' },
-  { id: 'act-seed-2', kind: 'accepted', personId: 'n3', time: '3d ago' },
-]
+export const defaultActivity: ActivityEvent[] = []
 
 export type DirectMessage = { id: string; from: 'me' | 'them'; text: string; time: string }
 
-export const defaultMessages: Record<string, DirectMessage[]> = {
-  n3: [
-    { id: 'm1', from: 'them', text: 'Hey! Saw you\'re also into web dev, are you joining the design jam next week?', time: '10:12 AM' },
-    { id: 'm2', from: 'me', text: 'Yeah planning to! Are you on a team yet?', time: '10:15 AM' },
-    { id: 'm3', from: 'them', text: 'Not yet, want to team up?', time: '10:16 AM' },
-  ],
-  n5: [
-    { id: 'm1', from: 'them', text: 'That CP contest this weekend, you in?', time: 'Yesterday' },
-    { id: 'm2', from: 'me', text: 'Definitely, let\'s do a virtual contest together before that too', time: 'Yesterday' },
-  ],
-}
+export const defaultMessages: Record<string, DirectMessage[]> = {}
 
 // ---- Planner ----
 
@@ -333,15 +226,17 @@ export type PlannerTask = {
   done: boolean
 }
 
-function isoDaysFromToday(offset: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  return d.toISOString().slice(0, 10)
+// Personal tasks only; official dates come from academic-calendar.ts and are shown separately.
+export const defaultPlannerTasks: PlannerTask[] = []
+
+// Sample tasks earlier versions seeded into every planner. Dropped on load so only the student's own remain.
+const SAMPLE_TASKS: Record<string, string> = {
+  t1: 'Submit OS assignment',
+  t2: 'Manipal Hackathon 2026',
+  t3: 'Course registration closes',
+  t4: 'Data Structures quiz',
 }
 
-export const defaultPlannerTasks: PlannerTask[] = [
-  { id: 't1', date: isoDaysFromToday(2), title: 'Submit OS assignment', category: 'Academic', done: false },
-  { id: 't2', date: isoDaysFromToday(5), title: 'Manipal Hackathon 2026', category: 'Event', done: false },
-  { id: 't3', date: isoDaysFromToday(10), title: 'Course registration closes', category: 'Important', done: false },
-  { id: 't4', date: isoDaysFromToday(-1), title: 'Data Structures quiz', category: 'Academic', done: true },
-]
+export function withoutSampleTasks(tasks: PlannerTask[]) {
+  return tasks.filter((t) => SAMPLE_TASKS[t.id] !== t.title)
+}
