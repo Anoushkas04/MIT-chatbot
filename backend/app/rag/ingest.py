@@ -136,7 +136,7 @@ def _retrieval_context(record: dict) -> str:
         values.append(f"Faculty email: {record['email']}")
     if record.get("cabin"):
         values.append(f"Faculty cabin: {record['cabin']}")
-    if str(record.get("source_file", "")).lower() == "mit_manipal_faculty.csv":
+    if str(record.get("source_file", "")).lower() in {"mit_manipal_faculty.csv", "merged_faculty.csv"}:
         values.append(
             "Institution-wide faculty directory covering all departments, searchable by department and designation"
         )

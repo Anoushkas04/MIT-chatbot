@@ -416,8 +416,8 @@ def test_faculty_department_query_returns_complete_source_backed_list():
 
     assert result is not None
     assert result["kind"] == "department_list"
-    assert len(result["records"]) == 180
-    assert "School of Computer Engineering has 180 faculty records" in result["answer"]
+    assert len(result["records"]) == 190
+    assert "School of Computer Engineering has 190 faculty records" in result["answer"]
     assert "Dr. Radhika M Pai" in result["answer"]
     assert result["evidence"]["retrieval_method"] == "structured_faculty_directory"
 
@@ -494,5 +494,5 @@ def test_chat_contract_keeps_department_alias_faculty_result(chat_router, monkey
 
     assert response.confidence == "high"
     assert len(response.citations) == 1
-    assert "School of Computer Engineering has 180 faculty records" in response.text
-    assert "180." in response.text
+    assert "School of Computer Engineering has 190 faculty records" in response.text
+    assert "190." in response.text

@@ -1,7 +1,7 @@
 """Source-backed campus directories for the Utilities pages.
 
-Faculty come from the official CSVs in DOCS_DIR, merged by institutional email
-(app/faculty_directory.load_faculty). Fields a source doesn't give stay empty;
+Faculty come from the master faculty CSV in DOCS_DIR (merged_faculty.csv: the official
+directory merged with the SCE cabin list by email), via app/faculty_directory.load_faculty. Fields a source doesn't give stay empty;
 nothing is guessed.
 """
 from fastapi import APIRouter, Depends
@@ -22,11 +22,11 @@ def faculty(me: models.User = Depends(get_current_user)):
                 "name": f["name"],
                 "designation": f["designation"],
                 "department": f["dept"],
-                "qualification": f["qualification"].removeprefix("Qualification:").strip(),
+                "qualification": f["qualification"],
                 "email": f["email"],
                 "cabin": f["cabin"],
             }
             for f in load_faculty()
         ],
-        "sources": ["mit_manipal_faculty.csv", "manipal_sce_faculty_cabins.csv"],
+        "sources": sorted({f["source"] for f in load_faculty()}),
     }

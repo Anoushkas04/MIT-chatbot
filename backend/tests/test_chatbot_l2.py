@@ -204,7 +204,8 @@ def test_l2_similar_documents_are_disambiguated():
 
 def test_l2_faculty_rows_are_deduplicated_and_missing_cabin_is_explicit():
     faculty = load_faculty()
-    emails = [record["email"] for record in faculty]
+    # Adjunct and visiting faculty without an email in the directory are kept with it left blank
+    emails = [record["email"] for record in faculty if record["email"]]
     assert len(emails) == len(set(emails))
 
     jimcymol = lookup_faculty("Tell me about Jimcymol James and her cabin")

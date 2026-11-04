@@ -378,7 +378,7 @@ function ProfessorsSection() {
       {error && <p className="community-error">{error}</p>}
       {faculty !== null && (
         <p className="directory-count">
-          {list.length} of {faculty.length} faculty · from the official MIT faculty directory
+          {list.length} of {faculty.length} faculty · from the master MIT faculty directory
         </p>
       )}
       <div className="directory-list">
@@ -393,7 +393,7 @@ function ProfessorsSection() {
               <span>{[f.designation, f.department].filter(Boolean).join(' · ')}</span>
               {f.qualification && <small>{f.qualification}</small>}
               <small>
-                <a href={`mailto:${f.email}`}>{f.email}</a>
+                {f.email ? <a href={`mailto:${f.email}`}>{f.email}</a> : <span className="muted">Email not listed</span>}
                 {' · '}
                 {f.cabin ? `Cabin: ${f.cabin}` : <span className="muted">Cabin not listed</span>}
               </small>

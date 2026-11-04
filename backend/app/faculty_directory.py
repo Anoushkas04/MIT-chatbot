@@ -53,9 +53,72 @@ def _tokens(value: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", value.lower().replace("&", " and "))
 
 
+MERGED_FACULTY_FILE = "merged_faculty.csv"
+EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+# Roles some rows carry in the name column, e.g. "Dr. X Adjunct Faculty"
+NAME_ROLE_RE = re.compile(r"\s+((?:International\s+)?Adjunct\b.*|International Faculty\b.*)$", re.IGNORECASE)
+QUALIFICATION_PREFIX_RE = re.compile(r"^qualifications?\s*:\s*", re.IGNORECASE)
+
+
+def _clean(value: str | None) -> str:
+    return " ".join((value or "").split())
+
+
+def _take_email(text: str) -> tuple[str, str]:
+    """Split an email address written into another column out of it."""
+    match = EMAIL_RE.search(text)
+    if not match:
+        return text, ""
+    return _clean(text[: match.start()] + text[match.end():]), match.group(0).lower()
+
+
+def _load_merged(path) -> list[dict]:
+    """The master faculty CSV (official directory merged with the SCE cabin list).
+
+    Some rows have the role or an email typed into the name or designation column; those are
+    moved to their own fields. Nothing missing is filled in.
+    """
+    records: dict[str, dict] = {}
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            name, name_email = _take_email(_clean(row.get("professor name")))
+            designation, designation_email = _take_email(_clean(row.get("title/designation")))
+            role = NAME_ROLE_RE.search(name)
+            if role:
+                name = name[: role.start()].strip()
+                designation = designation or role.group(1).rstrip(" .")
+            bare_name = re.sub(r"^(?:(?:Dr|Prof|Mr|Mrs|Ms|Cmde)\.?\s*)+", "", name)
+            if bare_name and designation.endswith(bare_name):  # "Assistant Professor ... <their own name>"
+                designation = designation[: -len(bare_name)].strip()
+            designation = re.sub(r"\S+@\S+(?:\s+edu)?$", "", designation).strip()  # a broken address
+            email = _clean(row.get("mail id")).lower() or name_email or designation_email
+            if email.startswith("noreply@"):  # a placeholder shared by several people, not a contact
+                email = ""
+            dept = _clean(row.get("department"))
+            if not name:
+                continue
+            key = email or f"{name.lower()}|{dept.lower()}"
+            if key in records:
+                continue
+            records[key] = {
+                "id": f"faculty-{len(records) + 1}",
+                "name": name,
+                "dept": dept,
+                "designation": designation,
+                "cabin": _clean(row.get("cabin no.")) or None,
+                "email": email,
+                "qualification": QUALIFICATION_PREFIX_RE.sub("", _clean(row.get("qualification"))),
+                "source": path.name,
+            }
+    return sorted(records.values(), key=lambda faculty: faculty["name"].lower())
+
+
 @lru_cache
 def load_faculty() -> list[dict]:
-    """Load and de-duplicate the two source-backed faculty CSV directories."""
+    """Load the master faculty CSV, or merge the two source CSVs by email if it isn't there."""
+    merged_path = DOCS_DIR / MERGED_FACULTY_FILE
+    if merged_path.is_file():
+        return _load_merged(merged_path)
     by_email: dict[str, dict] = {}
     general_path = DOCS_DIR / "mit_manipal_faculty.csv"
     if general_path.is_file():
@@ -140,7 +203,7 @@ def _record_text(record: dict) -> str:
         f"Name: {record['name']}",
         f"Department: {record['dept']}",
         f"Designation: {record['designation'] or 'Not specified'}",
-        f"Email: {record['email']}",
+        f"Email: {record['email'] or 'Not listed'}",
     ]
     if record.get("cabin"):
         fields.append(f"Cabin: {record['cabin']}")
@@ -205,7 +268,7 @@ def lookup_faculty(query: str) -> dict | None:
         details = [
             f"{record['name']} — {record['designation'] or 'designation not specified'}",
             record["dept"],
-            f"Email: {record['email']}",
+            f"Email: {record['email'] or 'Not listed'}",
         ]
         if record.get("cabin"):
             details.append(f"Cabin: {record['cabin']}")

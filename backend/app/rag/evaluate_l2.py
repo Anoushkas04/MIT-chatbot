@@ -41,11 +41,13 @@ SELECTED_CORPUS = {
     "First year Core 2026 B.Tech.pdf": {"First year Core 2026 B.Tech.pdf"},
     "First year CS 2026 B.Tech.pdf": {"First year CS 2026 B.Tech.pdf"},
     "clubs.pdf": {"clubs.pdf"},
+    # merged_faculty.csv is the master directory built from both faculty CSVs, so citing it counts for either
     "manipal_sce_faculty_cabins.csv": {
         "manipal_sce_faculty_cabins.csv",
         "School of Computer Engineering faculty list, July 2026",
+        "merged_faculty.csv",
     },
-    "mit_manipal_faculty.csv": {"mit_manipal_faculty.csv"},
+    "mit_manipal_faculty.csv": {"mit_manipal_faculty.csv", "merged_faculty.csv"},
 }
 
 
