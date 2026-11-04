@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { AlertTriangle, Database, FileText, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
 import { opsApi, type DatasetFile, type DatasetInfo } from '@/lib/api'
 import { useAdminError } from '@/lib/use-admin-error'
@@ -102,30 +101,15 @@ export default function AdminDatasetPage() {
         <div className="stat-tiles">
           <div className="stat-tile">
             <span>Documents</span>
-            <strong>{info!.files.length}</strong>
-          </div>
-          <div className="stat-tile">
-            <span>Readable by the chatbot</span>
             <strong>
               {info!.files.filter((f) => f.chunks).length}/{info!.files.length}
             </strong>
-            {idx.exists && info!.files.some((f) => f.supported && !f.chunks) && <small>others have no text layer (scanned?)</small>}
+            <small>readable by the chatbot</small>
           </div>
           <div className="stat-tile">
-            <span>Indexed chunks</span>
+            <span>Index health</span>
             <strong>{idx.exists ? (idx.total_chunks ?? '—') : 'No index'}</strong>
-          </div>
-          <div className="stat-tile">
-            <span>Community posts in dataset</span>
-            <strong>{info!.community_posts_in_dataset}</strong>
-            <Link href="/admin/community" className="inline-link">
-              Manage
-            </Link>
-          </div>
-          <div className="stat-tile">
-            <span>Last built</span>
-            <strong className="small">{idx.built_at ? new Date(idx.built_at).toLocaleString() : '—'}</strong>
-            <small>{idx.embedder ?? idx.current_embedder}</small>
+            <small>{idx.built_at ? `chunks · built ${new Date(idx.built_at).toLocaleDateString()}` : 'chunks'}</small>
           </div>
         </div>
       )}
