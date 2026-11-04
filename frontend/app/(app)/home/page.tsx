@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowUpRight, Bell, Search, Send, Sparkles } from 'lucide-react'
@@ -8,11 +8,17 @@ import { DiscoveryCard } from '@/components/discovery-card'
 import { NetworkPersonCard } from '@/components/network-person-card'
 import { useLocalState } from '@/lib/use-local-state'
 import { useNetworkPeople } from '@/lib/use-network'
+import { countUnseenNotifications } from '@/lib/notifications'
 import { defaultPlannerTasks, defaultProfile, discoveries, type PlannerTask, type Profile } from '@/lib/mock-data'
 
 export default function HomePage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const [hasUnseen, setHasUnseen] = useState(false)
+
+  useEffect(() => {
+    setHasUnseen(countUnseenNotifications() > 0)
+  }, [])
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [saved, setSaved] = useLocalState<string[]>('mitra_saved', [])
   const [tasks] = useLocalState<PlannerTask[]>('mitra_planner_tasks', defaultPlannerTasks)
@@ -52,7 +58,7 @@ export default function HomePage() {
         <div className="header-actions">
           <Link href="/notifications" className="icon-button" aria-label="Notifications">
             <Bell />
-            <i />
+            {hasUnseen && <i />}
           </Link>
           <div className="header-avatar" style={{ background: profile.avatar.color }}>
             {profile.avatar.emoji}

@@ -30,6 +30,10 @@ export type AppNotification = {
 }
 
 export const READ_KEY = 'mitra_notifications_read'
+// Ids shown on a visited section tab. Seen clears the red count badges; read (clicked) clears the row highlight.
+export const SEEN_KEY = 'mitra_notifications_seen'
+// Fired after the read/seen lists change, so the sidebar badge can recount without a navigation.
+export const NOTIFICATIONS_CHANGED = 'mitra:notifications-changed'
 // Cached copy of /api/me/notifications (official replies, removals, verifications).
 export const SERVER_KEY = 'mitra_server_notifications'
 
@@ -206,8 +210,8 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
-/** Unread count straight from storage, for places (like the sidebar) that don't hold the state. */
-export function countUnreadNotifications(): number {
+/** Unseen count straight from storage, for places (like the sidebar) that don't hold the state. */
+export function countUnseenNotifications(): number {
   const profile = readJSON<Profile>('mitra_profile', defaultProfile)
   const list = buildNotifications({
     people: readJSON('mitra_network', defaultNetworkPeople),
@@ -216,7 +220,7 @@ export function countUnreadNotifications(): number {
     myVotes: readJSON('mitra_community_votes', {}),
     me: profile.name,
   })
-  const read = new Set(readJSON<string[]>(READ_KEY, []))
+  const seen = new Set([...readJSON<string[]>(READ_KEY, []), ...readJSON<string[]>(SEEN_KEY, [])])
   const server = fromServer(readJSON<ServerNotification[]>(SERVER_KEY, []))
-  return list.filter((n) => !read.has(n.id)).length + server.filter((n) => !n.serverRead && !read.has(n.id)).length
+  return list.filter((n) => !seen.has(n.id)).length + server.filter((n) => !n.serverRead && !seen.has(n.id)).length
 }

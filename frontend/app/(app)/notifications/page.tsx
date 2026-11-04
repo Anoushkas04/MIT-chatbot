@@ -3,7 +3,16 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BadgeCheck, Heart, Lightbulb, MessageSquare, UserCheck, UserPlus, UserX } from 'lucide-react'
-import { buildNotifications, fromServer, READ_KEY, SERVER_KEY, type AppNotification, type NotificationKind } from '@/lib/notifications'
+import {
+  buildNotifications,
+  fromServer,
+  NOTIFICATIONS_CHANGED,
+  READ_KEY,
+  SEEN_KEY,
+  SERVER_KEY,
+  type AppNotification,
+  type NotificationKind,
+} from '@/lib/notifications'
 import { defaultProfile, type CommunityQuestion, type Profile } from '@/lib/mock-data'
 import { communityApi, meApi, type ServerNotification } from '@/lib/api'
 import { useLocalState } from '@/lib/use-local-state'
@@ -35,6 +44,7 @@ export default function NotificationsPage() {
   const [questions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', [])
   const [myVotes, setMyVotes] = useLocalState<Record<string, 1 | -1>>('mitra_community_votes', {})
   const [read, setRead] = useLocalState<string[]>(READ_KEY, [])
+  const [seen, setSeen] = useLocalState<string[]>(SEEN_KEY, [])
   const [server, setServer] = useLocalState<ServerNotification[]>(SERVER_KEY, [])
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -58,7 +68,23 @@ export default function NotificationsPage() {
   const all: AppNotification[] = [...official, ...buildNotifications({ people, activity, questions, myVotes, me: profile.name })]
   const readSet = new Set([...read, ...serverRead])
   const unread = all.filter((n) => !readSet.has(n.id))
+  const seenSet = new Set([...readSet, ...seen])
+  const unseen = all.filter((n) => !seenSet.has(n.id))
   const visible = filter === 'all' ? all : all.filter((n) => n.kind === filter)
+
+  // Opening a section tab counts as seeing what's in it, which clears that tab's badge.
+  // "All" doesn't, so the sidebar badge only goes once every section has been visited.
+  const newlySeen = filter === 'all' ? [] : visible.filter((n) => !seenSet.has(n.id)).map((n) => n.id)
+  const newlySeenKey = newlySeen.join('|')
+  useEffect(() => {
+    if (!newlySeenKey) return
+    setSeen((prev) => [...new Set([...prev, ...newlySeenKey.split('|')])])
+  }, [newlySeenKey, setSeen])
+
+  // Runs after useLocalState has saved the lists, so the sidebar recounts from fresh storage
+  useEffect(() => {
+    window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED))
+  }, [read, seen])
 
   function markRead(id: string) {
     setRead((prev) => (prev.includes(id) ? prev : [...prev, id]))
@@ -94,7 +120,7 @@ export default function NotificationsPage() {
 
       <div className="discover-tabs">
         {filters.map((f) => {
-          const count = f.value === 'all' ? unread.length : unread.filter((n) => n.kind === f.value).length
+          const count = f.value === 'all' ? unseen.length : unseen.filter((n) => n.kind === f.value).length
           return (
             <button key={f.value} className={filter === f.value ? 'active' : ''} onClick={() => setFilter(f.value)}>
               {f.label} {count > 0 && <span className="nav-badge inline">{count}</span>}

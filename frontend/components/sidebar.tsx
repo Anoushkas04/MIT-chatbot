@@ -23,7 +23,7 @@ import { Logo } from '@/components/logo'
 import { clearSession, getAdminSession } from '@/lib/session'
 import { useLocalState } from '@/lib/use-local-state'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
-import { countUnreadNotifications, SERVER_KEY } from '@/lib/notifications'
+import { countUnseenNotifications, NOTIFICATIONS_CHANGED, SERVER_KEY } from '@/lib/notifications'
 import { logoutEverywhere, meApi } from '@/lib/api'
 
 const navItems = [
@@ -46,7 +46,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
 
   // The sidebar stays mounted across pages, so recount from storage on each navigation.
   useEffect(() => {
-    setUnread(countUnreadNotifications())
+    setUnread(countUnseenNotifications())
     // Shortcut only: the admin console has its own sign-in and session.
     setIsAdmin(getAdminSession() !== null)
     // Pick up new messages from the MITra team, then recount.
@@ -58,13 +58,20 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
         try {
           localStorage.setItem(SERVER_KEY, JSON.stringify(res.notifications))
         } catch {}
-        setUnread(countUnreadNotifications())
+        setUnread(countUnseenNotifications())
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [pathname])
+
+  // The notifications page clears badges as sections are visited; recount without waiting for a navigation.
+  useEffect(() => {
+    const recount = () => setUnread(countUnseenNotifications())
+    window.addEventListener(NOTIFICATIONS_CHANGED, recount)
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED, recount)
+  }, [])
 
   async function logout() {
     // Revoke on the server too, so a copied token stops working; sign out locally regardless.
