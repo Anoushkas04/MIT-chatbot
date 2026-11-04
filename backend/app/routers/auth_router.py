@@ -274,7 +274,7 @@ def _issue_otp(db, lid: str, purpose: str = "signup", name: str = "") -> dict:
     raw_otp = None
     if supabase_enabled():
         # Send first: if Supabase refuses, no cooldown is recorded and the student can retry
-        send_supabase_email_otp(lid)
+        send_supabase_email_otp(lid, name=name)
         otp_hash = SUPABASE_OTP_MARKER
     else:
         raw_otp = f"{secrets.randbelow(1_000_000):06d}"

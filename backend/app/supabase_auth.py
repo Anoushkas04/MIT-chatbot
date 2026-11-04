@@ -36,8 +36,10 @@ def map_supabase_error(raw_msg: str, status_code: int = 400) -> str:
     return raw_msg or "Authentication request failed. Please try again."
 
 
-def send_supabase_email_otp(email: str) -> Dict[str, Any]:
-    """Requests Supabase Auth to dispatch a 6-digit Email OTP to the student's mailbox."""
+def send_supabase_email_otp(email: str, name: str = "") -> Dict[str, Any]:
+    """Requests Supabase Auth to dispatch a 6-digit Email OTP to the student's mailbox.
+    `name` is stored as user metadata when Supabase creates the user, so the email
+    templates can greet them with {{ .Data.first_name }}."""
     if not validate_email_domain(email):
         allowed_str = ", ".join([f"@{d}" for d in ALLOWED_EMAIL_DOMAINS])
         raise HTTPException(
@@ -53,7 +55,11 @@ def send_supabase_email_otp(email: str) -> Dict[str, Any]:
         }
 
     url = f"{SUPABASE_URL}/auth/v1/otp"
-    payload = json.dumps({"email": email, "create_user": True}).encode("utf-8")
+    body: Dict[str, Any] = {"email": email, "create_user": True}
+    first_name = (name or "").strip().split(" ")[0]
+    if first_name:
+        body["data"] = {"first_name": first_name}
+    payload = json.dumps(body).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
         "apikey": SUPABASE_ANON_KEY,
