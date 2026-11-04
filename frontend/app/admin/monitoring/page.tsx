@@ -103,7 +103,7 @@ export default function AdminMonitoringPage() {
               </Link>
             )}
             {data.moderation.pending_appeals > 0 && (
-              <Link href="/admin/pleas" className="attention-row">
+              <Link href="/admin/reports?tab=pleas" className="attention-row">
                 <AlertTriangle />
                 <span>
                   {data.moderation.pending_appeals} disabled account{data.moderation.pending_appeals === 1 ? ' has' : 's have'} appealed
@@ -111,7 +111,7 @@ export default function AdminMonitoringPage() {
               </Link>
             )}
             {data.moderation.pending_pleas > 0 && (
-              <Link href="/admin/pleas" className="attention-row">
+              <Link href="/admin/reports?tab=pleas" className="attention-row">
                 <AlertTriangle />
                 <span>
                   {data.moderation.pending_pleas} plea{data.moderation.pending_pleas === 1 ? '' : 's'} waiting for a decision
