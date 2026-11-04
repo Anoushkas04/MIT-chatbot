@@ -8,10 +8,16 @@ from app.config import DATABASE_URL
 # SQLite Database File Path (used when DATABASE_URL isn't set)
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "campus_os.db")
 
-# Supabase shows "postgres://" URLs; SQLAlchemy 2 only accepts "postgresql://"
-SQLALCHEMY_DATABASE_URL = (
-    DATABASE_URL.replace("postgres://", "postgresql://", 1) if DATABASE_URL else f"sqlite:///{DB_PATH}"
-)
+def _normalize_postgres_url(url: str) -> str:
+    # Supabase shows "postgres://" URLs, which SQLAlchemy 2 rejects, and SQLAlchemy 2.1 maps a
+    # bare "postgresql://" to psycopg 3. Pin the psycopg2 driver that requirements.txt installs.
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg2://" + url[len(prefix):]
+    return url
+
+
+SQLALCHEMY_DATABASE_URL = _normalize_postgres_url(DATABASE_URL) if DATABASE_URL else f"sqlite:///{DB_PATH}"
 
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
