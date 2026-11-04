@@ -158,6 +158,35 @@ export function searchUsers(q: string) {
   return authed<{ results: PublicUser[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`)
 }
 
+// ---- Connections and private messages between registered students ----
+
+export type NetworkSnapshot = {
+  connections: PublicUser[]
+  incoming: PublicUser[]
+  outgoing: PublicUser[]
+  unread: Record<string, number> // sender's user id -> unread message count
+  blocked: string[] // user ids I've blocked
+}
+
+export type ServerMessage = { id: number; from: 'me' | 'them'; text: string; time: string; at: string }
+
+export const networkApi = {
+  snapshot: () => authed<NetworkSnapshot>('GET', '/api/network'),
+  request: (userId: string) => authed<{ status: 'pending' | 'connected' }>('POST', `/api/network/requests/${userId}`),
+  accept: (userId: string) => authed<{ status: string }>('POST', `/api/network/requests/${userId}/accept`),
+  decline: (userId: string) => authed<{ status: string }>('POST', `/api/network/requests/${userId}/decline`),
+  withdraw: (userId: string) => authed<{ status: string }>('DELETE', `/api/network/requests/${userId}`),
+  remove: (userId: string) => authed<{ status: string }>('DELETE', `/api/network/connections/${userId}`),
+  block: (userId: string) => authed<{ status: string }>('POST', `/api/network/blocks/${userId}`),
+  unblock: (userId: string) => authed<{ status: string }>('DELETE', `/api/network/blocks/${userId}`),
+}
+
+export const messagesApi = {
+  thread: (userId: string, after?: number) =>
+    authed<{ messages: ServerMessage[] }>('GET', `/api/messages/${userId}${after !== undefined ? `?after=${after}` : ''}`),
+  send: (userId: string, text: string) => authed<ServerMessage>('POST', `/api/messages/${userId}`, { text }),
+}
+
 export function getPublicProfile(userId: string) {
   return authed<PublicProfile>('GET', `/api/users/${encodeURIComponent(userId)}`)
 }

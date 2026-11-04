@@ -13,6 +13,7 @@ export function NetworkPersonCard({
   onMessage,
   onDismiss,
   onRemove,
+  unreadCount = 0,
 }: {
   person: NetworkPerson
   onConnect?: () => void
@@ -24,6 +25,7 @@ export function NetworkPersonCard({
   onDismiss?: () => void
   // Removing a connection gets its own labelled button
   onRemove?: () => void
+  unreadCount?: number // unread private messages from this connection
 }) {
   return (
     <article className="network-card">
@@ -74,6 +76,7 @@ export function NetworkPersonCard({
         <div className="network-action-row">
           <button className="network-action connected" onClick={onMessage}>
             <MessageCircle /> Message
+            {unreadCount > 0 && <span className="nav-badge inline">{unreadCount}</span>}
           </button>
           {onRemove && (
             <button className="network-action remove" onClick={onRemove}>

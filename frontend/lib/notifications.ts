@@ -1,4 +1,4 @@
-import type { ServerNotification } from '@/lib/api'
+import type { NetworkSnapshot, ServerNotification } from '@/lib/api'
 import { matchTopics } from '@/lib/community-search'
 import {
   defaultActivity,
@@ -34,6 +34,8 @@ export const READ_KEY = 'mitra_notifications_read'
 export const SEEN_KEY = 'mitra_notifications_seen'
 // Fired after the read/seen lists change, so the sidebar badge can recount without a navigation.
 export const NOTIFICATIONS_CHANGED = 'mitra:notifications-changed'
+// Cached copy of /api/network (connections, requests, unread messages), written by useNetworkPeople.
+export const SERVER_NETWORK_KEY = 'mitra_server_network'
 // Cached copy of /api/me/notifications (official replies, removals, verifications).
 export const SERVER_KEY = 'mitra_server_notifications'
 
@@ -81,15 +83,30 @@ export function buildNotifications({
   questions,
   myVotes,
   me,
+  unreadMessages = {},
 }: {
   people: NetworkPerson[]
   activity: ActivityEvent[]
   questions: CommunityQuestion[]
   myVotes: Votes
   me: string
+  unreadMessages?: Record<string, number> // network person id -> unread private messages
 }): AppNotification[] {
   const out: AppNotification[] = []
   const byId = new Map(people.map((p) => [p.id, p]))
+
+  // New private messages. The count is in the id, so another message makes it new again.
+  for (const [personId, count] of Object.entries(unreadMessages)) {
+    const p = byId.get(personId)
+    if (!p || count <= 0 || p.status === 'blocked') continue
+    out.push({
+      id: `msg-${personId}-${count}`,
+      kind: 'response',
+      title: `${p.name} sent you ${count === 1 ? 'a message' : `${count} messages`}`,
+      detail: 'Open the chat to read and reply.',
+      href: `/network?chat=${encodeURIComponent(personId)}`,
+    })
+  }
 
   // Requests: people waiting on you.
   for (const p of people.filter((x) => x.status === 'incoming')) {
@@ -210,6 +227,11 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
+/** Unread message counts from a cached /api/network snapshot, keyed by network person id. */
+export function unreadFromSnapshot(snap: NetworkSnapshot | null): Record<string, number> {
+  return Object.fromEntries(Object.entries(snap?.unread ?? {}).map(([id, n]) => [`acc-${id}`, n]))
+}
+
 /** Unseen count straight from storage, for places (like the sidebar) that don't hold the state. */
 export function countUnseenNotifications(): number {
   const profile = readJSON<Profile>('mitra_profile', defaultProfile)
@@ -219,6 +241,7 @@ export function countUnseenNotifications(): number {
     questions: readJSON<CommunityQuestion[]>('mitra_community', []),
     myVotes: readJSON('mitra_community_votes', {}),
     me: profile.name,
+    unreadMessages: unreadFromSnapshot(readJSON<NetworkSnapshot | null>(SERVER_NETWORK_KEY, null)),
   })
   const seen = new Set([...readJSON<string[]>(READ_KEY, []), ...readJSON<string[]>(SEEN_KEY, [])])
   const server = fromServer(readJSON<ServerNotification[]>(SERVER_KEY, []))

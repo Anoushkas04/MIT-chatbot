@@ -27,7 +27,7 @@ function EntryList({ entries, empty }: { entries: ProfileEntry[]; empty: string 
 export default function PersonProfilePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { people, connect, connectNew, withdraw, accept, ignore, dismiss } = useNetworkPeople()
+  const { people, error: networkError, connect, connectNew, withdraw, accept, ignore, dismiss } = useNetworkPeople()
   const [remote, setRemote] = useState<PublicProfile | null>(null)
   const [remoteState, setRemoteState] = useState<'idle' | 'loading' | 'missing' | 'error'>('idle')
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null)
@@ -131,6 +131,7 @@ export default function PersonProfilePage() {
         </div>
       </section>
 
+      {networkError && <p className="field-error">{networkError}</p>}
       {remoteState === 'error' && (
         <p className="field-error">Couldn&apos;t load {firstName}&apos;s latest profile. Showing what&apos;s saved on this device.</p>
       )}

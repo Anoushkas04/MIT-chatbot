@@ -364,3 +364,40 @@ class AccountAppeal(Base):
     decision_note = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     decided_at = Column(DateTime, nullable=True)
+
+
+class Connection(Base):
+    """A connection request between two students. Stays pending until the addressee
+    accepts; there is at most one row per pair (in either direction)."""
+    __tablename__ = "connections"
+    __table_args__ = (UniqueConstraint("requester_id", "addressee_id", name="uq_connection_pair"),)
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    requester_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    addressee_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(String, default="pending", index=True)  # pending | accepted
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    responded_at = Column(DateTime, nullable=True)
+
+
+class DirectMessage(Base):
+    """A private message between two connected students."""
+    __tablename__ = "direct_messages"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    sender_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    recipient_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    read_at = Column(DateTime, nullable=True)
+
+
+class UserBlock(Base):
+    """blocker_id blocked blocked_id: no requests or messages either way."""
+    __tablename__ = "user_blocks"
+    __table_args__ = (UniqueConstraint("blocker_id", "blocked_id", name="uq_user_block"),)
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    blocker_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    blocked_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

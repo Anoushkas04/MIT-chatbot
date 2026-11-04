@@ -530,3 +530,4 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .person-subhead { margin-top: 24px; }
 .profile-missing { margin-top: 24px; }
 @media (max-width: 850px) { .person-hero { flex-wrap: wrap; } .person-grid { grid-template-columns: 1fr; } }
+.dm-error { margin: 0 14px 6px; }

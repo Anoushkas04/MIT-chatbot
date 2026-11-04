@@ -38,7 +38,7 @@ const kindIcon: Record<NotificationKind, typeof Heart> = {
 }
 
 export default function NotificationsPage() {
-  const { people, activity, accept, ignore } = useNetworkPeople()
+  const { people, activity, unread: unreadMessages, accept, ignore } = useNetworkPeople()
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   // Cached copy of the backend feed; refreshed below so replies and likes are current.
   const [questions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', [])
@@ -65,7 +65,7 @@ export default function NotificationsPage() {
   const official = fromServer(server)
   const serverRead = new Set(official.filter((n) => n.serverRead).map((n) => n.id))
   // Newest MITra messages first, then the activity built from local and community data.
-  const all: AppNotification[] = [...official, ...buildNotifications({ people, activity, questions, myVotes, me: profile.name })]
+  const all: AppNotification[] = [...official, ...buildNotifications({ people, activity, questions, myVotes, me: profile.name, unreadMessages })]
   const readSet = new Set([...read, ...serverRead])
   const unread = all.filter((n) => !readSet.has(n.id))
   const seenSet = new Set([...readSet, ...seen])

@@ -7,7 +7,7 @@ import { NetworkPersonCard } from '@/components/network-person-card'
 import { accountToPerson, useNetworkPeople } from '@/lib/use-network'
 import { defaultMessages, type DirectMessage, type NetworkPerson } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
-import { REPORT_REASONS, reportUser, searchUsers, type PublicUser, type ReportReason } from '@/lib/api'
+import { messagesApi, REPORT_REASONS, reportUser, searchUsers, type PublicUser, type ReportReason, type ServerMessage } from '@/lib/api'
 import { getSession } from '@/lib/session'
 
 type Tab = 'suggested' | 'requests' | 'connections'
@@ -77,8 +77,8 @@ function ReportPanel({
       </div>
       <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tell us more in your own words (optional)" maxLength={1000} />
       <p className="report-privacy">
-        <Lock /> Your chat stays private. The MITra team never sees your messages, only the reason you choose and anything you
-        write here. {person.name.split(' ')[0]} won&apos;t know who reported them.
+        <Lock /> Reports never include your messages, only the reason you choose and anything you write here.{' '}
+        {person.name.split(' ')[0]} won&apos;t know who reported them.
       </p>
       <label className="report-check">
         <input type="checkbox" checked={alsoBlock} onChange={(e) => setAlsoBlock(e.target.checked)} />
@@ -104,7 +104,11 @@ function ReportPanel({
 }
 
 export default function NetworkPage() {
-  const { people, connect, withdraw, accept, ignore, dismiss, block, unblock, connectNew } = useNetworkPeople()
+  const { people, unread, error: networkError, refresh, connect, withdraw, accept, ignore, dismiss, block, unblock, connectNew } =
+    useNetworkPeople()
+  // Conversations with registered students, loaded from the server (demo people use `messages`)
+  const [serverThreads, setServerThreads] = useState<Record<string, ServerMessage[]>>({})
+  const [chatError, setChatError] = useState<string | null>(null)
   const [messages, setMessages] = useLocalState<Record<string, DirectMessage[]>>('mitra_messages', defaultMessages)
   const [tab, setTab] = useState<Tab>('suggested')
   const [activeChat, setActiveChat] = useState<string | null>(null)
@@ -126,7 +130,44 @@ export default function NetworkPage() {
   const requestCount = incoming.length + pending.length
 
   const chatPerson = activeChat ? people.find((p) => p.id === activeChat && p.status === 'connected') : null
-  const thread = activeChat ? messages[activeChat] ?? [] : []
+  const chatAccountId = chatPerson?.accountId
+  const thread: DirectMessage[] = !activeChat
+    ? []
+    : chatAccountId
+      ? (serverThreads[activeChat] ?? []).map((m) => ({ id: `s-${m.id}`, from: m.from, text: m.text, time: m.time }))
+      : messages[activeChat] ?? []
+  const unreadTotal = connected.reduce((n, p) => n + (unread[p.id] ?? 0), 0)
+
+  // While a chat with a registered student is open, load it and check for new messages every few seconds.
+  useEffect(() => {
+    if (!activeChat || !chatAccountId) return
+    let cancelled = false
+    let lastId: number | undefined
+    async function poll(initial: boolean) {
+      try {
+        const res = await messagesApi.thread(chatAccountId!, initial ? undefined : lastId)
+        if (cancelled) return
+        if (res.messages.length > 0) lastId = res.messages[res.messages.length - 1].id
+        setServerThreads((prev) => {
+          if (initial) return { ...prev, [activeChat!]: res.messages }
+          const have = new Set((prev[activeChat!] ?? []).map((m) => m.id))
+          const fresh = res.messages.filter((m) => !have.has(m.id))
+          return fresh.length ? { ...prev, [activeChat!]: [...(prev[activeChat!] ?? []), ...fresh] } : prev
+        })
+        setChatError(null)
+        // Opening the chat marks their messages read; clear the badges
+        if (initial || res.messages.some((m) => m.from === 'them')) refresh()
+      } catch (e) {
+        if (!cancelled) setChatError(e instanceof Error ? e.message : "Couldn't load messages.")
+      }
+    }
+    poll(true)
+    const timer = setInterval(() => poll(false), 3000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [activeChat, chatAccountId, refresh])
 
   const q = query.trim().toLowerCase()
   const searching = q.length > 0
@@ -201,9 +242,24 @@ export default function NetworkPage() {
     })
   }
 
-  function sendMessage() {
+  async function sendMessage() {
     if (!draft.trim() || !activeChat) return
-    const msg: DirectMessage = { id: `m-${Date.now()}`, from: 'me', text: draft.trim(), time: 'Now' }
+    const text = draft.trim()
+    if (chatAccountId) {
+      try {
+        const sent = await messagesApi.send(chatAccountId, text)
+        setServerThreads((prev) => {
+          const list = prev[activeChat] ?? []
+          return list.some((m) => m.id === sent.id) ? prev : { ...prev, [activeChat]: [...list, sent] }
+        })
+        setDraft('')
+        setChatError(null)
+      } catch (e) {
+        setChatError(e instanceof Error ? e.message : "Couldn't send. Please try again.")
+      }
+      return
+    }
+    const msg: DirectMessage = { id: `m-${Date.now()}`, from: 'me', text, time: 'Now' }
     setMessages((prev) => ({ ...prev, [activeChat]: [...(prev[activeChat] ?? []), msg] }))
     setDraft('')
   }
@@ -236,6 +292,7 @@ export default function NetworkPage() {
             key={p.id}
             person={p}
             onMessage={() => setActiveChat(p.id)}
+            unreadCount={unread[p.id] ?? 0}
             onRemove={() => removeConnection(p)}
           />
         )
@@ -293,9 +350,10 @@ export default function NetworkPage() {
               Requests {requestCount > 0 && <span className="nav-badge inline">{requestCount}</span>}
             </button>
             <button className={tab === 'connections' ? 'active' : ''} onClick={() => setTab('connections')}>
-              My connections
+              My connections {unreadTotal > 0 && <span className="nav-badge inline">{unreadTotal}</span>}
             </button>
           </div>
+          {networkError && <p className="field-error">{networkError}</p>}
 
           {tab === 'suggested' && (
             <div className="network-grid">
@@ -400,6 +458,7 @@ export default function NetworkPage() {
                   ))}
                   {thread.length === 0 && <p className="view-sub">Say hi to {chatPerson.name.split(' ')[0]}.</p>}
                 </div>
+                {chatError && <p className="field-error dm-error">{chatError}</p>}
                 <div className="chat-compose dm-compose">
                   <input
                     value={draft}

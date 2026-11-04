@@ -29,6 +29,10 @@ def search_users(q: str = Query(..., min_length=2, max_length=80), current_user:
                 models.User.id != current_user.id,
                 models.User.status == "active",
                 models.User.is_suspended.is_(False),
+                # Students who blocked you don't show up
+                ~models.User.id.in_(
+                    db.query(models.UserBlock.blocker_id).filter(models.UserBlock.blocked_id == current_user.id)
+                ),
                 or_(
                     models.User.name.ilike(term),
                     models.User.department.ilike(term),
@@ -71,7 +75,10 @@ def get_public_profile(user_id: str, current_user: models.User = Depends(get_cur
             )
             .first()
         )
-        if not user:
+        blocked_me = user and db.query(models.UserBlock).filter(
+            models.UserBlock.blocker_id == user.id, models.UserBlock.blocked_id == current_user.id
+        ).first()
+        if not user or blocked_me:
             raise HTTPException(status_code=404, detail="This profile isn't available.")
         return public_profile(user)
     finally:
