@@ -23,12 +23,16 @@ def load_corpus(
     if render_images:
         image_dir.mkdir(parents=True, exist_ok=True)
 
-    for path in sorted(item for item in docs_dir.iterdir() if item.is_file()):
+    for path in sorted(item for item in docs_dir.iterdir() if item.is_file() and not item.name.startswith(".")):
         suffix = path.suffix.lower()
         if suffix == ".pdf":
             pdf_pages, pdf_chunks = _load_pdf(path, image_dir, render_images, render_dpi, visual_scope)
             pages.extend(pdf_pages)
             chunks.extend(pdf_chunks)
+        elif suffix == ".docx":
+            chunks.extend(_load_docx(path))
+        elif suffix in (".txt", ".md"):
+            chunks.extend(_load_text(path))
         elif suffix == ".csv" or _looks_like_csv(path):
             chunks.extend(_load_csv(path))
     return pages, chunks
@@ -84,6 +88,44 @@ def _load_pdf(
                     **metadata,
                 })
     return page_records, chunk_records
+
+
+def _load_docx(path: Path) -> list[dict]:
+    from docx import Document
+
+    doc = Document(str(path))
+    parts = [p.text for p in doc.paragraphs if p.text.strip()]
+    # Tables carry most of the structured info in campus documents (timetables, fees).
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [c.text.strip() for c in row.cells if c.text.strip()]
+            if cells:
+                parts.append(" | ".join(dict.fromkeys(cells)))  # merged cells repeat; keep one
+    return _text_chunks(path, "\n\n".join(parts), "docx_chunk")
+
+
+def _load_text(path: Path) -> list[dict]:
+    return _text_chunks(path, path.read_text(encoding="utf-8", errors="ignore"), "text_chunk")
+
+
+def _text_chunks(path: Path, full_text: str, record_type: str) -> list[dict]:
+    doc_id = document_id(path)
+    metadata = infer_document_metadata(path.name, full_text)
+    records = []
+    for index, value in enumerate(chunk_text(full_text)):
+        records.append({
+            "id": f"{doc_id}-r{index + 1:05d}",
+            "document_id": doc_id,
+            "source": path.name,
+            "source_file": path.name,
+            "page_number": None,
+            "chunk_index": index,
+            "text": value,
+            "image_path": None,
+            "record_type": record_type,
+            **metadata,
+        })
+    return records
 
 
 def _looks_like_csv(path: Path) -> bool:

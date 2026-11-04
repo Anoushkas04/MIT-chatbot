@@ -98,21 +98,10 @@ if phase == "main":
     check("same code twice rejected", r.status_code == 400, r.text)
     open(sys.argv[3], "w").write(token)
 
-    # legacy AuthModal flow
-    lid2 = "legacy.mitmpl2024@learner.manipal.edu"
-    r = requests.post(f"{A}/verify-learner-id", json={"learner_id": lid2})
-    check("legacy verify-learner-id", r.status_code == 200, r.text)
-    code = r.json().get("test_otp")
-    r = requests.post(f"{A}/verify-otp", json={"learner_id": lid2, "otp_code": code})
-    check("legacy verify-otp", r.status_code == 200, r.text)
-    reg_body = {"learner_id": lid2, "otp_code": code, "registration_number": "240905777", "name": "Legacy",
-                "password": "secret12", "agreed_terms": True}
-    r = requests.post(f"{A}/register-complete", json={**reg_body, "otp_code": "123456"})
-    check("legacy register-complete with 123456 rejected", r.status_code == 400, r.text)
-    r = requests.post(f"{A}/register-complete", json=reg_body)
-    check("legacy register-complete", r.status_code == 200 and r.json().get("access_token"), r.text)
-    r = requests.post(f"{A}/login", json={"email_or_id": "240905777", "password": "secret12"})
-    check("legacy password login", r.status_code == 200, r.text)
+    # The legacy password flow (AuthModal) was removed: sign-in is OTP-only.
+    for path in ("verify-learner-id", "verify-otp", "register-complete", "login"):
+        r = requests.post(f"{A}/{path}", json={})
+        check(f"legacy /{path} removed", r.status_code in (404, 405), r.text)
 
     r = requests.get(f"{B}/api/admin/analytics", headers={"Authorization": f"Bearer {token}"})
     check("student token cannot reach admin", r.status_code == 403, r.text)
