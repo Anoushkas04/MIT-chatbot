@@ -6,12 +6,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Activity,
   ArrowLeft,
-  BarChart3,
   Database,
   Flag,
-  History,
   MessageSquare,
-  Scale,
   ShieldCheck,
   Users,
 } from 'lucide-react'
@@ -19,15 +16,17 @@ import { Logo } from '@/components/logo'
 import { adminLogout } from '@/lib/api'
 import { clearAdminSession, getAdminSession, type Session } from '@/lib/session'
 
+// Insights folded into Overview (its one genuinely actionable section, knowledge gaps,
+// now lives there — the 12 stat tiles and 6 charts nobody checked daily are gone).
+// Pleas & appeals folded into Reports as a tab (same "decide on a flagged account"
+// workflow). Audit log dropped from the nav but still reachable via Overview's
+// "Full audit log" link — just not a primary destination for a 3-person admin team.
 const adminNav = [
-  { label: 'Monitoring', href: '/admin/monitoring', icon: Activity },
-  { label: 'Insights', href: '/admin/insights', icon: BarChart3 },
+  { label: 'Overview', href: '/admin/monitoring', icon: Activity },
   { label: 'Community', href: '/admin/community', icon: MessageSquare },
   { label: 'Reports', href: '/admin/reports', icon: Flag },
-  { label: 'Pleas & appeals', href: '/admin/pleas', icon: Scale },
   { label: 'Accounts', href: '/admin/accounts', icon: Users },
   { label: 'Dataset', href: '/admin/dataset', icon: Database },
-  { label: 'Audit log', href: '/admin/audit', icon: History },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

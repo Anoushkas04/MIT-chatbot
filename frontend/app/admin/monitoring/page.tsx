@@ -3,18 +3,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert, XCircle } from 'lucide-react'
-import { opsApi, type Monitoring } from '@/lib/api'
+import { opsApi, type Insights, type Monitoring } from '@/lib/api'
 import { useAdminError } from '@/lib/use-admin-error'
 
 export default function AdminMonitoringPage() {
   const [data, setData] = useState<Monitoring | null>(null)
+  const [gaps, setGaps] = useState<Insights['chat']['knowledge_gaps'] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [updated, setUpdated] = useState<Date | null>(null)
   const handleError = useAdminError(setError)
 
   const load = useCallback(async () => {
     try {
-      setData(await opsApi.monitoring())
+      const [monitoring, insights] = await Promise.all([opsApi.monitoring(), opsApi.insights(7)])
+      setData(monitoring)
+      // The only part of the old separate Insights page admins actually acted on: what the
+      // chatbot couldn't answer. Everything else there was charts nobody needed day to day —
+      // still computed by the same backend endpoint if that ever needs to come back.
+      setGaps(insights.chat.knowledge_gaps)
       setUpdated(new Date())
       setError(null)
     } catch (e) {
@@ -113,6 +119,31 @@ export default function AdminMonitoringPage() {
               </Link>
             )}
           </section>
+
+          {gaps && gaps.length > 0 && (
+            <section className="monitor-section">
+              <h3>Chatbot knowledge gaps</h3>
+              <p className="view-sub">Questions it couldn&apos;t answer confidently this week. Add a document or verify a Community answer to close them.</p>
+              <table className="gap-table">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Asked</th>
+                    <th>Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gaps.map((g) => (
+                    <tr key={g.question}>
+                      <td>{g.question}</td>
+                      <td>{g.times_asked}×</td>
+                      <td>{g.category}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
 
           <div className="monitor-grid">
             <section className="utility-card monitor-card">
