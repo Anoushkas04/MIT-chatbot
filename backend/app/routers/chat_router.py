@@ -1,11 +1,13 @@
 import re
 from urllib.parse import quote
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from app.answer_verifier import verify_answer
+from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
 from app.prompts import build_system_prompt
 from app.providers import GenerationRequest, GenerationResult, generate_answer
 from app.rag.hybrid import hybrid_search
+from app.routers.auth_router import get_current_user
 from app.schemas import ChatRequest, ChatResponse, CitationDetail
 from app.session_memory import add_turn, get_history
 from app.database import SessionLocal
@@ -61,44 +63,6 @@ def classify_intent(query: str) -> str:
         return "academic_official"
     else:
         return "community_experience"
-
-
-def search_community_posts(user_query: str, db) -> list:
-    """Searches student community posts with flexible keyword overlap & category matching."""
-    words = [w.lower() for w in re.findall(r'\b\w+\b', user_query) if len(w) >= 3 and w.lower() not in COMMON_STOPWORDS]
-
-    if not words:
-        return []
-
-    results = []
-    posts = db.query(models.StudentPost).order_by(models.StudentPost.id.desc()).limit(100).all()
-
-    for p in posts:
-        post_text = f"{p.title} {p.content} {p.sub_community} {p.tag}".lower()
-        comments_text = " ".join([c.content.lower() for c in p.comments]) if p.comments else ""
-        full_text = f"{post_text} {comments_text}"
-
-        matched_words = [w for w in words if w in full_text]
-        matches_count = len(matched_words)
-
-        if matches_count >= 1:
-            score = round(min(0.98, 0.75 + (matches_count * 0.08)), 2)
-
-            comment_str = ""
-            if p.comments:
-                comment_str = "\nCommunity Answers:\n" + "\n".join(
-                    [f" • {c.author_name} ({'★ Accepted Answer' if c.is_helpful else 'Reply'}): \"{c.content}\"" for c in p.comments]
-                )
-
-            results.append({
-                "source": f"Student Community Discussion: '{p.title.strip()}'",
-                "source_type": "community",
-                "text": f"Community Question by {p.author_name} ({p.sub_community}): \"{p.title.strip()}\"\nQuestion Context: {p.content}{comment_str}",
-                "score": score,
-            })
-
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:3]
 
 
 def detect_query_type(query: str) -> str:
@@ -225,9 +189,16 @@ def merge_evidence(
 
 
 @router.post("", response_model=ChatResponse, summary="Query the configured AI provider with RAG grounding")
-def chat_query(req: ChatRequest):
+def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
     db = SessionLocal()
     try:
+        # Conversations belong to one account: another user's session id can't be appended to.
+        if not req.session_id or len(req.session_id) > 64:
+            raise HTTPException(status_code=400, detail="Invalid conversation id.")
+        owner = db.query(models.ChatSession.user_id).filter(models.ChatSession.id == req.session_id).scalar()
+        if owner is not None and owner != me.id:
+            raise HTTPException(status_code=403, detail="That conversation belongs to someone else.")
+
         intent = classify_intent(req.message)
         query_type = detect_query_type(req.message)
         faculty_lookup = lookup_faculty(req.message)
@@ -263,8 +234,9 @@ def chat_query(req: ChatRequest):
             else filter_chunk_relevance(vector_matches, relevance_query, query_type)
         )
 
-        # 2. Database Search for Community Discussions
-        community_matches = [] if faculty_lookup else search_community_posts(req.message, db)
+        # 2. Database search for Community Q&A — only admin-verified, high-upvote posts
+        # that have actually been promoted into the dataset (app/community_knowledge.py).
+        community_matches = [] if faculty_lookup else search_dataset_posts(req.message, db, limit=4)
         relevant_community_matches = [cm for cm in community_matches if cm["score"] >= 0.50]
 
         # Calculate live community counts dynamically from DB
@@ -272,8 +244,8 @@ def chat_query(req: ChatRequest):
         response_count = 0
         for cm in relevant_community_matches:
             text_str = cm.get("text", "")
-            if "Community Answers:" in text_str:
-                replies_part = text_str.split("Community Answers:")[1]
+            if "Answers:" in text_str:
+                replies_part = text_str.split("Answers:")[1]
                 response_count += len([line for line in replies_part.split("\n") if line.strip().startswith("•")])
 
         demand_count = question_count
