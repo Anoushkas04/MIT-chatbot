@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Clock, MessageCircle, UserCheck, UserPlus, UserX, X } from 'lucide-react'
+import { Check, Clock, MessageCircle, UserCheck, UserMinus, UserPlus, UserX, X } from 'lucide-react'
 import type { NetworkPerson } from '@/lib/mock-data'
 
 export function NetworkPersonCard({
@@ -12,7 +12,6 @@ export function NetworkPersonCard({
   onMessage,
   onDismiss,
   onRemove,
-  removeLabel = 'Remove',
 }: {
   person: NetworkPerson
   onConnect?: () => void
@@ -20,24 +19,17 @@ export function NetworkPersonCard({
   onAccept?: () => void
   onIgnore?: () => void
   onMessage?: () => void
+  // The corner ✕ only ever means "not interested" in a suggestion
   onDismiss?: () => void
-  // Remove from any list (suggestions, requests, connections); labelled per context.
+  // Removing a connection gets its own labelled button
   onRemove?: () => void
-  removeLabel?: string
 }) {
   return (
     <article className="network-card">
-      {onRemove ? (
-        <button className="network-dismiss" onClick={onRemove} aria-label={removeLabel} title={removeLabel}>
+      {person.status === 'suggested' && onDismiss && (
+        <button className="network-dismiss" onClick={onDismiss} aria-label="Not interested" title="Not interested">
           <X />
         </button>
-      ) : (
-        person.status === 'suggested' &&
-        onDismiss && (
-          <button className="network-dismiss" onClick={onDismiss} aria-label="Remove suggestion">
-            <X />
-          </button>
-        )
       )}
       <div className="network-avatar">{person.initials}</div>
       <strong>{person.name}</strong>
@@ -76,9 +68,16 @@ export function NetworkPersonCard({
         </div>
       )}
       {person.status === 'connected' && (
-        <button className="network-action connected" onClick={onMessage}>
-          <MessageCircle /> Message
-        </button>
+        <div className="network-action-row">
+          <button className="network-action connected" onClick={onMessage}>
+            <MessageCircle /> Message
+          </button>
+          {onRemove && (
+            <button className="network-action remove" onClick={onRemove}>
+              <UserMinus /> Remove
+            </button>
+          )}
+        </div>
       )}
     </article>
   )

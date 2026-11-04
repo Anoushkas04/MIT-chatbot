@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Ban, Flag, Lock, MoreHorizontal, Search, Send, X } from 'lucide-react'
+import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog'
 import { NetworkPersonCard } from '@/components/network-person-card'
 import { useNetworkPeople } from '@/lib/use-network'
 import { defaultMessages, type DirectMessage, type NetworkPerson } from '@/lib/mock-data'
@@ -131,6 +132,8 @@ export default function NetworkPage() {
   const [activeChat, setActiveChat] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null)
+  const closeConfirm = useCallback(() => setConfirm(null), [])
   const [reporting, setReporting] = useState(false)
   const [showBlocked, setShowBlocked] = useState(false)
   const [query, setQuery] = useState('')
@@ -203,7 +206,12 @@ export default function NetworkPage() {
   }
 
   function removeConnection(person: NetworkPerson) {
-    if (window.confirm(`Remove ${person.name} from your connections?`)) dismiss(person.id)
+    setConfirm({
+      title: `Remove ${person.name}?`,
+      message: `${person.name.split(' ')[0]} will be removed from your connections. You can find them through search and connect again later.`,
+      confirmLabel: 'Remove',
+      onConfirm: () => dismiss(person.id),
+    })
   }
 
   function sendMessage() {
@@ -221,8 +229,7 @@ export default function NetworkPage() {
             key={p.id}
             person={p}
             onConnect={() => (known.has(p.id) ? connect(p.id) : connectNew(p))}
-            onRemove={known.has(p.id) ? () => dismiss(p.id) : undefined}
-            removeLabel="Remove suggestion"
+            onDismiss={known.has(p.id) ? () => dismiss(p.id) : undefined}
           />
         )
       case 'incoming':
@@ -232,8 +239,6 @@ export default function NetworkPage() {
             person={p}
             onAccept={() => accept(p.id)}
             onIgnore={() => ignore(p.id)}
-            onRemove={() => ignore(p.id)}
-            removeLabel="Decline request"
           />
         )
       case 'pending':
@@ -245,7 +250,6 @@ export default function NetworkPage() {
             person={p}
             onMessage={() => setActiveChat(p.id)}
             onRemove={() => removeConnection(p)}
-            removeLabel="Remove connection"
           />
         )
       default:
@@ -377,9 +381,12 @@ export default function NetworkPage() {
                       className="danger"
                       onClick={() => {
                         setMenuOpen(false)
-                        if (window.confirm(`Block ${chatPerson.name}? They'll be removed from your network and you won't see their messages.`)) {
-                          blockPerson(chatPerson)
-                        }
+                        setConfirm({
+                          title: `Block ${chatPerson.name}?`,
+                          message: "They'll be removed from your network and you won't see their messages.",
+                          confirmLabel: 'Block',
+                          onConfirm: () => blockPerson(chatPerson),
+                        })
                       }}
                     >
                       <Ban /> Block
@@ -424,6 +431,7 @@ export default function NetworkPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog request={confirm} onClose={closeConfirm} />
     </div>
   )
 }
