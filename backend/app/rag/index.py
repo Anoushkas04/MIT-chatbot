@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from app.config import DATA_DIR
+from app.config import DATA_DIR, DOCS_DIR
 from app.rag import jobs
 from app.rag.ingest import run_ingestion
 from app.rag.loaders import SUPPORTED_EXTENSIONS, UnsupportedDocument

@@ -1,3 +1,4 @@
+import datetime
 import sys
 
 # Standalone entrypoint (`python -m app.seed`) doesn't go through app.main, so it
@@ -6,6 +7,7 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
 
+from app.config import SEED_DEMO_COMMUNITY
 from app.database import SessionLocal, init_db
 from app import models
 
@@ -148,8 +150,47 @@ def seed_database():
             db.commit()
             print("✓ Database Seeded: Real Timeline Academic Events created.")
 
+        # 4. Opt-in demo content for the Community feed (SEED_DEMO_COMMUNITY=1 only).
+        if SEED_DEMO_COMMUNITY and db.query(models.CommunityPost).count() == 0:
+            _seed_demo_community(db)
+
     finally:
         db.close()
+
+
+def _seed_demo_community(db) -> None:
+    import json
+    from app.demo_community import DEMO_POSTS
+
+    def add_comments(post_id: int, parent_id, items: list) -> None:
+        for item in items:
+            comment = models.CommunityComment(
+                post_id=post_id,
+                parent_id=parent_id,
+                author_label=item["author"],
+                body=item["body"],
+                seed_score=item["votes"],
+                created_at=datetime.datetime.utcnow() - datetime.timedelta(days=item["days_ago"]),
+            )
+            db.add(comment)
+            db.flush()  # need comment.id before seeding its own replies
+            add_comments(post_id, comment.id, item.get("replies", []))
+
+    for p in DEMO_POSTS:
+        post = models.CommunityPost(
+            title=p["title"],
+            body=p["body"],
+            tags_json=json.dumps(p["tags"]),
+            author_label=p["author"],
+            seed_score=p["votes"],
+            created_at=datetime.datetime.utcnow() - datetime.timedelta(days=p["days_ago"]),
+        )
+        db.add(post)
+        db.flush()  # need post.id before seeding its answers
+        add_comments(post.id, None, p.get("answers", []))
+
+    db.commit()
+    print(f"✓ Database Seeded: {len(DEMO_POSTS)} labelled demo Community questions (SEED_DEMO_COMMUNITY=1).")
 
 
 if __name__ == "__main__":
