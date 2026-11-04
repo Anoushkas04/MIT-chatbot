@@ -1,17 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Ban, Flag, MoreHorizontal, Search, Send, X } from 'lucide-react'
+import { Ban, Flag, Lock, MoreHorizontal, Search, Send, X } from 'lucide-react'
 import { NetworkPersonCard } from '@/components/network-person-card'
 import { useNetworkPeople } from '@/lib/use-network'
 import { defaultMessages, type DirectMessage, type NetworkPerson } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
-import { reportUser, searchUsers, type PublicUser, type ReportReason } from '@/lib/api'
+import { REPORT_REASONS, reportUser, searchUsers, type PublicUser, type ReportReason } from '@/lib/api'
 import { getSession } from '@/lib/session'
 
 type Tab = 'suggested' | 'requests' | 'connections'
 
-const REPORT_REASONS: ReportReason[] = ['Harassment', 'Inappropriate content', 'Spam or scam', 'Other']
 
 function initialsOf(name: string) {
   return name
@@ -41,21 +40,21 @@ function matchesPerson(p: NetworkPerson, q: string) {
 
 function ReportPanel({
   person,
-  messages,
   onDone,
 }: {
   person: NetworkPerson
-  messages: DirectMessage[]
   // Blocking closes the chat, so it happens on the way out rather than mid-report.
   onDone: (block: boolean) => void
 }) {
-  const [reason, setReason] = useState<ReportReason>('Harassment')
-  const [details, setDetails] = useState('')
+  // No default, like Instagram: the reporter has to choose why.
+  const [reason, setReason] = useState<ReportReason | null>(null)
+  const [note, setNote] = useState('')
   const [alsoBlock, setAlsoBlock] = useState(true)
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [error, setError] = useState<string | null>(null)
 
   async function submit() {
+    if (!reason) return
     setState('sending')
     setError(null)
     try {
@@ -63,8 +62,7 @@ function ReportPanel({
         reported_user_id: person.accountId,
         reported_name: person.name,
         reason,
-        details: details.trim(),
-        recent_messages: messages.filter((m) => m.from === 'them').map((m) => m.text),
+        note: note.trim(),
       })
       setState('sent')
     } catch (e) {
@@ -90,6 +88,7 @@ function ReportPanel({
   return (
     <div className="report-panel">
       <strong>Report {person.name}</strong>
+      <p className="report-privacy">Why are you reporting this account?</p>
       <div className="tag-picker">
         {REPORT_REASONS.map((r) => (
           <button key={r} className={reason === r ? 'active' : ''} onClick={() => setReason(r)}>
@@ -97,7 +96,11 @@ function ReportPanel({
           </button>
         ))}
       </div>
-      <textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What happened? (optional)" />
+      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tell us more in your own words (optional)" maxLength={1000} />
+      <p className="report-privacy">
+        <Lock /> Your chat stays private. The MITra team never sees your messages, only the reason you choose and anything you
+        write here. {person.name.split(' ')[0]} won&apos;t know who reported them.
+      </p>
       <label className="report-check">
         <input type="checkbox" checked={alsoBlock} onChange={(e) => setAlsoBlock(e.target.checked)} />
         Also block {person.name.split(' ')[0]}
@@ -113,7 +116,7 @@ function ReportPanel({
             Block without reporting
           </button>
         )}
-        <button className="community-ask-btn small" onClick={submit} disabled={state === 'sending'}>
+        <button className="community-ask-btn small" onClick={submit} disabled={state === 'sending' || !reason}>
           {state === 'sending' ? 'Sending...' : 'Submit report'}
         </button>
       </div>
@@ -391,7 +394,6 @@ export default function NetworkPage() {
             {reporting ? (
               <ReportPanel
                 person={chatPerson}
-                messages={thread}
                 onDone={(alsoBlock) => (alsoBlock ? blockPerson(chatPerson) : setReporting(false))}
               />
             ) : (

@@ -1,6 +1,6 @@
+import type { ServerNotification } from '@/lib/api'
 import { matchTopics } from '@/lib/community-search'
 import {
-  communityQuestions,
   defaultActivity,
   defaultNetworkPeople,
   defaultProfile,
@@ -17,7 +17,7 @@ import {
  * feed, so they always reflect current state. Ids are stable per event, which is
  * what the read/unread list keys on.
  */
-export type NotificationKind = 'request' | 'response' | 'like' | 'recommendation'
+export type NotificationKind = 'request' | 'response' | 'like' | 'recommendation' | 'official'
 
 export type AppNotification = {
   id: string
@@ -30,6 +30,21 @@ export type AppNotification = {
 }
 
 export const READ_KEY = 'mitra_notifications_read'
+// Cached copy of /api/me/notifications (official replies, removals, verifications).
+export const SERVER_KEY = 'mitra_server_notifications'
+
+/** Notifications the MITra team's actions created on the server. Read state lives there. */
+export function fromServer(list: ServerNotification[]): (AppNotification & { serverRead: boolean })[] {
+  return list.map((n) => ({
+    id: n.id,
+    kind: 'official',
+    title: n.title,
+    detail: n.content,
+    time: n.time,
+    href: ['official_reply', 'post_deleted', 'post_verified'].includes(n.category) ? '/community' : '/notifications',
+    serverRead: n.read,
+  }))
+}
 
 type Votes = Record<string, 1 | -1>
 
@@ -45,6 +60,11 @@ function relativeTime(at?: number, fallback?: string): string | undefined {
 
 function shorten(text: string, max = 70) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+// The backend marks the viewer's own posts; the name check covers older cached data.
+function isMine(item: { isMine?: boolean; author: string }, me: string) {
+  return item.isMine ?? item.author === me
 }
 
 function questionTopics(q: CommunityQuestion): string[] {
@@ -98,9 +118,9 @@ export function buildNotifications({
   function walk(nodes: CommunityComment[], q: CommunityQuestion) {
     for (const c of nodes) {
       if (c.deleted) continue
-      const mine = c.author === me
+      const mine = isMine(c, me)
       for (const r of c.replies ?? []) {
-        if (mine && r.author !== me && !r.deleted) {
+        if (mine && !isMine(r, me) && !r.deleted) {
           out.push({
             id: `reply-${r.id}`,
             kind: 'response',
@@ -125,9 +145,9 @@ export function buildNotifications({
     }
   }
   for (const q of questions) {
-    if (q.author === me) {
+    if (isMine(q, me)) {
       for (const a of q.answers) {
-        if (a.author !== me && !a.deleted) {
+        if (!isMine(a, me) && !a.deleted) {
           out.push({
             id: `reply-${a.id}`,
             kind: 'response',
@@ -159,7 +179,7 @@ export function buildNotifications({
   for (const q of questions) for (const t of questionTopics(q)) topicCounts.set(t, (topicCounts.get(t) ?? 0) + 1)
   const topTopics = [...topicCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([t]) => t)
   const recs = questions
-    .filter((q) => q.author !== me && questionTopics(q).some((t) => topTopics.includes(t)))
+    .filter((q) => !isMine(q, me) && questionTopics(q).some((t) => topTopics.includes(t)))
     .sort((a, b) => (a.answers.length === 0 ? 0 : 1) - (b.answers.length === 0 ? 0 : 1) || b.votes - a.votes)
     .slice(0, 3)
   for (const q of recs) {
@@ -192,10 +212,11 @@ export function countUnreadNotifications(): number {
   const list = buildNotifications({
     people: readJSON('mitra_network', defaultNetworkPeople),
     activity: readJSON('mitra_activity', defaultActivity),
-    questions: readJSON('mitra_community', communityQuestions),
+    questions: readJSON<CommunityQuestion[]>('mitra_community', []),
     myVotes: readJSON('mitra_community_votes', {}),
     me: profile.name,
   })
   const read = new Set(readJSON<string[]>(READ_KEY, []))
-  return list.filter((n) => !read.has(n.id)).length
+  const server = fromServer(readJSON<ServerNotification[]>(SERVER_KEY, []))
+  return list.filter((n) => !read.has(n.id)).length + server.filter((n) => !n.serverRead && !read.has(n.id)).length
 }

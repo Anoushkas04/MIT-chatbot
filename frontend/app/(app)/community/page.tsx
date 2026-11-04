@@ -1,16 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ArrowBigDown, ArrowBigUp, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
-import {
-  communityQuestions as seedQuestions,
-  defaultProfile,
-  type CommunityComment,
-  type CommunityQuestion,
-  type Profile,
-} from '@/lib/mock-data'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import type { CommunityComment, CommunityQuestion } from '@/lib/mock-data'
 import { MIN_RELEVANCE, matchTopics, scoreQuestion } from '@/lib/community-search'
-import { useLocalState } from '@/lib/use-local-state'
+import { communityApi } from '@/lib/api'
 
 // Past this depth sub-threads stop indenting further so deep chains stay readable.
 const MAX_INDENT_DEPTH = 4
@@ -19,22 +13,8 @@ const tagOptions = ['Academics', 'Attendance', 'Exams', 'Hostel', 'Campus Life',
 type SortMode = 'top' | 'new' | 'unanswered'
 type Votes = Record<string, 1 | -1>
 
-// Stored data from before nesting existed has leaf replies without a `replies` array.
-function normalizeComment(c: CommunityComment): CommunityComment {
-  return { ...c, replies: (c.replies ?? []).map(normalizeComment) }
-}
-
 function mapComment(list: CommunityComment[], id: string, fn: (c: CommunityComment) => CommunityComment): CommunityComment[] {
   return list.map((c) => (c.id === id ? fn(c) : { ...c, replies: mapComment(c.replies ?? [], id, fn) }))
-}
-
-// A comment with replies becomes a placeholder so its sub-thread survives.
-function removeComment(list: CommunityComment[], id: string): CommunityComment[] {
-  return list.flatMap((c) => {
-    const replies = c.replies ?? []
-    if (c.id !== id) return [{ ...c, replies: removeComment(replies, id) }]
-    return replies.length > 0 ? [{ ...c, body: '', deleted: true }] : []
-  })
 }
 
 function applyDelta(list: CommunityQuestion[], id: string, delta: number): CommunityQuestion[] {
@@ -57,6 +37,15 @@ function VoteControl({ id, votes, myVotes, onVote }: { id: string; votes: number
         <ArrowBigDown />
       </button>
     </div>
+  )
+}
+
+// Admin accounts post as "MITra Official"; they're the only verified accounts.
+function OfficialBadge() {
+  return (
+    <span className="official-tag">
+      <BadgeCheck /> Official
+    </span>
   )
 }
 
@@ -97,7 +86,6 @@ function ReplyBox({
 }
 
 type ThreadHandlers = {
-  currentUser: string
   myVotes: Votes
   onVote: (id: string, dir: 1 | -1) => void
   onReply: (parentId: string, body: string) => void
@@ -106,18 +94,21 @@ type ThreadHandlers = {
 }
 
 function CommentThread({ comment, depth, ...handlers }: { comment: CommunityComment; depth: number } & ThreadHandlers) {
-  const { currentUser, myVotes, onVote, onReply, onEdit, onDelete } = handlers
+  const { myVotes, onVote, onReply, onEdit, onDelete } = handlers
   const [replyOpen, setReplyOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const isTop = depth === 0
-  const isOwn = !comment.deleted && comment.author === currentUser
+  const isOwn = !comment.deleted && !!comment.isMine
 
   return (
     <div className={isTop ? 'answer-row' : 'reply-row'}>
-      <span className={isTop ? 'comment-avatar' : 'comment-avatar small'}>{comment.deleted ? '?' : comment.initials}</span>
+      <span className={`${isTop ? 'comment-avatar' : 'comment-avatar small'}${comment.isOfficial && !comment.deleted ? ' official' : ''}`}>
+        {comment.deleted ? '?' : comment.initials}
+      </span>
       <div className="answer-body">
         <div className="community-meta">
           <strong>{comment.deleted ? '[deleted]' : comment.author}</strong>
+          {comment.isOfficial && !comment.deleted && <OfficialBadge />}
           <time>{comment.time}</time>
           {comment.edited && !comment.deleted && <span className="edited-tag">edited</span>}
           {isOwn && !editing && (
@@ -177,7 +168,6 @@ function CommentThread({ comment, depth, ...handlers }: { comment: CommunityComm
 
 function QuestionCard({
   question,
-  currentUser,
   myVotes,
   onVote,
   onAddAnswer,
@@ -188,7 +178,6 @@ function QuestionCard({
   onDelete,
 }: {
   question: CommunityQuestion
-  currentUser: string
   myVotes: Votes
   onVote: (id: string, dir: 1 | -1) => void
   onAddAnswer: (questionId: string, body: string) => void
@@ -202,7 +191,7 @@ function QuestionCard({
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(question.title)
   const [editBody, setEditBody] = useState(question.body)
-  const isOwn = question.author === currentUser
+  const isOwn = !!question.isMine
 
   function handleSaveEdit() {
     if (!editTitle.trim() || !editBody.trim()) return
@@ -221,10 +210,16 @@ function QuestionCard({
       <VoteControl id={question.id} votes={question.votes} myVotes={myVotes} onVote={onVote} />
       <div className="community-body">
         <div className="community-meta">
-          <span className="comment-avatar">{question.initials}</span>
+          <span className={`comment-avatar${question.isOfficial ? ' official' : ''}`}>{question.initials}</span>
           <strong>{question.author}</strong>
+          {question.isOfficial && <OfficialBadge />}
           <time>{question.time}</time>
           {question.edited && <span className="edited-tag">edited</span>}
+          {question.verified && (
+            <span className="verified-post-tag" title="Checked by the MITra team">
+              <BadgeCheck /> Verified
+            </span>
+          )}
           {isOwn && !editing && (
             <div className="own-post-actions">
               <button className="icon-action" onClick={() => setEditing(true)} aria-label="Edit post" title="Edit">
@@ -285,7 +280,6 @@ function QuestionCard({
                 key={a.id}
                 comment={a}
                 depth={0}
-                currentUser={currentUser}
                 myVotes={myVotes}
                 onVote={onVote}
                 onReply={(parentId, body) => onAddReply(question.id, parentId, body)}
@@ -301,9 +295,11 @@ function QuestionCard({
 }
 
 export default function CommunityPage() {
-  const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
-  const [storedQuestions, setQuestions] = useLocalState<CommunityQuestion[]>('mitra_community', seedQuestions)
-  const [myVotes, setMyVotes] = useLocalState<Votes>('mitra_community_votes', {})
+  const [questions, setQuestions] = useState<CommunityQuestion[]>([])
+  const [myVotes, setMyVotes] = useState<Votes>({})
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [sort, setSort] = useState<SortMode>('top')
   const [interest, setInterest] = useState('All')
   const [query, setQuery] = useState('')
@@ -312,83 +308,82 @@ export default function CommunityPage() {
   const [newBody, setNewBody] = useState('')
   const [newTags, setNewTags] = useState<string[]>([])
 
-  const questions = storedQuestions.map((q) => ({ ...q, answers: q.answers.map(normalizeComment) }))
+  const refresh = useCallback(async () => {
+    try {
+      const feed = await communityApi.list()
+      setQuestions(feed.questions)
+      setMyVotes(feed.myVotes)
+      setLoadError(null)
+      // Notifications (and the sidebar's unread count) read this cached copy.
+      try {
+        localStorage.setItem('mitra_community', JSON.stringify(feed.questions))
+        localStorage.setItem('mitra_community_votes', JSON.stringify(feed.myVotes))
+      } catch {}
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Couldn't load the community.")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  function showError(e: unknown, fallback: string) {
+    setActionError(e instanceof Error ? e.message : fallback)
+    setTimeout(() => setActionError(null), 5000)
+  }
+
+  // Runs a write, shows its error briefly if it fails, and reloads the feed either way.
+  async function run(action: () => Promise<unknown>) {
+    try {
+      await action()
+    } catch (e) {
+      showError(e, 'Something went wrong. Please try again.')
+    }
+    await refresh()
+  }
 
   function vote(id: string, dir: 1 | -1) {
     const current = myVotes[id] ?? 0
     const next = current === dir ? 0 : dir
-    const delta = next - current
+    // Optimistic: update the count now, then confirm with the server.
     setMyVotes((prev) => {
       const copy = { ...prev }
       if (next === 0) delete copy[id]
       else copy[id] = next
       return copy
     })
-    setQuestions((prev) => applyDelta(prev, id, delta))
+    setQuestions((prev) => applyDelta(prev, id, next - current))
+    communityApi.vote(id, next).catch((e) => {
+      showError(e, "Your vote wasn't saved.")
+      refresh()
+    })
   }
 
-  function newComment(id: string, body: string): CommunityComment {
-    return {
-      id,
-      author: profile.name,
-      initials: profile.initials,
-      time: 'Just now',
-      body: body.trim(),
-      votes: 0,
-      replies: [],
-    }
-  }
+  const addAnswer = (questionId: string, body: string) => run(() => communityApi.comment(questionId, body.trim()))
+  const addReply = (questionId: string, parentId: string, body: string) =>
+    run(() => communityApi.comment(questionId, body.trim(), parentId))
+  const editComment = (_questionId: string, id: string, body: string) => run(() => communityApi.editComment(id, body.trim()))
+  const deleteComment = (_questionId: string, id: string) => run(() => communityApi.deleteComment(id))
+  const editQuestion = (questionId: string, title: string, body: string) => run(() => communityApi.editPost(questionId, title, body))
+  const deleteQuestion = (questionId: string) => run(() => communityApi.deletePost(questionId))
 
-  function updateAnswers(questionId: string, fn: (answers: CommunityComment[]) => CommunityComment[]) {
-    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, answers: fn(q.answers) } : q)))
-  }
-
-  function addAnswer(questionId: string, body: string) {
-    const answer = newComment(`${questionId}-a-${Date.now()}`, body)
-    updateAnswers(questionId, (answers) => [...answers, answer])
-  }
-
-  function addReply(questionId: string, parentId: string, body: string) {
-    const reply = newComment(`${parentId}-r-${Date.now()}`, body)
-    updateAnswers(questionId, (answers) => mapComment(answers, parentId, (c) => ({ ...c, replies: [...(c.replies ?? []), reply] })))
-  }
-
-  function editComment(questionId: string, id: string, body: string) {
-    updateAnswers(questionId, (answers) => mapComment(answers, id, (c) => ({ ...c, body: body.trim(), edited: true })))
-  }
-
-  function deleteComment(questionId: string, id: string) {
-    updateAnswers(questionId, (answers) => removeComment(answers, id))
-  }
-
-  function postQuestion() {
+  async function postQuestion() {
     if (!newTitle.trim() || !newBody.trim()) return
-    const q: CommunityQuestion = {
-      id: `q-${Date.now()}`,
-      title: newTitle.trim(),
-      body: newBody.trim(),
-      tags: newTags,
-      author: profile.name,
-      initials: profile.initials,
-      time: 'Just now',
-      votes: 0,
-      answers: [],
+    try {
+      await communityApi.create(newTitle.trim(), newBody.trim(), newTags)
+    } catch (e) {
+      // Keep the draft so nothing typed is lost when the server refuses it.
+      showError(e, "Your question wasn't posted.")
+      return
     }
-    setQuestions((prev) => [q, ...prev])
     setNewTitle('')
     setNewBody('')
     setNewTags([])
     setComposerOpen(false)
-  }
-
-  function editQuestion(questionId: string, title: string, body: string) {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, title, body, edited: true } : q)),
-    )
-  }
-
-  function deleteQuestion(questionId: string) {
-    setQuestions((prev) => prev.filter((q) => q.id !== questionId))
+    await refresh()
   }
 
   const searching = query.trim().length > 0
@@ -493,12 +488,26 @@ export default function CommunityPage() {
         </button>
       </div>
 
+      {actionError && (
+        <p className="community-error" role="alert">
+          {actionError}
+        </p>
+      )}
+
       <div className="community-list">
+        {loading && <p className="view-sub">Loading questions…</p>}
+        {!loading && loadError && (
+          <div className="community-error" role="alert">
+            <span>{loadError}</span>
+            <button className="text-button" onClick={() => refresh()}>
+              Try again
+            </button>
+          </div>
+        )}
         {visible.map((q) => (
           <QuestionCard
             key={q.id}
             question={q}
-            currentUser={profile.name}
             myVotes={myVotes}
             onVote={vote}
             onAddAnswer={addAnswer}
@@ -509,8 +518,8 @@ export default function CommunityPage() {
             onDelete={deleteQuestion}
           />
         ))}
-        {visible.length === 0 && (
-          <p className="view-sub">{searching ? `No questions match "${query.trim()}".` : 'No questions here yet.'}</p>
+        {!loading && !loadError && visible.length === 0 && (
+          <p className="view-sub">{searching ? `No questions match "${query.trim()}".` : 'No questions here yet. Be the first to ask!'}</p>
         )}
       </div>
     </div>

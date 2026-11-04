@@ -137,6 +137,12 @@ export default function LoginPage() {
         </label>
         <p className="field-note">We&apos;ll email a one-time code to your learner email — no password needed.</p>
         {error && <p className="field-error">{error}</p>}
+        {/disabled/i.test(error) && (
+          <p className="field-note appeal-hint">
+            Think this is a mistake?{' '}
+            <Link href={`/appeal?id=${encodeURIComponent(identifier.trim())}`}>Send an appeal to the MITra team</Link>
+          </p>
+        )}
         <Button className="auth-submit" size="lg" type="submit" disabled={loading}>
           {loading ? 'Sending code…' : 'Send sign-in code'} <ArrowUpRight data-icon="inline-end" />
         </Button>
