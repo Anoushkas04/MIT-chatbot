@@ -1,3 +1,4 @@
+import datetime
 from typing import Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends, Header
@@ -5,42 +6,11 @@ from app.database import SessionLocal
 from app import models
 
 
-def require_admin_user(authorization: Optional[str] = Header(None)):
-    """Backend RBAC Guard: Requires valid System Administrator token for all /api/admin/* endpoints."""
-    if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication token required. Please sign in as System Administrator."
-        )
-
-    token = authorization.replace("Bearer ", "").strip()
-
-    if token in ["token_demo_student", "token_demo_faculty", "token_demo_parent", "token_demo_admin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Access Denied: You do not have System Administrator privileges."
-        )
-
-    # Real session token: must belong to an active admin account
-    from app.routers.auth_router import resolve_user_id
-    user_id = resolve_user_id(token)
-    db = SessionLocal()
-    try:
-        admin_user = (
-            db.query(models.User)
-            .filter(models.User.id == user_id, models.User.role == "admin", models.User.status == "active")
-            .first()
-            if user_id
-            else None
-        )
-        if not admin_user:
-            raise HTTPException(
-                status_code=403,
-                detail="Access Denied: System Administrator privileges required."
-            )
-        return True
-    finally:
-        db.close()
+def require_admin_user(authorization: Optional[str] = Header(None)) -> models.User:
+    """RBAC guard for every /api/admin/* endpoint: an active role="admin" account whose
+    email is one of the hard-coded config.ADMIN_ACCOUNTS. Raises 401/403 otherwise."""
+    from app.routers.auth_router import get_current_admin
+    return get_current_admin(authorization)
 
 
 router = APIRouter(
@@ -85,62 +55,29 @@ def get_users():
         db.close()
 
 
-@router.post("/users/toggle-status", summary="Toggle user active/suspended state")
-def toggle_user_status(user_id: str):
+@router.post("/users/toggle-status", summary="Disable or re-enable a student account (blocks sign-in entirely)")
+def toggle_user_status(user_id: str, admin: models.User = Depends(require_admin_user)):
+    # Separate from suspensions (app/safety.py): a disabled account can't sign in at all.
+    from app import audit
+
     db = SessionLocal()
     try:
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
-        user.status = "suspended" if user.status == "active" else "active"
-        user.is_suspended = (user.status == "suspended")
+        if user.role == "admin":
+            raise HTTPException(status_code=400, detail="Admin accounts are fixed in the code and can't be disabled here.")
+        user.status = "disabled" if user.status == "active" else "active"
+        if user.status == "active":
+            # Re-enabled directly: any appeal still waiting is now moot.
+            for ap in db.query(models.AccountAppeal).filter(models.AccountAppeal.user_id == user.id, models.AccountAppeal.status == "pending").all():
+                ap.status, ap.admin_id, ap.decision_note, ap.decided_at = "accepted", admin.id, "Account re-enabled", datetime.datetime.utcnow()
+        audit.record(db, admin, "accounts.disable" if user.status == "disabled" else "accounts.enable",
+                     f"{'Disabled' if user.status == 'disabled' else 'Re-enabled'} the account of {user.name}", "user", user.id)
         db.commit()
         return {"status": "success", "user_id": user.id, "new_status": user.status}
     finally:
         db.close()
-
-
-@router.get("/documents", summary="Get raw knowledge base document status")
-def get_documents():
-    db = SessionLocal()
-    try:
-        docs = db.query(models.KnowledgeDocument).all()
-        if docs:
-            return {
-                "total_documents": len(docs),
-                "documents": [
-                    {
-                        "filename": d.filename,
-                        "type": d.file_type,
-                        "size": d.file_size,
-                        "chunks": d.chunks_count,
-                        "status": d.status,
-                    }
-                    for d in docs
-                ],
-            }
-        return {
-            "total_documents": 6,
-            "documents": [
-                {"filename": "Academic Calendar 25-26_ Final_June30_2025.pdf", "type": "PDF", "size": "313 KB", "chunks": 42, "status": "Indexed & Vectorized"},
-                {"filename": "Academic Calendar 26-27 (1).pdf", "type": "PDF", "size": "298 KB", "chunks": 38, "status": "Indexed & Vectorized"},
-                {"filename": "BTech_Common_Counseling_2026_Cutoff_Rank_Round_2.pdf", "type": "PDF", "size": "145 KB", "chunks": 26, "status": "Indexed & Vectorized"},
-                {"filename": "MTech ME 2026 Cut off Rank.pdf", "type": "PDF", "size": "112 KB", "chunks": 18, "status": "Indexed & Vectorized"},
-                {"filename": "manipal_sce_faculty_cabins.csv", "type": "CSV", "size": "45 KB", "chunks": 64, "status": "Indexed & Vectorized"},
-                {"filename": "mit_manipal_faculty.csv", "type": "CSV", "size": "62 KB", "chunks": 88, "status": "Indexed & Vectorized"},
-            ],
-        }
-    finally:
-        db.close()
-
-
-@router.post("/reindex", summary="Trigger document re-indexing across RAG vector store")
-def trigger_reindex():
-    return {
-        "status": "success",
-        "message": "RAG Document Re-indexing initiated successfully across all PDFs and CSVs in minor_project_docs.",
-        "timestamp": "2026-08-25T09:58:00Z",
-    }
 
 
 @router.get("/violations", summary="Get community content violations and user strike audit log")

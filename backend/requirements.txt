@@ -9,6 +9,7 @@ PyJWT
 psycopg2-binary
 python-multipart
 python-docx
+bcrypt
 
 # Page-aware hybrid RAG.
 PyMuPDF>=1.26,<2
