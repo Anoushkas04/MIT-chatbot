@@ -134,6 +134,29 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .icon-ghost svg { width: 14px; }
 .deadline-card .card-heading button { background: none; border: 0; color: #6b8177; font-size: 10px; }
 
+/* ---- Planner: academic calendar ---- */
+.calendar-grid button.ac-exam { background: #f9ddd5; color: #8a3f2c; }
+.calendar-grid button.ac-holiday { background: #d7ebe8; color: #2f6159; }
+.calendar-grid button.ac-fest { background: #f6ecbf; color: #7a6417; }
+.calendar-grid button.ac-registration { background: #e6e2f6; color: #4f4689; }
+.calendar-grid button.ac-academic { background: #eceeea; color: #4d5a51; }
+.calendar-grid button.ac-day:hover, .calendar-grid button.ac-day.today { background: #234f4a; color: #d8ef68; }
+.academic-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 18px; color: #8a918a; font-size: 9px; }
+.academic-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.academic-legend i { width: 9px; height: 9px; border-radius: 3px; }
+.academic-legend i.ac-exam, .academic-pill.ac-exam { background: #f9ddd5; color: #8a3f2c; }
+.academic-legend i.ac-holiday, .academic-pill.ac-holiday { background: #d7ebe8; color: #2f6159; }
+.academic-legend i.ac-fest, .academic-pill.ac-fest { background: #f6ecbf; color: #7a6417; }
+.academic-legend i.ac-registration, .academic-pill.ac-registration { background: #e6e2f6; color: #4f4689; }
+.academic-legend i.ac-academic, .academic-pill.ac-academic { background: #eceeea; color: #4d5a51; }
+.academic-card { grid-column: 1 / -1; }
+.academic-card h3 { margin: 7px 0 0; }
+.academic-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 16px 0 6px; }
+.academic-filters button { padding: 6px 11px; border: 1px solid #e1e5dd; border-radius: 15px; background: none; color: #78867d; font-size: 10px; }
+.academic-filters button.active { border-color: #234f4a; background: #234f4a; color: #d8ef68; }
+.deadline.academic-row time { width: 78px; flex: 0 0 78px; }
+.academic-pill { flex: 0 0 auto; padding: 4px 8px; border-radius: 5px; font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+
 /* ---- Utilities hub + sub-sections ---- */
 .utility-hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 13px; margin-top: 38px; }
 .utility-hub-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 20px; border: 1px solid #e3e6df; border-radius: 15px; background: #fff; text-align: left; }

@@ -3,11 +3,39 @@
 import { useState } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  ACADEMIC_YEAR_LABEL,
+  academicEventsBetween,
+  academicEventsOn,
+  academicKindLabels,
+  academicKindPriority,
+  formatAcademicRange,
+  type AcademicEvent,
+  type AcademicEventKind,
+} from '@/lib/academic-calendar'
 import { defaultPlannerTasks, type PlannerTask } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
 const weekLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const categories = ['Academic', 'Event', 'Important', 'Personal']
+const academicFilters: Array<AcademicEventKind | 'all'> = ['all', 'exam', 'holiday', 'fest', 'registration', 'academic']
+
+function topKind(events: AcademicEvent[]): AcademicEventKind | null {
+  return academicKindPriority.find((k) => events.some((e) => e.kind === k)) ?? null
+}
+
+function AcademicRow({ event }: { event: AcademicEvent }) {
+  return (
+    <div className="deadline academic-row">
+      <time>{formatAcademicRange(event)}</time>
+      <div>
+        <strong>{event.title}</strong>
+        {event.note && <span>{event.note}</span>}
+      </div>
+      <span className={`academic-pill ac-${event.kind}`}>{academicKindLabels[event.kind]}</span>
+    </div>
+  )
+}
 
 function pad(n: number) {
   return n.toString().padStart(2, '0')
@@ -32,6 +60,7 @@ export default function PlannerPage() {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(todayIso)
   const [category, setCategory] = useState(categories[0])
+  const [academicFilter, setAcademicFilter] = useState<AcademicEventKind | 'all'>('all')
 
   const year = viewMonth.getFullYear()
   const month = viewMonth.getMonth()
@@ -40,6 +69,10 @@ export default function PlannerPage() {
   const monthLabel = viewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   const taskDates = new Set(tasks.map((t) => t.date))
+  const monthAcademic = academicEventsBetween(toIso(year, month, 1), toIso(year, month, totalDays))
+  const filteredMonthAcademic =
+    academicFilter === 'all' ? monthAcademic : monthAcademic.filter((e) => e.kind === academicFilter)
+  const selectedAcademic = selectedDate ? academicEventsOn(selectedDate) : []
 
   function changeMonth(delta: number) {
     setViewMonth(new Date(year, month + delta, 1))
@@ -126,13 +159,34 @@ export default function PlannerPage() {
             {Array.from({ length: totalDays }, (_, i) => {
               const day = i + 1
               const iso = toIso(year, month, day)
-              const classes = [iso === todayIso ? 'today' : '', taskDates.has(iso) ? 'has-event' : '', iso === selectedDate ? 'selected' : ''].filter(Boolean).join(' ')
+              const dayAcademic = academicEventsOn(iso)
+              const kind = topKind(dayAcademic.filter((e) => !e.listOnly))
+              const classes = [
+                iso === todayIso ? 'today' : '',
+                taskDates.has(iso) ? 'has-event' : '',
+                iso === selectedDate ? 'selected' : '',
+                kind ? `ac-day ac-${kind}` : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
               return (
-                <button key={iso} className={classes} onClick={() => setSelectedDate(iso === selectedDate ? null : iso)}>
+                <button
+                  key={iso}
+                  className={classes}
+                  title={dayAcademic.map((e) => e.title).join(' · ') || undefined}
+                  onClick={() => setSelectedDate(iso === selectedDate ? null : iso)}
+                >
                   {day}
                 </button>
               )
             })}
+          </div>
+          <div className="academic-legend">
+            {academicKindPriority.map((k) => (
+              <span key={k}>
+                <i className={`ac-${k}`} /> {academicKindLabels[k]}
+              </span>
+            ))}
           </div>
         </section>
         <section className="deadline-card">
@@ -147,6 +201,9 @@ export default function PlannerPage() {
               </button>
             )}
           </div>
+          {selectedAcademic.map((e) => (
+            <AcademicRow key={e.id} event={e} />
+          ))}
           {visibleTasks.map((t) => (
             <div className={`deadline ${t.done ? 'done' : ''}`} key={t.id}>
               <time>
@@ -164,7 +221,30 @@ export default function PlannerPage() {
               </button>
             </div>
           ))}
-          {visibleTasks.length === 0 && <p className="view-sub">Nothing here. Add a task to get started.</p>}
+          {visibleTasks.length === 0 && selectedAcademic.length === 0 && (
+            <p className="view-sub">Nothing here. Add a task to get started.</p>
+          )}
+        </section>
+        <section className="deadline-card academic-card">
+          <div className="card-heading">
+            <div>
+              <p className="section-kicker">ACADEMIC CALENDAR {ACADEMIC_YEAR_LABEL}</p>
+              <h3>{monthLabel}</h3>
+            </div>
+          </div>
+          <div className="academic-filters">
+            {academicFilters.map((f) => (
+              <button key={f} className={f === academicFilter ? 'active' : ''} onClick={() => setAcademicFilter(f)}>
+                {f === 'all' ? 'All' : academicKindLabels[f]}
+              </button>
+            ))}
+          </div>
+          {filteredMonthAcademic.map((e) => (
+            <AcademicRow key={e.id} event={e} />
+          ))}
+          {filteredMonthAcademic.length === 0 && (
+            <p className="view-sub">No {academicFilter === 'all' ? '' : `${academicKindLabels[academicFilter].toLowerCase()} `}dates this month.</p>
+          )}
         </section>
       </div>
     </div>
