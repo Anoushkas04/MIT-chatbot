@@ -268,7 +268,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         # Documents are in English: Hindi/Kannada questions are searched in translation
         language = answer_language(req.language, req.message)
         persona = _persona(req.role, me)
-        query = search_query(req.message, language)
+        query = search_query(req.message, language, get_history(req.session_id))
         intent = classify_intent(query)
         query_type = detect_query_type(query)
         faculty_lookup = _safely(lookup_faculty, query)
