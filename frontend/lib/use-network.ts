@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { networkApi, type NetworkSnapshot, type PublicUser } from './api'
 import { NOTIFICATIONS_CHANGED, SERVER_NETWORK_KEY, unreadFromSnapshot } from './notifications'
+import { accountKey, getSession } from './session'
 import { useLocalState } from './use-local-state'
 import { defaultActivity, defaultNetworkPeople, type ActivityEvent, type NetworkPerson, type NetworkStatus } from './mock-data'
 
@@ -33,7 +34,7 @@ export function accountToPerson(u: PublicUser): NetworkPerson {
 
 /** Applies the server's view of my connections to the local list. People without an account
  * (demo entries from earlier versions) are dropped; new suggestions are added. */
-function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPerson[] {
+function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot, me?: string): NetworkPerson[] {
   const server = new Map<string, { user?: PublicUser; status: NetworkStatus }>()
   for (const u of snap.connections) server.set(u.id, { user: u, status: 'connected' })
   for (const u of snap.incoming) server.set(u.id, { user: u, status: 'incoming' })
@@ -41,7 +42,7 @@ function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPer
   for (const id of snap.blocked) server.set(id, { status: 'blocked' })
 
   const seen = new Set<string>()
-  const next = prev.filter((p) => p.accountId).map((p) => {
+  const next = prev.filter((p) => p.accountId && p.accountId !== me).map((p) => {
     seen.add(p.accountId!)
     const s = server.get(p.accountId!)
     if (s) return s.status === p.status ? p : { ...p, status: s.status }
@@ -57,15 +58,18 @@ function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot): NetworkPer
   }
   // Suggestions you haven't dismissed yet; ones already in the list keep their status.
   for (const u of snap.suggested ?? []) {
-    if (!seen.has(u.id) && !server.has(u.id)) next.push(accountToPerson(u))
+    if (!seen.has(u.id) && !server.has(u.id) && u.id !== me) next.push(accountToPerson(u))
   }
   return next
 }
 
 export function useNetworkPeople() {
-  const [people, setPeople] = useLocalState<NetworkPerson[]>('mitra_network', defaultNetworkPeople)
+  const me = getSession()?.user.id
+  // Kept per account: a list saved while someone else was signed in on this browser
+  // would otherwise suggest you to yourself.
+  const [people, setPeople] = useLocalState<NetworkPerson[]>(accountKey('mitra_network'), defaultNetworkPeople)
   // Things other people did that concern you, shown on the Notifications page.
-  const [activity, setActivity] = useLocalState<ActivityEvent[]>('mitra_activity', defaultActivity)
+  const [activity, setActivity] = useLocalState<ActivityEvent[]>(accountKey('mitra_activity'), defaultActivity)
   // Unread private messages from registered students, keyed by network person id
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
@@ -86,14 +90,14 @@ export function useNetworkPeople() {
           ...a.filter((e) => !accepted.some((u) => e.id === `act-acc-${u.id}`)),
         ])
       }
-      return mergeSnapshot(prev, snap)
+      return mergeSnapshot(prev, snap, me)
     })
     setUnread(unreadFromSnapshot(snap))
     try {
-      localStorage.setItem(SERVER_NETWORK_KEY, JSON.stringify(snap))
+      localStorage.setItem(accountKey(SERVER_NETWORK_KEY), JSON.stringify(snap))
     } catch {}
     window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED))
-  }, [setPeople, setActivity])
+  }, [setPeople, setActivity, me])
 
   useEffect(() => {
     sync()
@@ -162,7 +166,7 @@ export function useNetworkPeople() {
 
   return {
     // Only registered students; demo entries saved by earlier versions are hidden until the next sync drops them
-    people: people.filter((p) => p.accountId),
+    people: people.filter((p) => p.accountId && p.accountId !== me),
     setPeople,
     activity,
     unread,

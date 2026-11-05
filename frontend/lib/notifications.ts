@@ -1,6 +1,7 @@
 import type { NetworkSnapshot, ServerNotification } from '@/lib/api'
 import { academicEvents, academicKindLabels, ACADEMIC_YEAR_LABEL } from '@/lib/academic-calendar'
 import { matchTopics } from '@/lib/community-search'
+import { accountKey } from '@/lib/session'
 import {
   defaultActivity,
   defaultNetworkPeople,
@@ -263,12 +264,12 @@ export function unreadFromSnapshot(snap: NetworkSnapshot | null): Record<string,
 export function countUnseenNotifications(): number {
   const profile = readJSON<Profile>('mitra_profile', defaultProfile)
   const list = buildNotifications({
-    people: readJSON('mitra_network', defaultNetworkPeople),
-    activity: readJSON('mitra_activity', defaultActivity),
+    people: readJSON(accountKey('mitra_network'), defaultNetworkPeople),
+    activity: readJSON(accountKey('mitra_activity'), defaultActivity),
     questions: readJSON<CommunityQuestion[]>('mitra_community', []),
     myVotes: readJSON('mitra_community_votes', {}),
     me: profile.name,
-    unreadMessages: unreadFromSnapshot(readJSON<NetworkSnapshot | null>(SERVER_NETWORK_KEY, null)),
+    unreadMessages: unreadFromSnapshot(readJSON<NetworkSnapshot | null>(accountKey(SERVER_NETWORK_KEY), null)),
   })
   const seen = new Set([...readJSON<string[]>(READ_KEY, []), ...readJSON<string[]>(SEEN_KEY, [])])
   const server = fromServer(readJSON<ServerNotification[]>(SERVER_KEY, []))

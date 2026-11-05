@@ -36,6 +36,15 @@ export function getSession(): Session | null {
   return s && s.user.role !== 'admin' ? s : null
 }
 
+/**
+ * A storage key for data that belongs to the signed-in student (their network, activity),
+ * so a second account on the same browser doesn't inherit the first one's people.
+ */
+export function accountKey(base: string): string {
+  const id = getSession()?.user.id
+  return id ? `${base}:${id}` : base
+}
+
 export function setSession(session: Session) {
   localStorage.setItem(KEY, JSON.stringify(session))
 }
