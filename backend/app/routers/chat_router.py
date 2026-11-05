@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
+from app.structured_lookup import calendar_evidence, club_evidence
 from app.prompts import build_system_prompt
 from app.providers import GenerationRequest, GenerationResult, generate_answer
 from app.rag.hybrid import hybrid_search
@@ -177,8 +178,17 @@ def merge_evidence(
     *,
     prefer_community: bool,
     limit: int = 4,
+    structured: list[dict] | None = None,
 ) -> list[dict]:
-    """Keep both knowledge partitions represented without crowding out sources."""
+    """Keep both knowledge partitions represented without crowding out sources.
+
+    Structured evidence (calendar entries, club records) goes first; document passages
+    still follow it so the answer can add context.
+    """
+    if structured:
+        rest = merge_evidence(official_matches, community_matches, prefer_community=prefer_community, limit=limit)
+        keys = {m.get("id") for m in structured}
+        return structured + [m for m in rest if m.get("id") not in keys][: max(2, limit - len(structured))]
     if official_matches and community_matches:
         if prefer_community:
             merged = community_matches[:2] + official_matches[:2]
@@ -187,6 +197,40 @@ def merge_evidence(
     else:
         merged = official_matches or community_matches
     return merged[:limit]
+
+
+def _citation(index: int, m: dict, src: str, faculty_lookup: dict | None) -> CitationDetail:
+    """One citation per evidence item ([E<index>]), with where clicking it should go."""
+    text = m.get("text", "")
+    kind, url, title = m.get("kind"), m.get("url"), m.get("source") or src
+    if faculty_lookup:
+        kind = "faculty"
+        people = faculty_lookup.get("records") or []
+        target = people[0]["name"] if faculty_lookup.get("kind") == "person" and people else (people[0]["dept"] if people else "")
+        url = f"/utilities?section=professors&q={quote(target)}"
+        title = "MIT faculty directory"
+    elif str(m.get("source_type", "")).startswith("community"):
+        kind = "community"
+        url = f"/community?q={quote(m.get('post_title') or '')}"
+    elif not kind:
+        kind = "document"
+    if kind == "calendar":
+        title = "Academic Calendar 2026-27"
+    elif kind == "document" and str(src).lower().endswith((".pdf", ".docx", ".csv", ".md", ".txt")):
+        title = re.sub(r"\s+", " ", re.sub(r"\.(pdf|docx|csv|md|txt)$", "", str(src), flags=re.I).replace("_", " ")).strip()
+    return CitationDetail(
+        index=index,
+        source=src,
+        title=title,
+        kind=kind,
+        snippet=text[:280] + ("..." if len(text) > 280 else ""),
+        score=round(float(m.get("score", 0.0)), 3),
+        document_id=m.get("document_id"),
+        page_number=m.get("page_number"),
+        retrieval_method=m.get("retrieval_method"),
+        # A web page (club) or an in-app page; documents open from source + page_number
+        source_url=url,
+    )
 
 
 @router.post("", response_model=ChatResponse, summary="Query the configured AI provider with RAG grounding")
@@ -203,6 +247,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         intent = classify_intent(req.message)
         query_type = detect_query_type(req.message)
         faculty_lookup = lookup_faculty(req.message)
+        structured = [] if faculty_lookup else calendar_evidence(req.message) + club_evidence(req.message)
 
         # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
         if faculty_lookup:
@@ -261,6 +306,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
                 has_community_query_signal
                 or intent == "community_experience"
             ),
+            structured=structured,
         )
 
         # Evaluate Confidence
@@ -348,7 +394,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         citations = []
         sources = []
-        for m in all_matches:
+        for index, m in enumerate(all_matches, start=1):
             src = (
                 m.get("source_file")
                 or m.get("source")
@@ -356,21 +402,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             )
             if src not in sources:
                 sources.append(src)
-            citations.append(
-                CitationDetail(
-                    source=src,
-                    snippet=m.get("text", "")[:280] + ("..." if len(m.get("text", "")) > 280 else ""),
-                    score=round(float(m.get("score", 0.0)), 3),
-                    document_id=m.get("document_id"),
-                    page_number=m.get("page_number"),
-                    retrieval_method=m.get("retrieval_method"),
-                    source_url=(
-                        f"/api/search/page/{quote(str(m['document_id']))}/{int(m['page_number'])}"
-                        if m.get("document_id") and m.get("page_number")
-                        else None
-                    ),
-                )
-            )
+            citations.append(_citation(index, m, src, faculty_lookup))
 
         if not all_matches:
             reply_text = "I couldn't find reliable information about that in the MIT CampusOS official knowledge base."

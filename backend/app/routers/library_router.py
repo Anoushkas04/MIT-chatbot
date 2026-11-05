@@ -13,6 +13,7 @@ from app.config import DOCS_DIR
 from app.llm import embed_query
 from app.rag import index
 from app.rag.loaders import SUPPORTED_EXTENSIONS
+from app.rag.page_loader import NOT_KNOWLEDGE
 from app.routers.admin_dataset import _doc_path, _human
 from app.routers.auth_router import get_current_user
 
@@ -64,7 +65,10 @@ def list_documents(me: models.User = Depends(get_current_user)):
     out = []
     if DOCS_DIR.exists():
         for p in sorted(DOCS_DIR.iterdir(), key=lambda x: x.name.lower()):
-            if not p.is_file() or p.name.startswith(".") or p.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            if (
+                not p.is_file() or p.name.startswith(".")
+                or p.suffix.lower() not in SUPPORTED_EXTENSIONS or p.name in NOT_KNOWLEDGE
+            ):
                 continue
             stat = p.stat()
             out.append({

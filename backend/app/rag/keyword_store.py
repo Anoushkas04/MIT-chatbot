@@ -1,14 +1,10 @@
-import re
 from functools import lru_cache
 
 import numpy as np
 from rank_bm25 import BM25Okapi
 
 from app.rag.store import get_store
-
-
-def _tokens(value: str) -> list[str]:
-    return [token for token in re.findall(r"[a-z0-9]+", value.lower()) if len(token) > 1]
+from app.rag.text_norm import index_tokens as _tokens
 
 
 class KeywordStore:

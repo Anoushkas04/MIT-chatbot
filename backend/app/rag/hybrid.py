@@ -6,6 +6,7 @@ from app.llm import embed_query
 from app.rag.keyword_store import get_keyword_store
 from app.rag.metadata import normalize_department
 from app.rag.store import get_store
+from app.rag.text_norm import expand_query
 from app.rag.visual_store import _metadata_tokens, get_visual_store
 
 
@@ -33,6 +34,11 @@ QUERY_REWRITES = {
     "how many student clubs": "total clubs",
 }
 
+# Older editions of a document, ranked lower unless the question names their year.
+SUPERSEDED_SOURCES = {
+    "Academic Calendar 25-26_ Final_June30_2025.pdf": ("2025", "25-26", "2025-26", "last year"),
+}
+
 MONTH_NUMBERS = {
     "january": 1, "february": 2, "march": 3, "april": 4,
     "may": 5, "june": 6, "july": 7, "august": 8,
@@ -50,6 +56,12 @@ CONTENT_STOPWORDS = {
 }
 
 
+def _superseded(source_name: str, query: str) -> bool:
+    """An older edition the question didn't ask for ("not 2025-26" doesn't count as asking)."""
+    markers = SUPERSEDED_SOURCES.get(source_name)
+    return bool(markers) and not any(m in _positive_query(query).lower() for m in markers)
+
+
 def _expanded_query(query: str) -> str:
     normalized = " ".join(query.lower().split())
     additions = {
@@ -62,7 +74,7 @@ def _expanded_query(query: str) -> str:
         for phrase, replacement in QUERY_REWRITES.items()
         if phrase in normalized
     )
-    return f"{query} {' '.join(sorted(additions))}".strip()
+    return expand_query(f"{query} {' '.join(sorted(additions))}".strip())
 
 
 def _key(record: dict) -> str:
@@ -234,6 +246,8 @@ def hybrid_search(
             weight += min(metadata_matches, 5) * 0.25
             weight += _context_score(record, department, academic_year, semester) * 0.35
             weight += _record_query_priority(record, query) * 0.4
+            if _superseded(source_name, query):
+                weight *= 0.4
             fused_scores[key] += weight / (60 + rank)
             methods[key].add(method)
             if key not in records or float(record.get("score", 0)) > float(records[key].get("score", 0)):
@@ -324,6 +338,7 @@ def hybrid_search(
             key == promoted_metadata,
             key == promoted_visual,
             bool(methods[key].intersection({"bm25", "dense"})),
+            not _superseded(str(records[key].get("source_file") or records[key].get("source", "")), query),
             _record_query_priority(records[key], query),
             _context_score(records[key], department, academic_year, semester),
             _content_match_score(query, records[key]),

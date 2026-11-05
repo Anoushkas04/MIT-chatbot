@@ -103,6 +103,7 @@ def search_dataset_posts(user_query: str, db, limit: int = 3) -> list:
         results.append({
             "source": f"MITra Community{' (verified)' if p.verified else ''}: '{p.title.strip()}'",
             "source_type": "community_verified" if p.verified else "community",
+            "post_title": p.title.strip(),
             "text": text,
             "score": round(score, 2),
         })

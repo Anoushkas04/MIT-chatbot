@@ -332,7 +332,7 @@ export const clubs: Club[] = [
     category: 'Non-technical',
     description: "Kalakriya, the Indian classical fine arts club at Manipal Institute of Technology, is dedicated to preserving and promoting the rich heritage of Indian classical music and dance. Through vibrant performances, competitions, and weekly temple events, Kalakriya provides a platform for students to showcase their talents and immerse themselves in cultural traditions.",
     emails: ["kalakriya.mit@manipal.edu"],
-    url: "https://www.manipal.edu/mit/mit-experience/student-welfare/non-technical-clubs/180-degree-consulting----mit--manipal-academy-of-higher-educatio.html",
+    url: null, // the source links this club to another club's page
   },
   {
     id: "club-leaders-of-tomorrow",
@@ -364,7 +364,7 @@ export const clubs: Club[] = [
     category: 'Non-technical',
     description: "The aim of MIT Radio Club is to provide a plaIorm for students to express themselves creatively through broadcasting via the online radio station, Station 57 . The objectives are\n\nTo serve as a bridge between the college authorities and the students. It will provide information about campus events and community news.\n\nThe club aims to create an inclusive and diverse space where students from various backgrounds can share their perspectives and voices. This will promote a sense of unity and understanding on campus.\n\nPlan to oﬀer entekainment and relaxation for both members and listeners. They provide an escape from the stresses of academic life and oﬀer a plaIorm for students to unwind and enjoy their favourite music or content.\n\nTo provide oppokunities for members to develop leadership skills and gain practical experience in event planning and organisation.\n\nTo uphold the principles of this constitution and the rules and regulations of the college at all times.\n\nTo foster a sense of community and belonging among members by organising social events, mentoring programs, and other initiatives that promote camaraderie and friendship among members.",
     emails: ["mitstation57@manipal.edu"],
-    url: "https://www.manipal.edu/mit/mit-experience/student-welfare/non-technical-clubs/the-psych-club---mit--manipal-academy-of-higher-education.html",
+    url: null, // the source links this club to another club's page
   },
   {
     id: "club-mudra-imprint",

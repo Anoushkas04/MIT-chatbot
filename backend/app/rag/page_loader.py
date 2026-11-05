@@ -7,6 +7,10 @@ from app.rag.chunker import chunk_text
 from app.rag.manifest import document_id
 from app.rag.metadata import infer_document_metadata, normalize_department
 
+# Files kept in the documents folder that aren't campus knowledge: the project's own
+# synopsis describes the chatbot, so citing it as an MIT source would be wrong.
+NOT_KNOWLEDGE = {"minor_project_synopsys.pdf"}
+
 
 def load_corpus(
     docs_dir: Path,
@@ -23,7 +27,10 @@ def load_corpus(
     if render_images:
         image_dir.mkdir(parents=True, exist_ok=True)
 
-    for path in sorted(item for item in docs_dir.iterdir() if item.is_file() and not item.name.startswith(".")):
+    for path in sorted(
+        item for item in docs_dir.iterdir()
+        if item.is_file() and not item.name.startswith(".") and item.name not in NOT_KNOWLEDGE
+    ):
         suffix = path.suffix.lower()
         if suffix == ".pdf":
             pdf_pages, pdf_chunks = _load_pdf(path, image_dir, render_images, render_dpi, visual_scope)

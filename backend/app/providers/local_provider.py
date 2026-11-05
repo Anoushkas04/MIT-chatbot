@@ -14,6 +14,28 @@ class LocalProvider(Provider):
         sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", clean)
         return [sentence.strip() for sentence in sentences if len(sentence.strip()) >= 20]
 
+    @staticmethod
+    def _structured_answer(evidence: list[dict]) -> str | None:
+        """Calendar entries and club records are already the answer: list them as-is."""
+        calendar = [(i, e) for i, e in enumerate(evidence, start=1) if e.get("retrieval_method") == "structured_calendar"]
+        if calendar:
+            index, item = calendar[0]
+            lines = [line for line in str(item.get("text", "")).splitlines() if line.startswith("- ")]
+            return "From the Academic Calendar 2026-27:\n" + "\n".join(lines) + f" [E{index}]"
+        clubs = [(i, e) for i, e in enumerate(evidence, start=1) if e.get("retrieval_method") == "structured_clubs"]
+        if not clubs:
+            return None
+        if len(clubs) == 1 and clubs[0][1].get("kind") != "club":  # the full list
+            index, item = clubs[0]
+            return str(item.get("text", "")) + f" [E{index}]"
+        lines = []
+        for index, item in clubs:
+            text = str(item.get("text", ""))
+            head, _, rest = text.partition(". ")
+            summary = LocalProvider._sentences(rest)[:1]
+            lines.append(f"- {head}. {summary[0] if summary else ''} [E{index}]".rstrip())
+        return "These official MIT clubs match:\n" + "\n".join(lines)
+
     def generate(self, request: GenerationRequest) -> GenerationResult:
         if request.evidence and request.evidence[0].get("image_path") and not request.evidence[0].get("text"):
             return GenerationResult(
@@ -24,6 +46,9 @@ class LocalProvider(Provider):
                 provider=self.name,
                 model=self.model,
             )
+        structured = self._structured_answer(request.evidence)
+        if structured:
+            return GenerationResult(text=structured, provider=self.name, model=self.model)
         terms = {
             word for word in re.findall(r"[a-z0-9]+", request.question.lower())
             if len(word) > 2 and word not in {"what", "where", "when", "which", "with", "the", "for"}

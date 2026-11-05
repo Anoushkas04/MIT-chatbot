@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import type { CommunityComment, CommunityQuestion } from '@/lib/mock-data'
 import { MIN_RELEVANCE, matchTopics, scoreQuestion } from '@/lib/community-search'
@@ -295,6 +296,16 @@ function QuestionCard({
 }
 
 export default function CommunityPage() {
+  return (
+    <Suspense fallback={null}>
+      <CommunityInner />
+    </Suspense>
+  )
+}
+
+function CommunityInner() {
+  // Chat citations link here with ?q=<post title>
+  const params = useSearchParams()
   const [questions, setQuestions] = useState<CommunityQuestion[]>([])
   const [myVotes, setMyVotes] = useState<Votes>({})
   const [loading, setLoading] = useState(true)
@@ -302,7 +313,7 @@ export default function CommunityPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [sort, setSort] = useState<SortMode>('top')
   const [interest, setInterest] = useState('All')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(params.get('q') ?? '')
   const [composerOpen, setComposerOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newBody, setNewBody] = useState('')

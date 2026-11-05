@@ -3,7 +3,10 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class CitationDetail(BaseModel):
-    source: str
+    index: int = 0  # the [E<index>] marker in the answer text
+    source: str  # document file name, or a label for non-document evidence
+    title: str = ""  # readable name to show
+    kind: str = "document"  # document | calendar | club | faculty | community
     snippet: str
     score: float
     document_id: Optional[str] = None

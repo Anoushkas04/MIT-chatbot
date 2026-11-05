@@ -91,7 +91,10 @@ def test_chat_contract_returns_grounded_answer_and_page_citation(chat_router, mo
     assert body["provider"] == "local"
     assert body["sources"] == ["policy.pdf"]
     assert body["citations"][0]["page_number"] == 2
-    assert body["citations"][0]["source_url"] == "/api/search/page/policy%202024/2"
+    # Documents open from their file name and page; source_url is only for web or in-app pages
+    assert body["citations"][0]["index"] == 1
+    assert body["citations"][0]["kind"] == "document"
+    assert body["citations"][0]["source_url"] is None
     assert body["verification_warnings"] == []
 
 

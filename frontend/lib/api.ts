@@ -34,9 +34,21 @@ export type OtpSentResponse = {
   expires_in_seconds: number
 }
 
+// One piece of evidence the answer was built from; the answer cites it as [E<index>].
+export type ChatCitation = {
+  index: number
+  source: string // document file name, or a label for non-document evidence
+  title: string
+  kind: 'document' | 'calendar' | 'club' | 'faculty' | 'community'
+  snippet: string
+  page_number: number | null
+  source_url: string | null // a web page (club) or an in-app page; documents open by name
+}
+
 export type ChatResponse = {
   text: string
   sources: string[]
+  citations?: ChatCitation[]
   confidence: string
   confidence_type: string
 }
@@ -685,5 +697,26 @@ export const libraryApi = {
     a.download = name
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+  },
+  /**
+   * Opens a document in a new tab, at `page` for PDFs. The tab is opened before the
+   * authenticated fetch so popup blockers treat it as part of the click.
+   */
+  async open(name: string, page?: number | null) {
+    const tab = window.open('', '_blank')
+    try {
+      const token = getSession()?.token
+      if (!token) throw new ApiError('Please sign in to do this.', 401)
+      const res = await fetch(`${API_BASE}/api/documents/${encodeURIComponent(name)}/download`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) throw new ApiError(res.status === 404 ? 'That document is no longer available.' : `Couldn't open it (${res.status}).`, res.status)
+      const url = URL.createObjectURL(await res.blob())
+      const target = page && name.toLowerCase().endsWith('.pdf') ? `${url}#page=${page}` : url
+      if (tab) tab.location.href = target
+      else window.location.href = target
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) {
+      tab?.close()
+      throw e
+    }
   },
 }

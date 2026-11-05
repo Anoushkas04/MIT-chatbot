@@ -36,13 +36,15 @@ def get_client() -> genai.Client:
 
 
 HASH_EMBED_DIM = 768
+# v2: stopwords removed and light stemming (app/rag/text_norm.py); v1 indexes need a rebuild
+LOCAL_EMBEDDER = "local-hash-v2"
 
 
 def active_embedder() -> str:
     """The embedder a build would use now: Gemini only when enabled AND keyed."""
     if GEMINI_EMBEDDINGS_ENABLED and is_valid_key(GEMINI_API_KEY):
         return f"gemini:{EMBEDDING_MODEL}"
-    return "local-hash"
+    return LOCAL_EMBEDDER
 
 
 
@@ -52,10 +54,11 @@ def _hash_embed(text: str, dim: int = HASH_EMBED_DIM) -> list[float]:
     Improved local embedding using TF-IDF-style unigram + bigram hashing with
     position weighting. Produces much better retrieval than simple unigrams.
     """
-    import re as _re
+    from app.rag.text_norm import index_tokens
+
     vec = np.zeros(dim, dtype=np.float32)
-    # Tokenise: lowercase, keep alphanumeric tokens
-    tokens = _re.findall(r'[a-z0-9]+', text.lower())
+    # Stopwords dropped and plurals folded, so question words don't dominate the vector
+    tokens = index_tokens(text)
     if not tokens:
         return vec.tolist()
 
@@ -91,7 +94,7 @@ def embed_texts_labelled(texts: list[str]) -> tuple[list[list[float]], str]:
     that a failed Gemini call fell back to local vectors."""
     if not GEMINI_EMBEDDINGS_ENABLED or not is_valid_key(GEMINI_API_KEY):
         print("Using local hash embeddings. Set GEMINI_EMBEDDINGS_ENABLED=true and rebuild the index to use Gemini embeddings.")
-        return [_hash_embed(t) for t in texts], "local-hash"
+        return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
     try:
         client = get_client()
         vectors = []
@@ -103,7 +106,7 @@ def embed_texts_labelled(texts: list[str]) -> tuple[list[list[float]], str]:
     except Exception as err:
         print(f"Gemini embedding notice: {err}. Using local feature hash embeddings.")
         # Every text is re-embedded locally, so an index is never a mix of the two.
-        return [_hash_embed(t) for t in texts], "local-hash"
+        return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
 
 
 def _embed_batch_with_retry(client, batch, max_retries=6):

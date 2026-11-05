@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Building2,
@@ -336,7 +337,9 @@ const SCHOOL_SHORT: Record<string, string> = {
 }
 
 function ProfessorsSection() {
-  const [q, setQ] = useState('')
+  // Chat citations link here with ?q=<name or school>
+  const params = useSearchParams()
+  const [q, setQ] = useState(params.get('q') ?? '')
   const [school, setSchool] = useState<string>('all')
   const [shown, setShown] = useState(FACULTY_PAGE)
   const [faculty, setFaculty] = useState<FacultyMember[] | null>(null)
@@ -503,7 +506,16 @@ const sectionComponents: Record<Section, () => React.ReactElement> = {
 }
 
 export default function UtilitiesPage() {
-  const [active, setActive] = useState<Section | null>(null)
+  return (
+    <Suspense fallback={null}>
+      <UtilitiesInner />
+    </Suspense>
+  )
+}
+
+function UtilitiesInner() {
+  const requested = useSearchParams().get('section') as Section | null
+  const [active, setActive] = useState<Section | null>(requested && requested in sectionComponents ? requested : null)
 
   if (active) {
     const SectionComponent = sectionComponents[active]
