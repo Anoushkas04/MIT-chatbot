@@ -90,11 +90,8 @@ def test_l2_selected_corpus_files_are_present_and_readable():
 
 def test_l2_csv_schemas_and_rows_are_usable():
     expected = {
-        "manipal_sce_faculty_cabins.csv": {
-            "id", "name", "designation", "cabin_no", "email", "text", "source",
-        },
-        "mit_manipal_faculty.csv": {
-            "Title", "Department", "Professor Name", "Qualification", "Mail ID",
+        "merged_faculty.csv": {
+            "title/designation", "department", "professor name", "qualification", "mail id", "cabin no.",
         },
     }
     for source_file, required_columns in expected.items():
@@ -134,7 +131,7 @@ def test_l2_real_retrieval_evidence_and_local_answers_pass_all_cases():
     report = run_evaluation()
 
     assert report["network_llm_calls"] == 0
-    assert report["selected_sources"] == 12
+    assert report["selected_sources"] == 11
     assert report["total_cases"] >= 36
     assert report["failures"] == [], json.dumps(report["failures"], indent=2)
     assert report["pass_rate"] == 1.0

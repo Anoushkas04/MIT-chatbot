@@ -26,10 +26,10 @@
 {"id":"text-26","modality":"text","question":"What was the BTech lateral entry round one general cutoff?","expected_source":"BTech Lateral Round 1_General.pdf"}
 {"id":"text-27","modality":"text","question":"What was the BTech lateral entry round two SAGES cutoff?","expected_source":"BTech Lateral Round 2_SAGES CUT OFF RANK.pdf"}
 {"id":"text-28","modality":"text","question":"Which student clubs are listed?","expected_source":"clubs.pdf"}
-{"id":"csv-01","modality":"csv","question":"Which cabin is assigned to a School of Computer Engineering faculty member?","expected_source":"manipal_sce_faculty_cabins.csv"}
-{"id":"csv-02","modality":"csv","question":"List faculty in the School of Computer Engineering.","expected_source":"manipal_sce_faculty_cabins.csv"}
-{"id":"csv-03","modality":"csv","question":"What faculty qualifications are listed for MIT Manipal?","expected_source":"mit_manipal_faculty.csv"}
-{"id":"csv-04","modality":"csv","question":"Find a faculty member by department and designation.","expected_source":"mit_manipal_faculty.csv"}
+{"id":"csv-01","modality":"csv","question":"Which cabin is assigned to a School of Computer Engineering faculty member?","expected_source":"merged_faculty.csv"}
+{"id":"csv-02","modality":"csv","question":"List faculty in the School of Computer Engineering.","expected_source":"merged_faculty.csv"}
+{"id":"csv-03","modality":"csv","question":"What faculty qualifications are listed for MIT Manipal?","expected_source":"merged_faculty.csv"}
+{"id":"csv-04","modality":"csv","question":"Find a faculty member by department and designation.","expected_source":"merged_faculty.csv"}
 {"id":"visual-01","modality":"visual","question":"What dates are shown in the 2025-26 academic calendar?","expected_source":"Academic Calendar 25-26_ Final_June30_2025.pdf"}
 {"id":"visual-02","modality":"visual","question":"What dates are shown in the 2026-27 academic calendar?","expected_source":"Academic Calendar 26-27 (1).pdf"}
 {"id":"visual-03","modality":"visual","question":"What are the first year computer science BTech subjects for 2026?","expected_source":"First year CS 2026 B.Tech.pdf"}
