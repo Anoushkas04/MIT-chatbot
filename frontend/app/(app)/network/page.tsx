@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Ban, Flag, Lock, MoreHorizontal, Search, Send, X } from 'lucide-react'
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog'
 import { NetworkPersonCard } from '@/components/network-person-card'
@@ -74,6 +75,11 @@ function ReportPanel({
           </button>
         ))}
       </div>
+      <p className="guidelines-note">
+        <Link href="/guidelines" target="_blank">
+          What breaks the Community Guidelines
+        </Link>
+      </p>
       <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tell us more in your own words (optional)" maxLength={1000} />
       <p className="report-privacy">
         <Lock /> Reports never include your messages, only the reason you choose and anything you write here.{' '}
@@ -463,6 +469,13 @@ export default function NetworkPage() {
                     <Send />
                   </button>
                 </div>
+                <p className="guidelines-note dm-guidelines">
+                  Chats follow the{' '}
+                  <Link href="/guidelines#privacy" target="_blank">
+                    Community Guidelines
+                  </Link>
+                  .
+                </p>
               </>
             )}
           </div>

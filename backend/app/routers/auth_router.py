@@ -18,6 +18,7 @@ from app.schemas import (
     LoginVerifyOTPRequest,
 )
 from app.email_service import send_otp_email
+from app.moderation_engine import COMMUNITY_GUIDELINES_VERSION
 from app.public_profile import parse_entries
 from app.supabase_auth import (
     send_supabase_email_otp,
@@ -434,6 +435,8 @@ def register_send_otp(req: RegisterSendOTPRequest):
 
 @router.post("/register-verify-otp", summary="Verify signup OTP and create the student account")
 def register_verify_otp(req: RegisterVerifyOTPRequest):
+    if not req.agreed_terms:
+        raise HTTPException(status_code=400, detail="Please agree to the Community Guidelines to create an account.")
     name = req.name.strip()
     lid = req.learner_id.strip().lower()
     reg_no = req.registration_number.strip()
@@ -462,7 +465,7 @@ def register_verify_otp(req: RegisterVerifyOTPRequest):
             rewards_points=50,
             avatar_icon="🎓",
             agreed_terms=True,
-            terms_version="v1.0-2026",
+            terms_version=req.terms_version.strip() or COMMUNITY_GUIDELINES_VERSION,
             terms_accepted_at=datetime.datetime.utcnow(),
             status="active",
         )

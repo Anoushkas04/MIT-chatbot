@@ -570,3 +570,31 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .chat-source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-source small { color: #9aa39b; font-size: 9px; white-space: nowrap; }
 @media (max-width: 520px) { .chat-source { grid-template-columns: 18px 14px 1fr; } .chat-source small { display: none; } }
+
+/* ---- Community Guidelines page ---- */
+.guidelines-shell { min-height: 100vh; max-width: 860px; margin: auto; padding: 32px 16px 60px; background: #f8f8f5; }
+.guidelines-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+.guidelines-head h1 { margin: 12px 0 10px; color: #234f4a; font-size: 34px; font-weight: 500; letter-spacing: -.05em; }
+.guidelines-head .view-sub { line-height: 1.6; }
+.guidelines-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 28px; }
+.guidelines-toc a { padding: 6px 11px; border: 1px solid #dde3da; border-radius: 20px; background: #fff; color: #53766f; font-size: 11px; }
+.guidelines-toc a:hover { border-color: #234f4a; color: #234f4a; }
+.guidelines-list { display: flex; flex-direction: column; gap: 12px; }
+.guidelines-section { scroll-margin-top: 20px; }
+.guidelines-section h2 { margin: 6px 0 8px; color: #234f4a; font-size: 18px; font-weight: 600; }
+.guidelines-intro { margin: 0 0 8px; color: #6f7a72; font-size: 12px; }
+.guidelines-section li { display: list-item; }
+.guidelines-section ul { margin: 0; padding-left: 18px; list-style: disc; color: #3f5049; font-size: 13px; line-height: 1.7; }
+.guidelines-section:target { border-color: #7ea59b; box-shadow: 0 0 0 3px #7ea59b25; }
+.guidelines-foot { margin-top: 26px; line-height: 1.6; }
+.guidelines-link { color: #53766f; text-decoration: underline; text-underline-offset: 2px; }
+.guidelines-note { margin: 6px 0 0; color: #8a948c; font-size: 10px; }
+.guidelines-note a { color: #53766f; text-decoration: underline; }
+.signup-agree { flex-direction: row !important; align-items: flex-start; gap: 9px !important; font-weight: 500 !important; line-height: 1.5; }
+.signup-agree input { flex: 0 0 16px; width: 16px; height: 16px !important; margin-top: 1px; padding: 0 !important; appearance: none; border: 1.5px solid #9aa79d !important; border-radius: 4px !important; background: #fff !important; cursor: pointer; display: grid; place-items: center; }
+.signup-agree input:checked { border-color: #234f4a !important; background: #234f4a !important; }
+.signup-agree input:checked::after { content: ''; width: 4px; height: 8px; margin-top: -2px; border: solid #d8ef68; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.signup-agree input:focus-visible { box-shadow: 0 0 0 3px #7ea59b40 !important; }
+.signup-agree a { color: #e07b64; text-decoration: underline; }
+@media (max-width: 520px) { .guidelines-head h1 { font-size: 27px; } }
+.dm-guidelines { margin: 0 14px 10px; text-align: center; }

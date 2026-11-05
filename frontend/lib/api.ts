@@ -117,6 +117,8 @@ export function registerVerifyOtp(body: {
   registration_number: string
   learner_id: string
   otp_code: string
+  agreed_terms: boolean
+  terms_version: string
 }) {
   return post<AuthResponse>('/api/auth/register-verify-otp', body)
 }

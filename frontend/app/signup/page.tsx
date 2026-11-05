@@ -7,6 +7,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AuthFrame } from '@/components/auth-frame'
 import { registerSendOtp, registerVerifyOtp } from '@/lib/api'
+import { GUIDELINES_VERSION } from '@/lib/community-guidelines'
 import { startSession } from '@/lib/session'
 import { RESEND_COOLDOWN_SECONDS, useCountdown } from '@/lib/use-countdown'
 
@@ -18,6 +19,7 @@ export default function SignupPage() {
   const [name, setName] = useState('')
   const [learnerId, setLearnerId] = useState('')
   const [regNumber, setRegNumber] = useState('')
+  const [agreed, setAgreed] = useState(false)
   const [otp, setOtp] = useState('')
   const [testOtp, setTestOtp] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
@@ -41,6 +43,10 @@ export default function SignupPage() {
     e.preventDefault()
     if (!name.trim() || !learnerId.trim() || !regNumber.trim()) {
       setError('Fill in every field to continue.')
+      return
+    }
+    if (!agreed) {
+      setError('Please agree to the Community Guidelines to create an account.')
       return
     }
     if (!learnerId.trim().toLowerCase().endsWith(LEARNER_DOMAIN)) {
@@ -74,7 +80,7 @@ export default function SignupPage() {
     setError('')
     setLoading(true)
     try {
-      startSession(await registerVerifyOtp({ ...details(), otp_code: otp }))
+      startSession(await registerVerifyOtp({ ...details(), otp_code: otp, agreed_terms: agreed, terms_version: GUIDELINES_VERSION }))
       router.replace('/home')
     } catch (err) {
       setError((err as Error).message)
@@ -174,8 +180,18 @@ export default function SignupPage() {
         <p className="field-note">
           Use your verified Manipal learner ID. We&apos;ll email you a one-time code before your account is activated.
         </p>
+        <label className="signup-agree">
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <span>
+            I agree to the{' '}
+            <a href="/guidelines" target="_blank" rel="noopener">
+              Community Guidelines
+            </a>
+            .
+          </span>
+        </label>
         {error && <p className="field-error">{error}</p>}
-        <Button className="auth-submit" size="lg" type="submit" disabled={loading}>
+        <Button className="auth-submit" size="lg" type="submit" disabled={loading || !agreed}>
           {loading ? 'Sending OTP…' : 'Create account'} <ArrowUpRight data-icon="inline-end" />
         </Button>
       </form>

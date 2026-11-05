@@ -62,6 +62,8 @@ class RegisterVerifyOTPRequest(BaseModel):
     registration_number: str
     learner_id: str
     otp_code: str
+    agreed_terms: bool = False  # the Community Guidelines checkbox on the sign-up form
+    terms_version: str = Field(default="", max_length=32)
 
 
 class LoginSendOTPRequest(BaseModel):

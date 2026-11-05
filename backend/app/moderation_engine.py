@@ -2,12 +2,19 @@ import datetime
 from typing import List, Dict, Any, Tuple
 from app import models
 
+# Short form of the Community Guidelines students agree to at sign-up. The full text
+# students read is frontend/lib/community-guidelines.ts; keep the two in step.
+COMMUNITY_GUIDELINES_VERSION = "2026-11"
 COMMUNITY_GUIDELINES = [
-    "1. Respectful Communication: No hate speech, harassment, or abusive language targeting students, faculty, or staff.",
-    "2. Fact Accuracy: Ensure academic timetables, lab room numbers, and cutoff numbers are backed by verified experience.",
-    "3. No Spam or Self-Promotion: Commercial ads, paid promotion, or duplicate spam posts will be quarantined immediately.",
-    "4. Report Outdated Info: Help keep CampusOS fresh by flagging outdated mess timings or obsolete circulars.",
-    "5. Maintain Confidentiality: Do not leak unannounced grading sheets or private faculty contact info.",
+    "1. Be respectful: no harassment, bullying, threats or hate speech, in posts or private messages.",
+    "2. Keep it safe and legal: no sexual content, drugs, forged documents or hacking.",
+    "3. Academic integrity: no leaked papers, exam-time answers or doing others' work.",
+    "4. Be accurate and helpful: answer from experience, flag outdated info, cite official sources.",
+    "5. Respect privacy: no one else's learner ID, registration number, contact details, chats or marks.",
+    "6. No spam, ads or impersonation of students, faculty, clubs or the MITra team.",
+    "7. If someone may not be safe, report it (Self-harm concern); emergencies: 112, Tele-MANAS 14416.",
+    "8. Report or block students from Network; the MITra team removes posts that break the guidelines.",
+    "9. Violations: blocked posts add a strike; 5 strikes = 7-day suspension; 10 reporters = suspension pending review.",
 ]
 
 # Prohibited Content Pattern Dictionary

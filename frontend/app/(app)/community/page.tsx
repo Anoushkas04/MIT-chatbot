@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import type { CommunityComment, CommunityQuestion } from '@/lib/mock-data'
 import { MIN_RELEVANCE, matchTopics, scoreQuestion } from '@/lib/community-search'
@@ -419,7 +420,12 @@ function CommunityInner() {
         <div>
           <p className="section-kicker">COMMUNITY</p>
           <h1>Ask your campus.</h1>
-          <p className="view-sub">Get answers from students who&apos;ve been there.</p>
+          <p className="view-sub">
+            Get answers from students who&apos;ve been there.{' '}
+            <Link href="/guidelines" className="guidelines-link">
+              Community Guidelines
+            </Link>
+          </p>
         </div>
         <button className="community-ask-btn" onClick={() => setComposerOpen((v) => !v)}>
           <Plus /> Ask a question
@@ -434,6 +440,10 @@ function CommunityInner() {
             onChange={(e) => setNewBody(e.target.value)}
             placeholder="Add any details that'll help people answer..."
           />
+          <p className="guidelines-note">
+            Keep it respectful and accurate, and leave out anyone&apos;s personal details.{' '}
+            <Link href="/guidelines">Read the guidelines</Link>
+          </p>
           <div className="tag-picker">
             {tagOptions.map((t) => (
               <button
@@ -502,6 +512,15 @@ function CommunityInner() {
       {actionError && (
         <p className="community-error" role="alert">
           {actionError}
+          {/* Posts the moderation check blocks come back with this wording (community_v2.py) */}
+          {actionError.includes('Community Guidelines') && (
+            <>
+              {' '}
+              <Link href="/guidelines#consequences" className="guidelines-link">
+                See the guidelines
+              </Link>
+            </>
+          )}
         </p>
       )}
 
