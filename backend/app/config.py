@@ -17,6 +17,9 @@ DOCS_DIR = Path(os.environ.get("DOCS_DIR", str(_default_docs)))
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(BACKEND_DIR / "data")))
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# Optional separate key for embeddings only (its own Google project, so its own free-tier
+# quota); answers, translation and moderation keep GEMINI_API_KEY.
+GEMINI_EMBEDDING_API_KEY = os.environ.get("GEMINI_EMBEDDING_API_KEY", "").strip() or GEMINI_API_KEY
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", os.environ.get("CHAT_MODEL", "gemini-flash-lite-latest"))
 CHAT_MODEL = GEMINI_MODEL
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001")

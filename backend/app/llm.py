@@ -11,6 +11,7 @@ from app.config import (
     CHAT_MODEL,
     EMBEDDING_MODEL,
     GEMINI_API_KEY,
+    GEMINI_EMBEDDING_API_KEY,
     GEMINI_EMBEDDINGS_ENABLED,
     LLM_TIMEOUT_SECONDS,
 )
@@ -52,7 +53,7 @@ QUERY_EMBED_TIMEOUT_MS = 10_000
 
 def active_embedder() -> str:
     """The embedder a build would use now: Gemini only when enabled AND keyed."""
-    if GEMINI_EMBEDDINGS_ENABLED and is_valid_key(GEMINI_API_KEY):
+    if GEMINI_EMBEDDINGS_ENABLED and is_valid_key(GEMINI_EMBEDDING_API_KEY):
         return f"gemini:{EMBEDDING_MODEL}"
     return LOCAL_EMBEDDER
 
@@ -96,6 +97,14 @@ def _hash_embed(text: str, dim: int = HASH_EMBED_DIM) -> list[float]:
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     return embed_texts_labelled(texts)[0]
+
+
+def _embedding_client(timeout_ms: int | None = None) -> genai.Client:
+    """Gemini client for embeddings: GEMINI_EMBEDDING_API_KEY if set, otherwise GEMINI_API_KEY."""
+    return genai.Client(
+        api_key=GEMINI_EMBEDDING_API_KEY.strip(),
+        http_options=types.HttpOptions(timeout=timeout_ms or int(LLM_TIMEOUT_SECONDS * 1000)),
+    )
 
 
 def estimate_tokens(text: str) -> int:
@@ -149,7 +158,7 @@ def embed_texts_labelled(texts: list[str], api_texts: list[str] | None = None) -
     is saved to the cache as it arrives, and a build stops after EMBED_BUILD_SECONDS: until
     every text is cached the index stays on local vectors, and the next build carries on."""
     last_embedding_progress.clear()
-    if not GEMINI_EMBEDDINGS_ENABLED or not is_valid_key(GEMINI_API_KEY):
+    if not GEMINI_EMBEDDINGS_ENABLED or not is_valid_key(GEMINI_EMBEDDING_API_KEY):
         print("Using local hash embeddings. Set GEMINI_EMBEDDINGS_ENABLED=true and rebuild the index to use Gemini embeddings.")
         return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
     from app.rag import embedding_cache
@@ -165,7 +174,7 @@ def embed_texts_labelled(texts: list[str], api_texts: list[str] | None = None) -
     pacer = _TokenPacer(EMBED_TOKENS_PER_MINUTE)
     done = len(wanted) - len(missing)
     try:
-        client = get_client()
+        client = _embedding_client()
         for batch in _token_batches(missing):
             pacer.wait_for(sum(estimate_tokens(t) for t in batch))
             # Checked after waiting for the token budget, so a wait can't run the build over its limit
@@ -226,12 +235,9 @@ def embed_query(text: str, index_embedder: str | None = None) -> list[float]:
     """
     if not index_embedder or index_embedder.startswith("local-hash"):
         return _hash_embed(text)
-    if not is_valid_key(GEMINI_API_KEY):
+    if not is_valid_key(GEMINI_EMBEDDING_API_KEY):
         raise RuntimeError("The index uses Gemini embeddings but no Gemini key is configured.")
-    client = genai.Client(
-        api_key=GEMINI_API_KEY.strip(),
-        http_options=types.HttpOptions(timeout=QUERY_EMBED_TIMEOUT_MS),
-    )
+    client = _embedding_client(timeout_ms=QUERY_EMBED_TIMEOUT_MS)
     response = client.models.embed_content(
         model=index_embedder.split(":", 1)[-1],
         contents=[text],

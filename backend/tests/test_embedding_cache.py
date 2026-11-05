@@ -14,8 +14,8 @@ def gemini(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "engine", engine)
     monkeypatch.setattr(database, "SessionLocal", sessionmaker(bind=engine))
     monkeypatch.setattr(llm, "GEMINI_EMBEDDINGS_ENABLED", True)
-    monkeypatch.setattr(llm, "GEMINI_API_KEY", "test-key-123456")
-    monkeypatch.setattr(llm, "get_client", lambda: object())
+    monkeypatch.setattr(llm, "GEMINI_EMBEDDING_API_KEY", "test-key-123456")
+    monkeypatch.setattr(llm, "_embedding_client", lambda **k: object())
     calls = {"requests": 0, "fail_after": None}
 
     def fake_batch(client, batch):

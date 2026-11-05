@@ -15,8 +15,8 @@ def gemini(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "engine", engine)
     monkeypatch.setattr(database, "SessionLocal", sessionmaker(bind=engine))
     monkeypatch.setattr(llm, "GEMINI_EMBEDDINGS_ENABLED", True)
-    monkeypatch.setattr(llm, "GEMINI_API_KEY", "test-key-123456")
-    monkeypatch.setattr(llm, "get_client", lambda: object())
+    monkeypatch.setattr(llm, "GEMINI_EMBEDDING_API_KEY", "test-key-123456")
+    monkeypatch.setattr(llm, "_embedding_client", lambda **k: object())
     clock = {"now": 0.0, "slept": 0.0, "requests": []}
     monkeypatch.setattr(llm.time, "monotonic", lambda: clock["now"])
 
@@ -71,3 +71,20 @@ def test_gemini_text_drops_the_label_and_the_repeated_overlap():
     api = api_embedding_texts(records)
     assert api[1] == "notice\nthen the second part."
     assert api[2] == ""  # answered from the file; not worth embedding tokens
+
+
+def test_embeddings_can_use_their_own_key_and_fall_back_to_the_main_one(monkeypatch):
+    import importlib
+
+    import app.config as config
+
+    monkeypatch.setenv("GEMINI_API_KEY", "main-key-123456")
+    monkeypatch.setenv("GEMINI_EMBEDDING_API_KEY", "")
+    assert importlib.reload(config).GEMINI_EMBEDDING_API_KEY == "main-key-123456"
+    monkeypatch.setenv("GEMINI_EMBEDDING_API_KEY", "embedding-key-654321")
+    reloaded = importlib.reload(config)
+    assert reloaded.GEMINI_EMBEDDING_API_KEY == "embedding-key-654321"
+    assert reloaded.GEMINI_API_KEY == "main-key-123456"  # answers keep the main key
+    monkeypatch.delenv("GEMINI_EMBEDDING_API_KEY")
+    monkeypatch.delenv("GEMINI_API_KEY")
+    importlib.reload(config)
