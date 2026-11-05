@@ -51,6 +51,7 @@ export type ChatResponse = {
   citations?: ChatCitation[]
   searched_for?: string | null // the corrected, translated or standalone search, when it differed
   followups?: string[] // questions the same evidence can answer
+  message_id?: number | null // for rateAnswer
   confidence: string
   confidence_type: string
 }
@@ -131,6 +132,11 @@ export function loginSendOtp(identifier: string) {
 
 export function loginVerifyOtp(identifier: string, otp_code: string) {
   return post<AuthResponse>('/api/auth/login-verify-otp', { identifier, otp_code })
+}
+
+/** 👍 (1) / 👎 (-1) on an answer, or 0 to clear it. */
+export function rateAnswer(messageId: number, rating: 1 | -1 | 0) {
+  return authed<{ status: string; rating: number | null }>('POST', '/api/chat/feedback', { message_id: messageId, rating })
 }
 
 export type ChatLanguage = 'en' | 'hi' | 'kn'
@@ -665,8 +671,25 @@ export type Insights = {
 // Results of the fixed chatbot test sets (backend/app/rag/evaluate.py and evaluate_l2.py)
 export type ChatbotEvaluation = {
   embedder: string
-  retrieval: { cases: number; passed: number; recall: number; by_type: Record<string, { evaluated: number; passed: number }>; failures: string[] }
+  retrieval: {
+    cases: number
+    passed: number
+    recall: number
+    recall_at_5: number
+    mrr: number
+    ndcg_at_5: number
+    by_type: Record<string, { evaluated: number; passed: number; recall_at_5?: number; mrr?: number }>
+    failures: string[]
+  }
   answers: { cases: number; passed: number; pass_rate: number; retrieval_passed: number; evidence_supported: number; answers_grounded: number; failures: string[] }
+  previous?: (Omit<ChatbotEvaluation, 'previous'> & { run_at: string }) | null
+}
+
+export type AnswerFeedbackSummary = {
+  helpful: number
+  not_helpful: number
+  rate: number | null
+  recent_not_helpful: { question: string; answer: string; confidence: string; rated_at: string | null }[]
 }
 
 export const opsApi = {
@@ -680,6 +703,7 @@ export const opsApi = {
   remove: (name: string) => authed<{ status: string; chunks_removed: number; indexing: boolean }>('DELETE', `/api/admin/dataset/files/${encodeURIComponent(name)}`),
   rebuild: () => authed<{ status: string }>('POST', '/api/admin/dataset/rebuild'),
   evaluate: () => authed<ChatbotEvaluation>('POST', '/api/admin/dataset/evaluate'),
+  feedback: () => authed<AnswerFeedbackSummary>('GET', '/api/admin/dataset/feedback'),
   monitoring: () => authed<Monitoring>('GET', '/api/admin/monitoring'),
   toggleDisabled: (userId: string) =>
     authed<{ status: string; new_status: string }>('POST', `/api/admin/users/toggle-status?user_id=${encodeURIComponent(userId)}`),

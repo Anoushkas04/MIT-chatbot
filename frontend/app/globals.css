@@ -605,8 +605,6 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .chat-language button { padding: 5px 10px; border: 0; border-radius: 6px; background: none; color: #78867d; font-size: 11px; font-family: inherit; cursor: pointer; }
 .chat-language button.active { background: #234f4a; color: #d8ef68; }
 @media (max-width: 520px) { .chat-head { flex-wrap: wrap; } .chat-head-actions { justify-content: flex-start; } }
-.chat-persona { display: inline-flex; align-items: center; gap: 6px; color: #8a948c; font-size: 11px; }
-.chat-persona select { height: 30px; padding: 0 8px; border: 1px solid #e0e4dd; border-radius: 8px; background: #fff; color: #3f5049; font-size: 11px; font-family: inherit; }
 .quality-check { margin: 18px 0; }
 .quality-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .quality-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
@@ -629,3 +627,18 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .doc-keywords { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .doc-keywords button { padding: 3px 8px; border: 0; border-radius: 10px; background: #eff3eb; color: #53766f; font-size: 10px; font-family: inherit; cursor: pointer; }
 .doc-keywords button:hover { background: #dbe9e7; color: #234f4a; }
+.message-meta { display: flex; align-items: center; gap: 10px; }
+.answer-rating { display: inline-flex; gap: 2px; }
+.answer-rating button { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: none; color: #a4aaa4; cursor: pointer; }
+.answer-rating button svg { width: 12px; }
+.answer-rating button:hover { background: #eff3eb; color: #53766f; }
+.answer-rating button.active { background: #dbe9e7; color: #234f4a; }
+.delta { margin-left: 6px; font-size: 11px; font-style: normal; font-weight: 600; }
+.delta.up { color: #2f7d4f; }
+.delta.down { color: #b4532f; }
+.delta.same { color: #8a948c; font-weight: 400; }
+.feedback-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.feedback-list details { padding: 8px 10px; border: 1px solid #e3e7df; border-radius: 9px; background: #fff; font-size: 12px; }
+.feedback-list summary { color: #234f4a; cursor: pointer; }
+.feedback-list p { margin: 6px 0 2px; color: #5d6b63; line-height: 1.5; }
+.feedback-list small { color: #9aa39b; font-size: 10px; }

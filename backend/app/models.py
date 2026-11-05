@@ -131,6 +131,8 @@ class ChatMessage(Base):
     confidence = Column(String, default="high")
     confidence_type = Column(String, default="official_verified")
     timestamp = Column(String, nullable=False)
+    rating = Column(Integer, nullable=True)  # the student's 👍 (1) / 👎 (-1) on an assistant answer
+    rated_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     session = relationship("ChatSession", back_populates="messages")
@@ -415,3 +417,14 @@ class EmbeddingCache(Base):
     model = Column(String, nullable=False)
     vector = Column(LargeBinary, nullable=False)  # float32 bytes
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class RagEvaluation(Base):
+    """One run of the admin quality check, kept so each run can be compared with the last."""
+    __tablename__ = "rag_evaluations"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    embedder = Column(String, nullable=True)
+    metrics_json = Column(Text, nullable=False)
+    run_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)

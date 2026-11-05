@@ -2,6 +2,7 @@ import datetime
 import re
 from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
@@ -16,7 +17,7 @@ from app.providers import GenerationRequest, GenerationResult, generate_answer
 from app.rag.hybrid import hybrid_search
 from app.routers.auth_router import get_current_user
 from app.schemas import ChatRequest, ChatResponse, CitationDetail
-from app.session_memory import add_turn, get_history
+from app.session_memory import add_turn, get_history, restore as restore_history
 from app.database import SessionLocal
 from app import models
 
@@ -214,6 +215,21 @@ def _persona(requested: str, me: models.User) -> str:
     return "student"
 
 
+def _stored_history(db, session_id: str) -> list[dict]:
+    """The conversation's recent turns from the database, put back into memory."""
+    from app.config import MAX_HISTORY_TURNS
+
+    rows = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.session_id == session_id)
+        .order_by(models.ChatMessage.id.desc())
+        .limit(MAX_HISTORY_TURNS * 2)
+        .all()
+    )
+    turns = [{"role": "user" if r.sender_role == "user" else "model", "text": r.text} for r in reversed(rows)]
+    return restore_history(session_id, turns) if turns else []
+
+
 def _safely(lookup, query: str):
     """A structured lookup is an extra; if it fails, answer from document search instead."""
     try:
@@ -271,7 +287,9 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         # Documents are in English: Hindi/Kannada questions are searched in translation
         language = answer_language(req.language, req.message)
         persona = _persona(req.role, me)
-        query = search_query(req.message, language, get_history(req.session_id))
+        # In-memory history is lost when the server restarts or sleeps; the messages are in the database
+        history = get_history(req.session_id) or _stored_history(db, req.session_id)
+        query = search_query(req.message, language, history)
         query = _safely(correct_query, query) or query  # misspellings match nothing in the documents
         intent = classify_intent(query)
         query_type = detect_query_type(query)
@@ -421,7 +439,6 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             query_type=query_type,
         )
 
-        history = get_history(req.session_id)
         # The directory's fixed answer is English; other languages go through the model
         if not all_matches:
             # Nothing to answer from: don't spend a model call
@@ -464,6 +481,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         # Checked against the same evidence, so each one can be answered (app/followups.py)
         followups = [] if not all_matches else (_safely(lambda q: suggest(q, all_matches, model_followups, faculty_lookup), query) or [])
         add_turn(req.session_id, req.message, reply_text)
+        message_id = None  # set once the answer is saved; the chat page sends it back with a 👍/👎
 
         # Save session & message to SQLite DB
         try:
@@ -495,6 +513,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             )
             db.add(msg_ai)
             db.flush()
+            message_id = msg_ai.id
             for citation in citations:
                 page_suffix = f"#page={citation.page_number}" if citation.page_number else ""
                 db.add(models.MessageCitation(
@@ -523,6 +542,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             model=generation.model,
             verification_warnings=verification_warnings,
             # Shown under the answer when the search differed from what was typed
+            message_id=message_id,
             searched_for=None if " ".join(query.lower().split()) == " ".join(req.message.lower().split()) else query,
         )
     except HTTPException:
@@ -530,5 +550,34 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
     except Exception as e:
         print(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail="Something went wrong answering that. Please try again.")
+    finally:
+        db.close()
+
+
+class AnswerFeedback(BaseModel):
+    message_id: int
+    rating: int = Field(ge=-1, le=1)  # 1 helpful, -1 not helpful, 0 clears it
+
+
+@router.post("/feedback", summary="Rate an answer helpful (1) or not (-1), or clear the rating (0)")
+def answer_feedback(req: AnswerFeedback, me: models.User = Depends(get_current_user)):
+    db = SessionLocal()
+    try:
+        message = (
+            db.query(models.ChatMessage)
+            .join(models.ChatSession, models.ChatSession.id == models.ChatMessage.session_id)
+            .filter(
+                models.ChatMessage.id == req.message_id,
+                models.ChatMessage.sender_role == "assistant",
+                models.ChatSession.user_id == me.id,  # only your own answers
+            )
+            .first()
+        )
+        if not message:
+            raise HTTPException(status_code=404, detail="That answer wasn't found.")
+        message.rating = req.rating or None
+        message.rated_at = datetime.datetime.utcnow() if req.rating else None
+        db.commit()
+        return {"status": "saved", "rating": message.rating}
     finally:
         db.close()

@@ -239,12 +239,15 @@ def evaluate(admin: models.User = Depends(require_admin_user)):
         raise HTTPException(status_code=409, detail="The chatbot index hasn't been built yet.")
     retrieval = retrieval_eval.run_evaluation()
     answers = evaluate_l2.run_evaluation()
-    return {
+    result = {
         "embedder": get_store().embedder,
         "retrieval": {
             "cases": retrieval["evaluated"],
             "passed": retrieval["passed"],
             "recall": retrieval["recall_at_final_k"],
+            "recall_at_5": retrieval["recall_at_5"],
+            "mrr": retrieval["mrr"],
+            "ndcg_at_5": retrieval["ndcg_at_5"],
             "by_type": retrieval["by_modality"],
             "failures": [f["id"] for f in retrieval["failures"]],
         },
@@ -258,3 +261,55 @@ def evaluate(admin: models.User = Depends(require_admin_user)):
             "failures": [f["id"] for f in answers["failures"]],
         },
     }
+    # Keep every run so the next one can show what changed
+    import json as _json
+
+    db = SessionLocal()
+    try:
+        previous = db.query(models.RagEvaluation).order_by(models.RagEvaluation.id.desc()).first()
+        result["previous"] = (
+            {**_json.loads(previous.metrics_json), "run_at": previous.created_at.isoformat()} if previous else None
+        )
+        db.add(models.RagEvaluation(
+            embedder=result["embedder"], run_by=admin.id,
+            metrics_json=_json.dumps({k: result[k] for k in ("embedder", "retrieval", "answers")}),
+        ))
+        db.commit()
+    finally:
+        db.close()
+    return result
+
+
+@router.get("/feedback", summary="Students' 👍/👎 on chatbot answers, with the latest 👎 questions")
+def answer_feedback_summary(admin: models.User = Depends(require_admin_user)):
+    db = SessionLocal()
+    try:
+        rated = db.query(models.ChatMessage).filter(models.ChatMessage.rating.isnot(None))
+        up = rated.filter(models.ChatMessage.rating > 0).count()
+        down = rated.filter(models.ChatMessage.rating < 0).count()
+        recent = (
+            db.query(models.ChatMessage)
+            .filter(models.ChatMessage.rating < 0)
+            .order_by(models.ChatMessage.rated_at.desc())
+            .limit(10)
+            .all()
+        )
+        unhelpful = []
+        for answer in recent:
+            # The question is the student's message just before the answer in the same conversation
+            question = (
+                db.query(models.ChatMessage)
+                .filter(models.ChatMessage.session_id == answer.session_id, models.ChatMessage.sender_role == "user",
+                        models.ChatMessage.id < answer.id)
+                .order_by(models.ChatMessage.id.desc())
+                .first()
+            )
+            unhelpful.append({
+                "question": question.text if question else "",
+                "answer": answer.text[:300],
+                "confidence": answer.confidence,
+                "rated_at": answer.rated_at.isoformat() if answer.rated_at else None,
+            })
+        return {"helpful": up, "not_helpful": down, "rate": round(up / (up + down), 4) if up + down else None, "recent_not_helpful": unhelpful}
+    finally:
+        db.close()

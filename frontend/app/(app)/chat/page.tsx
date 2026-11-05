@@ -2,9 +2,10 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CalendarDays, ExternalLink, FileText, MessagesSquare, Paperclip, Plus, Send, Sparkles, Users } from 'lucide-react'
-import { askMitra, libraryApi, type ChatCitation, type ChatLanguage, type ChatPersona } from '@/lib/api'
+import { CalendarDays, ExternalLink, FileText, MessagesSquare, Paperclip, Plus, Send, Sparkles, ThumbsDown, ThumbsUp, Users } from 'lucide-react'
+import { askMitra, libraryApi, rateAnswer, type ChatCitation, type ChatLanguage } from '@/lib/api'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
+import { accountKey } from '@/lib/session'
 import { useLocalState } from '@/lib/use-local-state'
 
 type ChatMessage = {
@@ -15,19 +16,14 @@ type ChatMessage = {
   citations?: ChatCitation[]
   searchedFor?: string | null
   followups?: string[]
+  messageId?: number | null
+  rating?: 1 | -1 | null
 }
 
 const languages: { value: ChatLanguage; label: string; placeholder: string }[] = [
   { value: 'en', label: 'English', placeholder: 'Ask about campus, academics, or anything else...' },
   { value: 'hi', label: 'हिन्दी', placeholder: 'कैंपस, पढ़ाई या किसी भी चीज़ के बारे में पूछें...' },
   { value: 'kn', label: 'ಕನ್ನಡ', placeholder: 'ಕ್ಯಾಂಪಸ್, ಓದು ಅಥವಾ ಯಾವುದರ ಬಗ್ಗೆಯೂ ಕೇಳಿ...' },
-]
-
-// Who the answer is written for: changes what MITra emphasises (prompts.ROLE_PERSONAS)
-const personas: { value: ChatPersona; label: string }[] = [
-  { value: 'student', label: 'Me (student)' },
-  { value: 'parent', label: 'A parent' },
-  { value: 'prospective', label: 'A prospective student' },
 ]
 
 const kindIcon: Record<ChatCitation['kind'], typeof FileText> = {
@@ -67,10 +63,36 @@ function AnswerText({ text, citations, onOpen }: { text: string; citations: Chat
   )
 }
 
+function clockTime() {
+  return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
 function seedMessages(): ChatMessage[] {
   return [
-    { id: 'm1', from: 'ai', text: "Hey! I'm MITra, your campus companion. What can I help you figure out today?", time: '10:42 AM' },
+    { id: 'm1', from: 'ai', text: "Hey! I'm MITra, your campus companion. What can I help you figure out today?", time: clockTime() },
   ]
+}
+
+// The open conversation is kept per account until "New conversation", so leaving Chat or
+// reloading doesn't lose it. The server also keeps it under the same id (chat_router).
+const CONVERSATION_KEY = 'mitra_chat_conversation'
+const MAX_KEPT_MESSAGES = 200
+type StoredConversation = { sessionId: string; messages: ChatMessage[] }
+
+function readConversation(key: string): StoredConversation | null {
+  try {
+    const raw = localStorage.getItem(key)
+    const c = raw ? (JSON.parse(raw) as StoredConversation) : null
+    return c && c.sessionId && Array.isArray(c.messages) ? c : null
+  } catch {
+    return null
+  }
+}
+
+function writeConversation(key: string, c: StoredConversation) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ sessionId: c.sessionId, messages: c.messages.slice(-MAX_KEPT_MESSAGES) }))
+  } catch {}
 }
 
 function ChatInner() {
@@ -79,25 +101,45 @@ function ChatInner() {
   const [openError, setOpenError] = useState<string | null>(null)
   // Answers come back in this language; questions can be typed in any of the three
   const [language, setLanguage] = useLocalState<ChatLanguage>('mitra_chat_language', 'en')
-  const [persona, setPersona] = useLocalState<ChatPersona>('mitra_chat_persona', 'student')
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages)
   const [draft, setDraft] = useState('')
   const [thinking, setThinking] = useState(false)
   const askedRef = useRef(false)
-  const idRef = useRef(1)
-  // Backend keeps a short per-conversation history keyed by this id
-  const sessionIdRef = useRef(crypto.randomUUID())
+  // The conversation id the server keys its history on; restored with the messages
+  const sessionIdRef = useRef('')
+  const storageKey = accountKey(CONVERSATION_KEY)
+  const [restored, setRestored] = useState(false)
+  const mountedRef = useRef(true)
+
+  // Restore the open conversation first, so a question passed in with ?q= joins it
+  useEffect(() => {
+    mountedRef.current = true
+    const saved = readConversation(storageKey)
+    if (saved) {
+      sessionIdRef.current = saved.sessionId
+      setMessages(saved.messages)
+    } else {
+      sessionIdRef.current = crypto.randomUUID()
+    }
+    setRestored(true)
+    return () => {
+      mountedRef.current = false
+    }
+  }, [storageKey])
+
+  useEffect(() => {
+    if (restored) writeConversation(storageKey, { sessionId: sessionIdRef.current, messages })
+  }, [messages, restored, storageKey])
 
   function nextId() {
-    idRef.current += 1
-    return `m${idRef.current}`
+    return crypto.randomUUID()
   }
 
   async function ask(text: string) {
     const trimmed = text.trim()
     if (!trimmed) return
-    setMessages((prev) => [...prev, { id: nextId(), from: 'user', text: trimmed, time: 'Now' }])
+    setMessages((prev) => [...prev, { id: nextId(), from: 'user', text: trimmed, time: clockTime() }])
     setThinking(true)
     const conversation = sessionIdRef.current
     let reply: ChatMessage
@@ -106,7 +148,6 @@ function ChatInner() {
         message: trimmed,
         session_id: conversation,
         language,
-        role: persona,
         department: profile.branch || null,
         semester: profile.semester || null,
       })
@@ -114,16 +155,23 @@ function ChatInner() {
         id: nextId(),
         from: 'ai',
         text: answer.text,
-        time: 'Now',
+        time: clockTime(),
         searchedFor: answer.searched_for,
         followups: answer.followups ?? [],
+        messageId: answer.message_id ?? null,
         // Older servers only send file names; show those as plain documents
         citations:
           answer.citations ??
           answer.sources.map((s, i) => ({ index: i + 1, source: s, title: s, kind: 'document' as const, snippet: '', page_number: null, source_url: null })),
       }
     } catch {
-      reply = { id: nextId(), from: 'ai', text: "I couldn't reach MITra's server. Please try again.", time: 'Now' }
+      reply = { id: nextId(), from: 'ai', text: "I couldn't reach MITra's server. Please try again.", time: clockTime() }
+    }
+    if (!mountedRef.current) {
+      // Left Chat while the answer was on its way: save it so it's there on return
+      const saved = readConversation(storageKey)
+      if (saved?.sessionId === conversation) writeConversation(storageKey, { ...saved, messages: [...saved.messages, reply] })
+      return
     }
     // Drop replies that arrive after "New conversation" was pressed
     if (sessionIdRef.current !== conversation) return
@@ -155,6 +203,18 @@ function ChatInner() {
     }
   }
 
+  // 👍/👎: clicking the active one again clears it
+  async function rate(m: ChatMessage, value: 1 | -1) {
+    if (!m.messageId) return
+    const next = m.rating === value ? null : value
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, rating: next } : x)))
+    try {
+      await rateAnswer(m.messageId, next ?? 0)
+    } catch {
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, rating: m.rating ?? null } : x)))
+    }
+  }
+
   function send() {
     if (!draft.trim()) return
     ask(draft)
@@ -176,16 +236,6 @@ function ChatInner() {
           <h1>Ask MITra</h1>
         </div>
         <div className="chat-head-actions">
-          <label className="chat-persona">
-            Answer for
-            <select value={persona} onChange={(e) => setPersona(e.target.value as ChatPersona)}>
-              {personas.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
           <div className="chat-language" role="group" aria-label="Answer language">
             {languages.map((l) => (
               <button key={l.value} className={language === l.value ? 'active' : ''} onClick={() => setLanguage(l.value)} lang={l.value}>
@@ -239,7 +289,19 @@ function ChatInner() {
                   ))}
                 </div>
               )}
-              <time>{m.time}</time>
+              <div className="message-meta">
+                <time>{m.time}</time>
+                {m.from === 'ai' && m.messageId && (
+                  <span className="answer-rating" role="group" aria-label="Was this answer helpful?">
+                    <button className={m.rating === 1 ? 'active' : ''} onClick={() => rate(m, 1)} aria-label="Helpful" aria-pressed={m.rating === 1}>
+                      <ThumbsUp />
+                    </button>
+                    <button className={m.rating === -1 ? 'active' : ''} onClick={() => rate(m, -1)} aria-label="Not helpful" aria-pressed={m.rating === -1}>
+                      <ThumbsDown />
+                    </button>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}

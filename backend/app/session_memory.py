@@ -11,6 +11,12 @@ def get_history(session_id: str) -> list[dict]:
     return _sessions[session_id]
 
 
+def restore(session_id: str, turns: list[dict]) -> list[dict]:
+    """Put a conversation loaded from the database back into memory (after a restart)."""
+    _sessions[session_id] = turns[-MAX_HISTORY_TURNS * 2:]
+    return _sessions[session_id]
+
+
 def add_turn(session_id: str, user_message: str, model_message: str) -> None:
     history = _sessions[session_id]
     history.append({"role": "user", "text": user_message})

@@ -3,11 +3,58 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, CheckCircle2, Database, FileText, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
-import { opsApi, type ChatbotEvaluation, type DatasetFile, type DatasetInfo } from '@/lib/api'
+import { opsApi, type AnswerFeedbackSummary, type ChatbotEvaluation, type DatasetFile, type DatasetInfo } from '@/lib/api'
 import { useAdminError } from '@/lib/use-admin-error'
 
 function pct(n: number) {
   return `${Math.round(n * 100)}%`
+}
+
+/** "+0.04" / "−0.10" against the previous run, or nothing when there wasn't one. */
+function delta(now: number, before?: number) {
+  if (before === undefined || before === null) return null
+  const d = now - before
+  if (Math.abs(d) < 0.0005) return <em className="delta same">no change</em>
+  return <em className={`delta ${d > 0 ? 'up' : 'down'}`}>{`${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(3)}`}</em>
+}
+
+/** Students' 👍/👎 on answers, and the latest unhelpful ones to look into. */
+function AnswerFeedback() {
+  const [data, setData] = useState<AnswerFeedbackSummary | null>(null)
+  useEffect(() => {
+    opsApi.feedback().then(setData).catch(() => setData(null))
+  }, [])
+  if (!data) return null
+  const total = data.helpful + data.not_helpful
+  return (
+    <section className="deadline-card quality-check">
+      <p className="section-kicker">STUDENT FEEDBACK ON ANSWERS</p>
+      {total === 0 ? (
+        <p className="view-sub">No answers rated yet. Students can rate answers with 👍 / 👎 in Chat.</p>
+      ) : (
+        <>
+          <div className="quality-results">
+            <div>
+              <strong>{data.rate === null ? '—' : pct(data.rate)}</strong>
+              <span>Rated helpful · {data.helpful} 👍 / {data.not_helpful} 👎</span>
+            </div>
+          </div>
+          {data.recent_not_helpful.length > 0 && (
+            <div className="feedback-list">
+              <span className="chat-sources-label">Latest answers rated not helpful</span>
+              {data.recent_not_helpful.map((f, i) => (
+                <details key={i}>
+                  <summary>{f.question || '(question not found)'}</summary>
+                  <p>{f.answer}</p>
+                  <small>Confidence: {f.confidence}</small>
+                </details>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
 }
 
 /** Runs the fixed chatbot test sets against the live index, so a rebuild can be checked. */
@@ -49,6 +96,18 @@ function QualityCheck() {
             </span>
           </div>
           <div>
+            <strong>
+              {result.retrieval.mrr.toFixed(3)} {delta(result.retrieval.mrr, result.previous?.retrieval.mrr)}
+            </strong>
+            <span>MRR (1 = the right document always ranks first)</span>
+          </div>
+          <div>
+            <strong>
+              {result.retrieval.ndcg_at_5.toFixed(3)} {delta(result.retrieval.ndcg_at_5, result.previous?.retrieval.ndcg_at_5)}
+            </strong>
+            <span>nDCG@5 · Recall@5 {pct(result.retrieval.recall_at_5)}</span>
+          </div>
+          <div>
             <strong>{pct(result.answers.pass_rate)}</strong>
             <span>
               Answered with the right, cited evidence · {result.answers.passed}/{result.answers.cases}
@@ -58,6 +117,11 @@ function QualityCheck() {
             <strong>{result.embedder}</strong>
             <span>Embeddings in this index</span>
           </div>
+          <p className="view-sub quality-failures">
+            {result.previous
+              ? `Compared with the run on ${new Date(result.previous.run_at).toLocaleString()} (embeddings: ${result.previous.embedder}).`
+              : 'First recorded run: the next one will show what changed.'}
+          </p>
           {(result.retrieval.failures.length > 0 || result.answers.failures.length > 0) && (
             <p className="view-sub quality-failures">
               Failing questions: {[...result.retrieval.failures, ...result.answers.failures].join(', ')}
@@ -265,6 +329,7 @@ export default function AdminDatasetPage() {
       {error && <p className="community-error">{error}</p>}
 
       <QualityCheck />
+      <AnswerFeedback />
 
       <div className="dataset-toolbar">
         <div className="large-search community-search">
