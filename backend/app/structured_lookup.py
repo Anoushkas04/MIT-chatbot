@@ -25,13 +25,18 @@ MONTHS = {
          "august", "september", "october", "november", "december"], start=1)
 }
 MONTHS.update({m[:3]: i for m, i in list(MONTHS.items())})
+# Words that make a question about dates. Generic ones ("end", "start", "results", "last") are
+# not enough on their own: "attendance needed to write the end-semester exam" isn't a date question.
 DATE_SIGNALS = {
-    "when", "date", "dates", "deadline", "last", "schedule", "calendar", "holiday", "holidays",
-    "vacation", "start", "starts", "begin", "begins", "end", "ends", "upcoming", "next", "week",
-    "month", "day", "days", "result", "results", "fest", "revels", "techtatva", "utsav",
+    "when", "date", "dates", "deadline", "schedule", "calendar", "holiday", "holidays",
+    "vacation", "upcoming", "fest", "revels", "techtatva", "utsav",
 }
 # Too common in calendar lines to tell entries apart
-CALENDAR_GENERIC = {"semester", "sem", "date", "day", "start", "end", "last", "course", "tech", "b", "mit"}
+CALENDAR_GENERIC = {
+    "semester", "sem", "date", "day", "start", "end", "last", "course", "tech", "b", "mit",
+    # words about the calendar itself, not an event in it ("what date is Christmas marked on the calendar")
+    "academic", "calendar", "mark", "list", "show", "year", "manipal",
+}
 CLUB_GENERIC = {
     "club", "clubs", "society", "chapter", "manipal", "mit", "student", "students", "official", "join",
     "technical", "non", "nontechnical", "cultural", "all", "available", "name", "every",
@@ -100,7 +105,7 @@ def calendar_evidence(query: str, limit: int = 12) -> list[dict]:
     months = _requested_months(raw)
     if not (DATE_SIGNALS.intersection(raw) or months):
         return []
-    wanted = set(index_tokens(expand_query(query))) - CALENDAR_GENERIC - set(MONTHS)
+    wanted = {t for t in index_tokens(expand_query(query)) if not t.isdigit()} - CALENDAR_GENERIC - set(MONTHS)
     wants_holidays = bool({"holiday", "vacation", "leave", "break"}.intersection(index_tokens(query)))
     lowered = " ".join(raw)
     phrases = [target for target, said in CALENDAR_PHRASES.items() if any(s in query.lower() or s in lowered for s in said)]

@@ -6,6 +6,7 @@ from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
 from app.multilingual import LOW_CONFIDENCE, NO_INFO, answer_language, search_query
+from app.rag.entities import extract as extract_entities
 from app.rag.spelling import correct_query
 from app.structured_lookup import calendar_evidence, club_evidence
 from app.prompts import build_system_prompt
@@ -273,7 +274,9 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         query = _safely(correct_query, query) or query  # misspellings match nothing in the documents
         intent = classify_intent(query)
         query_type = detect_query_type(query)
-        faculty_lookup = _safely(lookup_faculty, query)
+        entities = extract_entities(query)
+        # "List subjects in BTech CSE" is a curriculum question, not a request for the CSE professors
+        faculty_lookup = None if "curriculum" in entities.intents and "person" not in entities.intents else _safely(lookup_faculty, query)
         structured = [] if faculty_lookup else (_safely(calendar_evidence, query) or []) + (_safely(club_evidence, query) or [])
 
         # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
@@ -281,11 +284,15 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             vector_matches = [faculty_lookup["evidence"]]
         else:
             try:
+                # A department named in the question replaces the profile's (a CSE student asking about
+                # Mech gets Mech pages), but doesn't add a department boost the search didn't have:
+                # that would lift every page of the department above the one that answers.
                 vector_matches = hybrid_search(
                     query,
-                    department=req.department,
-                    academic_year=req.academic_year,
+                    department=(entities.department or req.department) if req.department else None,
+                    academic_year=entities.academic_year or req.academic_year,
                     semester=req.semester,
+                    entities=entities,
                 )
             except Exception as e:
                 print("Vector search error:", e)

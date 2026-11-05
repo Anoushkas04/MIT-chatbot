@@ -194,9 +194,30 @@ def _cutoff_list_priority(record: dict, normalized_query: str) -> int:
     return score
 
 
-def _record_query_priority(record: dict, query: str) -> int:
-    normalized = query.lower()
+SEMESTER_WORDS = {1: ("FIRST", "I"), 2: ("SECOND", "II"), 3: ("THIRD", "III"), 4: ("FOURTH", "IV"),
+                  5: ("FIFTH", "V"), 6: ("SIXTH", "VI"), 7: ("SEVENTH", "VII"), 8: ("EIGHTH", "VIII")}
+
+
+def _entity_priority(record: dict, entities) -> int:
+    """Course codes and semesters named in the question, found in the passage."""
+    if entities is None or not (entities.course_codes or entities.semesters):
+        return 0
+    text = " ".join(str(record.get("text", "")).upper().split())
     score = 0
+    compact = text.replace(" ", "")
+    for code in entities.course_codes:
+        if code.replace(" ", "") in compact:
+            score += 3
+    for sem in entities.semesters:
+        ordinal, roman = SEMESTER_WORDS[sem]
+        if re.search(rf"\b{ordinal} SEMESTER\b|\bSEMESTER[ -]*{roman}\b|\b{roman} SEMESTER\b|\bSEM[ -]*{roman}\b", text):
+            score += 2
+    return score
+
+
+def _record_query_priority(record: dict, query: str, entities=None) -> int:
+    normalized = query.lower()
+    score = _entity_priority(record, entities)
     requested_months = {
         month for name, month in MONTH_NUMBERS.items() if name in normalized
     }
@@ -226,9 +247,14 @@ def hybrid_search(
     department: str | None = None,
     academic_year: str | None = None,
     semester: str | None = None,
+    entities=None,
 ) -> list[dict]:
     if final_k <= 0 or not query.strip():
         return []
+    if entities is None:
+        from app.rag.entities import extract
+
+        entities = extract(query)
     context = " ".join(value for value in (department, academic_year, semester) if value)
     ranking_query = f"{query} {context}".strip()
     search_query = _expanded_query(f"{_positive_query(query)} {context}".strip())
@@ -266,7 +292,7 @@ def hybrid_search(
             weight = 1.25 if method == "colvision" else 1.0
             weight += min(metadata_matches, 5) * 0.25
             weight += _context_score(record, department, academic_year, semester) * 0.35
-            weight += _record_query_priority(record, query) * 0.4
+            weight += _record_query_priority(record, query, entities) * 0.4
             if _superseded(source_name, query):
                 weight *= 0.4
             fused_scores[key] += weight / (60 + rank)
@@ -294,7 +320,7 @@ def hybrid_search(
         candidate = (
             title_match + (2 * content_match),
             title_match,
-            _record_query_priority(record, query),
+            _record_query_priority(record, query, entities),
             content_match,
             fused_scores[key],
             key,
@@ -332,7 +358,7 @@ def hybrid_search(
                 source_records,
                 key=lambda record: (
                     _content_match_score(query, record),
-                    _record_query_priority(record, query),
+                    _record_query_priority(record, query, entities),
                 ),
             )
             current_content = _content_match_score(query, records[promoted_metadata])
@@ -360,7 +386,7 @@ def hybrid_search(
             key == promoted_visual,
             bool(methods[key].intersection({"bm25", "dense"})),
             not _superseded(str(records[key].get("source_file") or records[key].get("source", "")), query),
-            _record_query_priority(records[key], query),
+            _record_query_priority(records[key], query, entities),
             _context_score(records[key], department, academic_year, semester),
             _content_match_score(query, records[key]),
             fused_scores[key],
@@ -368,14 +394,14 @@ def hybrid_search(
         reverse=True,
     )
     maximum_priority = max(
-        (_record_query_priority(records[key], query) for key in fused_scores),
+        (_record_query_priority(records[key], query, entities) for key in fused_scores),
         default=0,
     )
     maximum_priority_context = max(
         (
             _context_score(records[key], department, academic_year, semester)
             for key in fused_scores
-            if _record_query_priority(records[key], query) == maximum_priority
+            if _record_query_priority(records[key], query, entities) == maximum_priority
         ),
         default=0,
     )
@@ -398,7 +424,7 @@ def hybrid_search(
             if key in {promoted_metadata, promoted_visual}
             or (
                 maximum_priority > 0
-                and _record_query_priority(record, query) == maximum_priority
+                and _record_query_priority(record, query, entities) == maximum_priority
                 and _context_score(record, department, academic_year, semester)
                 == maximum_priority_context
             )

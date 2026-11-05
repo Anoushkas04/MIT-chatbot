@@ -188,11 +188,24 @@ def _evidence(text: str, source: str) -> dict:
     }
 
 
+def _named_people(query: str) -> list[dict]:
+    """Faculty whose first and last name (two or more name words) both appear in the query."""
+    query_set = {t for t in _tokens(query) if t not in PERSON_QUERY_STOPWORDS and len(t) > 1}
+    found = []
+    for record in load_faculty():
+        name_tokens = {t for t in _tokens(record["name"]) if t not in HONORIFIC_TOKENS and len(t) > 1}
+        if len(name_tokens & query_set) >= 2:
+            found.append((len(name_tokens & query_set), record))
+    best = max((n for n, _ in found), default=0)
+    return [r for n, r in found if n == best]
+
+
 def lookup_faculty(query: str) -> dict | None:
     """Return deterministic faculty evidence and an answer for supported directory queries."""
     query_tokens = set(_tokens(query))
     department = detect_department(query)
-    is_directory_list = bool(department and query_tokens.intersection(LIST_SIGNALS))
+    # "Professor Sanjay Singh in the SCE faculty rooms" is about one person, not the SCE list
+    is_directory_list = bool(department and query_tokens.intersection(LIST_SIGNALS)) and not _named_people(query)
     if is_directory_list:
         records = [record for record in load_faculty() if record["dept"] == department]
         if not records:
@@ -221,7 +234,7 @@ def lookup_faculty(query: str) -> dict | None:
     person_signals = {"about", "cabin", "contact", "email", "professor", "faculty", "where", "who"}
     if not query_tokens.intersection(person_signals):
         return None
-    records = _person_matches(query)
+    records = _named_people(query) or _person_matches(query)
     if not records:
         return None
     evidence_text = "\n".join(_record_text(record) for record in records)
