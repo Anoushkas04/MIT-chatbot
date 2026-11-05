@@ -14,6 +14,8 @@ bcrypt
 PyMuPDF>=1.26,<2
 Pillow>=10,<14
 rank-bm25>=0.2,<0.3
+# Spelling correction of search queries against the corpus vocabulary (app/rag/spelling.py)
+rapidfuzz>=3.9,<4
 # Offline OCR for scanned PDFs (academic calendars, regulations); no API calls.
 rapidocr-onnxruntime>=1.2,<2
 

@@ -13,6 +13,7 @@ type ChatMessage = {
   text: string
   time: string
   citations?: ChatCitation[]
+  searchedFor?: string | null
 }
 
 const languages: { value: ChatLanguage; label: string; placeholder: string }[] = [
@@ -113,6 +114,7 @@ function ChatInner() {
         from: 'ai',
         text: answer.text,
         time: 'Now',
+        searchedFor: answer.searched_for,
         // Older servers only send file names; show those as plain documents
         citations:
           answer.citations ??
@@ -202,6 +204,11 @@ function ChatInner() {
               <div className="message-bubble">
                 {m.citations?.length ? <AnswerText text={m.text} citations={m.citations} onOpen={openCitation} /> : m.text}
               </div>
+              {m.searchedFor && (
+                <p className="chat-searched">
+                  Searched for: <em>{m.searchedFor}</em>
+                </p>
+              )}
               {m.citations && m.citations.length > 0 && (
                 <div className="chat-sources">
                   <span className="chat-sources-label">Sources</span>

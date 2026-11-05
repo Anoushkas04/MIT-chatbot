@@ -6,6 +6,7 @@ from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
 from app.multilingual import LOW_CONFIDENCE, NO_INFO, answer_language, search_query
+from app.rag.spelling import correct_query
 from app.structured_lookup import calendar_evidence, club_evidence
 from app.prompts import build_system_prompt
 from app.providers import GenerationRequest, GenerationResult, generate_answer
@@ -269,6 +270,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         language = answer_language(req.language, req.message)
         persona = _persona(req.role, me)
         query = search_query(req.message, language, get_history(req.session_id))
+        query = _safely(correct_query, query) or query  # misspellings match nothing in the documents
         intent = classify_intent(query)
         query_type = detect_query_type(query)
         faculty_lookup = _safely(lookup_faculty, query)
@@ -411,7 +413,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             )
         else:
             generation = generate_answer(GenerationRequest(
-                question=req.message if query == req.message else f"{req.message}\n(English translation used for the search: {query})",
+                question=req.message if query == req.message else f"{req.message}\n(The documents were searched for: {query})",
                 system_prompt=system_prompt,
                 evidence=all_matches,
                 history=history,
@@ -499,6 +501,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             provider=generation.provider,
             model=generation.model,
             verification_warnings=verification_warnings,
+            # Shown under the answer when the search differed from what was typed
+            searched_for=None if " ".join(query.lower().split()) == " ".join(req.message.lower().split()) else query,
         )
     except HTTPException:
         raise  # deliberate errors (e.g. 403 for someone else's conversation) keep their status

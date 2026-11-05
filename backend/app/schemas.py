@@ -43,6 +43,7 @@ class ChatResponse(BaseModel):
     provider: str = "local"
     model: str = "evidence-only"
     verification_warnings: List[str] = Field(default_factory=list)
+    searched_for: Optional[str] = None  # the corrected / translated / standalone search, if it differed
     question_count: int = 0
     response_count: int = 0
     demand_count: int = 0

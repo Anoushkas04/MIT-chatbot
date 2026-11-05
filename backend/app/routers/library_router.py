@@ -34,6 +34,9 @@ def search(q: str = Query(..., min_length=2, max_length=200), me: models.User = 
     from app.rag.store import get_store
 
     try:
+        from app.rag.spelling import correct_query
+
+        q = correct_query(q)
         store = get_store()
         hits = store.search(embed_query(q, store.embedder), raw_query=q, k=20)
     except Exception:
