@@ -61,6 +61,8 @@ def build_system_prompt(
         f"   - For DEFINITION/EXPLANATION: Short explanation + optional brief example.\n"
         f"4. SOURCE ATTRIBUTION: Cite each factual claim with [E1], [E2], etc. Do not add a separate references section.\n"
         f"5. DIRECTNESS: Do not start with filler such as 'Based on the provided context'. Never reproduce a raw evidence chunk.\n"
+        f"6. FOLLOW-UPS: End with one line 'Follow-up questions: <q1> | <q2> | <q3>': up to three short questions "
+        f"the student might ask next that the SAME evidence answers. Leave the line out if there are none.\n"
     )
 
     if context_chunks:

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
+from app.followups import split_model_followups, suggest
 from app.multilingual import LOW_CONFIDENCE, NO_INFO, answer_language, search_query
 from app.rag.entities import extract as extract_entities
 from app.rag.rerank import best_relevance, rerank
@@ -447,7 +448,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
                 evidence=all_matches,
                 history=history,
             ))
-        reply_text, verification_warnings = verify_answer(generation.text, all_matches)
+        answer_text, model_followups = split_model_followups(generation.text)
+        reply_text, verification_warnings = verify_answer(answer_text, all_matches)
 
         citations = []
         sources = []
@@ -468,9 +470,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         elif fallback_suffix:
             reply_text += LOW_CONFIDENCE[language]
 
-        # Follow-up suggestions are intentionally empty until they can be generated
-        # and verified against the same evidence set.
-        followups = []
+        # Checked against the same evidence, so each one can be answered (app/followups.py)
+        followups = [] if not all_matches else (_safely(lambda q: suggest(q, all_matches, model_followups, faculty_lookup), query) or [])
         add_turn(req.session_id, req.message, reply_text)
 
         # Save session & message to SQLite DB

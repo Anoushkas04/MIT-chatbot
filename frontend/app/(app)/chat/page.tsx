@@ -14,6 +14,7 @@ type ChatMessage = {
   time: string
   citations?: ChatCitation[]
   searchedFor?: string | null
+  followups?: string[]
 }
 
 const languages: { value: ChatLanguage; label: string; placeholder: string }[] = [
@@ -115,6 +116,7 @@ function ChatInner() {
         text: answer.text,
         time: 'Now',
         searchedFor: answer.searched_for,
+        followups: answer.followups ?? [],
         // Older servers only send file names; show those as plain documents
         citations:
           answer.citations ??
@@ -226,6 +228,15 @@ function ChatInner() {
                       </button>
                     )
                   })}
+                </div>
+              )}
+              {m.followups && m.followups.length > 0 && (
+                <div className="chat-followups" aria-label="Suggested follow-up questions">
+                  {m.followups.map((f) => (
+                    <button key={f} onClick={() => ask(f)} disabled={thinking}>
+                      {f}
+                    </button>
+                  ))}
                 </div>
               )}
               <time>{m.time}</time>

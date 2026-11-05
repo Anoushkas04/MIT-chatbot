@@ -50,6 +50,7 @@ export type ChatResponse = {
   sources: string[]
   citations?: ChatCitation[]
   searched_for?: string | null // the corrected, translated or standalone search, when it differed
+  followups?: string[] // questions the same evidence can answer
   confidence: string
   confidence_type: string
 }
