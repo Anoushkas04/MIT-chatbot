@@ -101,8 +101,6 @@ export function buildNotifications({
   unreadMessages?: Record<string, number> // network person id -> unread private messages
 }): AppNotification[] {
   const out: AppNotification[] = []
-  // Registered students only; demo people saved by earlier versions don't notify
-  people = people.filter((p) => p.accountId)
   const byId = new Map(people.map((p) => [p.id, p]))
 
   // Official dates from the academic calendar that are on now or in the next week. One per

@@ -90,7 +90,7 @@ export default function PersonProfilePage() {
         <div className="person-hero-info">
           <h1>{person.name}</h1>
           <p className="view-sub">{[branch, semester].filter(Boolean).join(' · ') || 'Student at MIT Manipal'}</p>
-          {person.accountId && <span className="account-badge">On MITra</span>}
+          {person.accountId ? <span className="account-badge">On MITra</span> : <span className="account-badge sample">Sample</span>}
         </div>
         <div className="person-actions">
           {(person.status === 'suggested' || person.status === 'dismissed') && (

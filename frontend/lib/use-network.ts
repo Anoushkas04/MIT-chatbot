@@ -32,8 +32,8 @@ export function accountToPerson(u: PublicUser): NetworkPerson {
   }
 }
 
-/** Applies the server's view of my connections to the local list. People without an account
- * (demo entries from earlier versions) are dropped; new suggestions are added. */
+/** Applies the server's view of my connections to the local list. Sample people (no account)
+ * are left as they are; new suggestions are added. */
 function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot, me?: string): NetworkPerson[] {
   const server = new Map<string, { user?: PublicUser; status: NetworkStatus }>()
   for (const u of snap.connections) server.set(u.id, { user: u, status: 'connected' })
@@ -42,8 +42,9 @@ function mergeSnapshot(prev: NetworkPerson[], snap: NetworkSnapshot, me?: string
   for (const id of snap.blocked) server.set(id, { status: 'blocked' })
 
   const seen = new Set<string>()
-  const next = prev.filter((p) => p.accountId && p.accountId !== me).map((p) => {
-    seen.add(p.accountId!)
+  const next = prev.filter((p) => p.accountId !== me || !p.accountId).map((p) => {
+    if (!p.accountId) return p  // sample people only change on this device
+    seen.add(p.accountId)
     const s = server.get(p.accountId!)
     if (s) return s.status === p.status ? p : { ...p, status: s.status }
     // No relationship on the server: they removed, declined or withdrew, or it was only ever
@@ -70,6 +71,19 @@ export function useNetworkPeople() {
   const [people, setPeople] = useLocalState<NetworkPerson[]>(accountKey('mitra_network'), defaultNetworkPeople)
   // Things other people did that concern you, shown on the Notifications page.
   const [activity, setActivity] = useLocalState<ActivityEvent[]>(accountKey('mitra_activity'), defaultActivity)
+
+  // Lists saved while there were no sample people get them added (whatever you did with
+  // one, like dismissing it, is kept because it's already in your list)
+  useEffect(() => {
+    setPeople((prev) => {
+      const missing = defaultNetworkPeople.filter((d) => !prev.some((p) => p.id === d.id))
+      return missing.length ? [...prev, ...missing] : prev
+    })
+    setActivity((prev) => {
+      const missing = defaultActivity.filter((d) => !prev.some((a) => a.id === d.id))
+      return missing.length ? [...prev, ...missing] : prev
+    })
+  }, [setPeople, setActivity])
   // Unread private messages from registered students, keyed by network person id
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
@@ -113,7 +127,7 @@ export function useNetworkPeople() {
     setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)))
   }
 
-  /** Runs a server action, then updates the local status. */
+  /** Runs a server action for registered students; sample people only change locally. */
   async function serverAction(id: string, action: (accountId: string) => Promise<unknown>, nextStatus: NetworkStatus) {
     const person = people.find((p) => p.id === id)
     if (person?.accountId) {
@@ -129,7 +143,15 @@ export function useNetworkPeople() {
   }
 
   async function sendRequest(person: NetworkPerson) {
-    if (!person.accountId) return
+    if (!person.accountId) {
+      // Sample people aren't real accounts, so their acceptance is simulated
+      setStatus(person.id, 'pending')
+      setTimeout(() => {
+        setStatus(person.id, 'connected')
+        setActivity((prev) => [{ id: `act-${Date.now()}`, kind: 'accepted', personId: person.id, at: Date.now() }, ...prev])
+      }, 1600)
+      return
+    }
     try {
       setError(null)
       const res = await networkApi.request(person.accountId)
@@ -165,8 +187,8 @@ export function useNetworkPeople() {
   }
 
   return {
-    // Only registered students; demo entries saved by earlier versions are hidden until the next sync drops them
-    people: people.filter((p) => p.accountId && p.accountId !== me),
+    // Registered students and the sample people, never yourself
+    people: people.filter((p) => !p.accountId || p.accountId !== me),
     setPeople,
     activity,
     unread,

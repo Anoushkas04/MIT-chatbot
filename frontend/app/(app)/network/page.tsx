@@ -6,9 +6,10 @@ import { Ban, Flag, Lock, MoreHorizontal, Search, Send, X } from 'lucide-react'
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog'
 import { NetworkPersonCard } from '@/components/network-person-card'
 import { accountToPerson, useNetworkPeople } from '@/lib/use-network'
-import type { DirectMessage, NetworkPerson } from '@/lib/mock-data'
+import { defaultMessages, type DirectMessage, type NetworkPerson } from '@/lib/mock-data'
+import { useLocalState } from '@/lib/use-local-state'
 import { messagesApi, REPORT_REASONS, reportUser, searchUsers, type PublicUser, type ReportReason, type ServerMessage } from '@/lib/api'
-import { getSession } from '@/lib/session'
+import { accountKey, getSession } from '@/lib/session'
 
 type Tab = 'suggested' | 'requests' | 'connections'
 
@@ -111,8 +112,9 @@ function ReportPanel({
 export default function NetworkPage() {
   const { people, unread, error: networkError, refresh, connect, withdraw, accept, ignore, dismiss, block, unblock, connectNew } =
     useNetworkPeople()
-  // Conversations with registered students, loaded from the server
+  // Conversations with registered students, loaded from the server; sample people's chats stay on this device
   const [serverThreads, setServerThreads] = useState<Record<string, ServerMessage[]>>({})
+  const [messages, setMessages] = useLocalState<Record<string, DirectMessage[]>>(accountKey('mitra_messages'), defaultMessages)
   const [chatError, setChatError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('suggested')
   const [activeChat, setActiveChat] = useState<string | null>(null)
@@ -135,10 +137,11 @@ export default function NetworkPage() {
 
   const chatPerson = activeChat ? people.find((p) => p.id === activeChat && p.status === 'connected') : null
   const chatAccountId = chatPerson?.accountId
-  const thread: DirectMessage[] =
-    activeChat && chatAccountId
+  const thread: DirectMessage[] = !activeChat
+    ? []
+    : chatAccountId
       ? (serverThreads[activeChat] ?? []).map((m) => ({ id: `s-${m.id}`, from: m.from, text: m.text, time: m.time }))
-      : []
+      : messages[activeChat] ?? []
   const unreadTotal = connected.reduce((n, p) => n + (unread[p.id] ?? 0), 0)
 
   // While a chat with a registered student is open, load it and check for new messages every few seconds.
@@ -246,8 +249,15 @@ export default function NetworkPage() {
   }
 
   async function sendMessage() {
-    if (!draft.trim() || !activeChat || !chatAccountId) return
+    if (!draft.trim() || !activeChat) return
     const text = draft.trim()
+    if (!chatAccountId) {
+      // A sample person: the chat stays on this device
+      const msg: DirectMessage = { id: `m-${Date.now()}`, from: 'me', text, time: 'Now' }
+      setMessages((prev) => ({ ...prev, [activeChat]: [...(prev[activeChat] ?? []), msg] }))
+      setDraft('')
+      return
+    }
     try {
       const sent = await messagesApi.send(chatAccountId, text)
       setServerThreads((prev) => {

@@ -19,13 +19,9 @@ def seed_database():
     db = SessionLocal()
 
     try:
-        # Opt-in demo content for the Community feed (SEED_DEMO_COMMUNITY=1 only). Added
-        # alongside real posts, once: demo posts are the ones with a label and no account, so
-        # a restart (or an admin deleting them, which keeps the row) never seeds them again.
-        demo_seeded = db.query(models.CommunityPost).filter(
-            models.CommunityPost.author_id.is_(None), models.CommunityPost.author_label.isnot(None)
-        ).first()
-        if SEED_DEMO_COMMUNITY and not demo_seeded:
+        # Opt-in demo content for the Community feed (SEED_DEMO_COMMUNITY=1 only), added
+        # alongside real posts.
+        if SEED_DEMO_COMMUNITY:
             _seed_demo_community(db)
 
     finally:
@@ -33,8 +29,20 @@ def seed_database():
 
 
 def _seed_demo_community(db) -> None:
+    """Adds each demo question that isn't there yet. Demo posts are the ones with a label and
+    no account; one an admin deleted keeps its row, so it isn't added again on restart."""
     import json
     from app.demo_community import DEMO_POSTS
+
+    existing = {
+        title
+        for (title,) in db.query(models.CommunityPost.title).filter(
+            models.CommunityPost.author_id.is_(None), models.CommunityPost.author_label.isnot(None)
+        )
+    }
+    missing = [p for p in DEMO_POSTS if p["title"] not in existing]
+    if not missing:
+        return
 
     def add_comments(post_id: int, parent_id, items: list) -> None:
         for item in items:
@@ -50,7 +58,7 @@ def _seed_demo_community(db) -> None:
             db.flush()  # need comment.id before seeding its own replies
             add_comments(post_id, comment.id, item.get("replies", []))
 
-    for p in DEMO_POSTS:
+    for p in missing:
         post = models.CommunityPost(
             title=p["title"],
             body=p["body"],
@@ -64,7 +72,7 @@ def _seed_demo_community(db) -> None:
         add_comments(post.id, None, p.get("answers", []))
 
     db.commit()
-    print(f"✓ Database Seeded: {len(DEMO_POSTS)} labelled demo Community questions (SEED_DEMO_COMMUNITY=1).")
+    print(f"✓ Database Seeded: {len(missing)} labelled demo Community questions (SEED_DEMO_COMMUNITY=1).")
 
 
 if __name__ == "__main__":

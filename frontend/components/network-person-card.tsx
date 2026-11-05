@@ -37,7 +37,7 @@ export function NetworkPersonCard({
       <Link href={`/network/${encodeURIComponent(person.id)}`} className="network-card-link" aria-label={`View ${person.name}'s profile`}>
         <div className="network-avatar">{person.initials}</div>
         <strong>{person.name}</strong>
-        {person.accountId && <span className="account-badge">On MITra</span>}
+        {person.accountId ? <span className="account-badge">On MITra</span> : <span className="account-badge sample">Sample</span>}
         <span className="network-meta">
           {[person.branch, person.semester].filter(Boolean).join(' · ')}
         </span>

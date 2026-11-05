@@ -203,18 +203,43 @@ export type NetworkPerson = {
   accountId?: string
 }
 
-// Network only shows registered students from the backend (see use-network.ts).
-export const defaultNetworkPeople: NetworkPerson[] = []
+// Sample people shown alongside registered students, so Network isn't empty. They have
+// no account: connecting is simulated and their chats stay on this device (use-network.ts).
+export const defaultNetworkPeople: NetworkPerson[] = [
+  { id: 'n1', name: 'Tanvi Rao', initials: 'TR', branch: 'CSE', semester: '5th sem', sharedInterests: ['Artificial Intelligence', 'Research'], status: 'suggested' },
+  { id: 'n2', name: 'Karan Bhatt', initials: 'KB', branch: 'ECE', semester: '5th sem', sharedInterests: ['Robotics'], status: 'suggested' },
+  { id: 'n3', name: 'Nisha Pillai', initials: 'NP', branch: 'CSE', semester: '3rd sem', sharedInterests: ['Design', 'Web Development'], status: 'connected' },
+  { id: 'n4', name: 'Arjun Verma', initials: 'AV', branch: 'Mechanical', semester: '7th sem', sharedInterests: ['Entrepreneurship'], status: 'suggested' },
+  { id: 'n5', name: 'Fatima Sheikh', initials: 'FS', branch: 'CSE', semester: '5th sem', sharedInterests: ['Artificial Intelligence', 'Competitive Programming'], status: 'connected' },
+  { id: 'n6', name: 'Rohit Dsouza', initials: 'RD', branch: 'ECE', semester: '5th sem', sharedInterests: ['Design'], status: 'suggested' },
+  { id: 'n7', name: 'Ananya Iyer', initials: 'AI', branch: 'CSE', semester: '5th sem', sharedInterests: ['Research', 'Public Speaking'], status: 'suggested' },
+  { id: 'n8', name: 'Sameer Khan', initials: 'SK', branch: 'CSE', semester: '5th sem', sharedInterests: ['Robotics', 'Artificial Intelligence'], status: 'pending' },
+  { id: 'n9', name: 'Priyanka Das', initials: 'PD', branch: 'CSE', semester: '5th sem', sharedInterests: ['Competitive Programming'], status: 'incoming' },
+  { id: 'n10', name: 'Yusuf Ali', initials: 'YA', branch: 'ECE', semester: '5th sem', sharedInterests: ['Music'], status: 'incoming' },
+]
 
 // A thing someone else did that concerns you. `at` is a timestamp for live events;
 // seeded demo events carry a display `time` instead.
 export type ActivityEvent = { id: string; kind: 'accepted'; personId: string; at?: number; time?: string }
 
-export const defaultActivity: ActivityEvent[] = []
+export const defaultActivity: ActivityEvent[] = [
+  { id: 'act-seed-1', kind: 'accepted', personId: 'n5', time: '1d ago' },
+  { id: 'act-seed-2', kind: 'accepted', personId: 'n3', time: '3d ago' },
+]
 
 export type DirectMessage = { id: string; from: 'me' | 'them'; text: string; time: string }
 
-export const defaultMessages: Record<string, DirectMessage[]> = {}
+export const defaultMessages: Record<string, DirectMessage[]> = {
+  n3: [
+    { id: 'm1', from: 'them', text: 'Hey! Saw you\'re also into web dev, are you joining the design jam next week?', time: '10:12 AM' },
+    { id: 'm2', from: 'me', text: 'Yeah planning to! Are you on a team yet?', time: '10:15 AM' },
+    { id: 'm3', from: 'them', text: 'Not yet, want to team up?', time: '10:16 AM' },
+  ],
+  n5: [
+    { id: 'm1', from: 'them', text: 'That CP contest this weekend, you in?', time: 'Yesterday' },
+    { id: 'm2', from: 'me', text: 'Definitely, let\'s do a virtual contest together before that too', time: 'Yesterday' },
+  ],
+}
 
 // ---- Planner ----
 
