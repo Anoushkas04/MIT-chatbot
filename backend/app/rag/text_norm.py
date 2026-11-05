@@ -89,6 +89,9 @@ SYNONYMS = {
     "cheating": "malpractice",
     "copying": "malpractice",
     "hall ticket": "admit card hall ticket",
+    "handbook": "hand book",
+    "undergraduate": "ug",
+    "postgraduate": "pg",
 }
 
 _SUFFIXES = (("ies", "y"), ("sses", "ss"), ("ing", ""), ("es", ""), ("ed", ""), ("s", ""))

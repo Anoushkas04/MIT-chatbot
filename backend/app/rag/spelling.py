@@ -18,6 +18,11 @@ from rapidfuzz.distance import OSA
 from app.rag.text_norm import STOPWORDS, SYNONYMS, stem
 
 WORD = re.compile(r"[a-z]+")
+NUMBER_WORDS = (
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+    "seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety hundred thousand lakh crore "
+    "first second third fourth fifth sixth seventh eighth ninth tenth"
+).split()
 MIN_LENGTH = 4
 # A word the corpus has at most this often is treated as a possible OCR misspelling…
 RARE = 2
@@ -33,8 +38,12 @@ def vocabulary() -> tuple[Counter, dict]:
     counts: Counter = Counter()
     for chunk in get_store().chunks:
         counts.update(WORD.findall(f"{chunk.get('retrieval_text', '')} {chunk.get('text', '')}".lower()))
-    for phrase in SYNONYMS:  # "endsem", "midsem", "bunk": known words, never corrected
-        counts.update(WORD.findall(phrase))
+    from app.rag.hybrid import QUERY_ALIASES, QUERY_REWRITES
+
+    # Words the search already understands ("endsem", "bunk") and number words. Rewrite keys
+    # are misspellings ("attendence"), so only their corrected values count.
+    for phrase in [*SYNONYMS, *QUERY_REWRITES.values(), *QUERY_ALIASES, *NUMBER_WORDS]:
+        counts.update(WORD.findall(phrase) * (RARE + 1))
     by_length: dict = defaultdict(list)
     for word in counts:
         if len(word) >= MIN_LENGTH:  # never "correct" into a short word or acronym ("cabn" -> "can")

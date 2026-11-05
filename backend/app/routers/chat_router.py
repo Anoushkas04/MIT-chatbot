@@ -7,6 +7,7 @@ from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
 from app.multilingual import LOW_CONFIDENCE, NO_INFO, answer_language, search_query
 from app.rag.entities import extract as extract_entities
+from app.rag.rerank import best_relevance, rerank
 from app.rag.spelling import correct_query
 from app.structured_lookup import calendar_evidence, club_evidence
 from app.prompts import build_system_prompt
@@ -132,7 +133,7 @@ def extract_query_features(query: str, intent: str, query_type: str, confidence:
     }
 
 
-def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) -> list:
+def filter_chunk_relevance(vector_matches: list, query: str, query_type: str, limit: int = 4) -> list:
     """Relevance Filtering: Filters out raw bibliography lines, unrelated faculty directories,
 
     and handbook fluff, retaining only chunks containing entities relevant to the query.
@@ -172,7 +173,7 @@ def filter_chunk_relevance(vector_matches: list, query: str, query_type: str) ->
             filtered.append(m_copy)
 
     filtered.sort(key=lambda x: x["score"], reverse=True)
-    return filtered[:4]
+    return filtered[:limit]
 
 
 def merge_evidence(
@@ -201,6 +202,14 @@ def merge_evidence(
         merged = official_matches or community_matches
     return merged[:limit]
 
+
+# Re-ranking (app/rag/rerank.py): candidates fetched, and the coverage thresholds. Chosen on a
+# calibration set kept apart from the evaluation (rag_queries.jsonl as answerable,
+# dev_unanswerable.jsonl): answerable questions' best passage covered >= 0.47 of the question,
+# unanswerable ones <= 0.40.
+RERANK_CANDIDATES = 10
+NO_ANSWER_BELOW = 0.30
+LOW_CONFIDENCE_BELOW = 0.44
 
 # Who the answer is written for (prompts.ROLE_PERSONAS). Any student can ask on behalf of a
 # parent or a prospective student; the faculty persona is for faculty accounts.
@@ -293,6 +302,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
                     academic_year=entities.academic_year or req.academic_year,
                     semester=req.semester,
                     entities=entities,
+                    final_k=RERANK_CANDIDATES,
                 )
             except Exception as e:
                 print("Vector search error:", e)
@@ -311,8 +321,15 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         relevant_official_matches = (
             vector_matches
             if faculty_lookup
-            else filter_chunk_relevance(vector_matches, relevance_query, query_type)
+            else rerank(query, filter_chunk_relevance(vector_matches, relevance_query, query_type, limit=RERANK_CANDIDATES))[:4]
         )
+        # How much of the question the best passage covers (absolute, unlike the fused rank
+        # scores). Structured lookups are exact matches, so they're exempt.
+        coverage = None
+        if not faculty_lookup and not structured:
+            coverage = best_relevance(query, relevant_official_matches)
+            if coverage < NO_ANSWER_BELOW:
+                relevant_official_matches = []  # nothing in the documents answers this
 
         # 2. Database search for Community Q&A — only admin-verified, high-upvote posts
         # that have actually been promoted into the dataset (app/community_knowledge.py).
@@ -346,6 +363,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         # Evaluate Confidence
         from app.hallucination_guard import evaluate_confidence
         confidence, confidence_type, fallback_suffix = evaluate_confidence(all_matches)
+        if coverage is not None and coverage < LOW_CONFIDENCE_BELOW and all_matches and confidence in ("high", "medium"):
+            confidence, fallback_suffix = "low", LOW_CONFIDENCE["en"]  # weak match: answer with the warning
 
         # Feature & Internal Sentiment Extraction (Requirement 10 & 11)
         source_type_primary = all_matches[0].get("source_type", "official") if all_matches else "none"
@@ -412,7 +431,10 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         history = get_history(req.session_id)
         # The directory's fixed answer is English; other languages go through the model
-        if faculty_lookup and language == "en":
+        if not all_matches:
+            # Nothing to answer from: don't spend a model call
+            generation = GenerationResult(text=NO_INFO[language], provider="local", model="no-evidence")
+        elif faculty_lookup and language == "en":
             generation = GenerationResult(
                 text=faculty_lookup["answer"],
                 provider="local",
