@@ -110,18 +110,39 @@ def root():
     }
 
 
+def _ocr_status() -> dict:
+    """What the last index build read from scanned pages (from its manifest)."""
+    from app.rag.store import get_store
+
+    try:
+        manifest = get_store().manifest or {}
+    except Exception:
+        return {"scanned_pages": None, "ocr_pages": None}
+    return {
+        "scanned_pages": manifest.get("scanned_page_count"),
+        "ocr_pages": manifest.get("ocr_page_count"),
+        "ocr_chunks": manifest.get("ocr_chunk_count"),
+        "calendar_events": manifest.get("calendar_event_count"),
+    }
+
+
 @app.get("/api/health", tags=["0. System Health"])
 def health():
     rag = get_store_status()
     from app.providers import get_provider_status
     from app.rag.visual_store import get_visual_status
+    from app.database import schema_status
     visual = get_visual_status()
+    database = schema_status()
     return {
-        "status": "ok",
+        "status": "ok" if rag["ready"] and database["ok"] else "degraded",
         "platform": "MIT CampusOS",
         "rag_store_ready": rag["ready"],
         "rag_chunk_count": rag["chunk_count"],
         "rag_error": rag["error"],
+        "rag_embedder": rag.get("embedder"),
+        "ocr": _ocr_status(),
+        "database": database,
         "visual_rag": visual,
         "llm": get_provider_status(),
         "docs_url": "http://localhost:8000/docs",

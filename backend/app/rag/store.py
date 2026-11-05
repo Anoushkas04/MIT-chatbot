@@ -30,6 +30,8 @@ class VectorStore:
         self.manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else None
         if len(self.chunks) != len(self.embeddings):
             raise ValueError("RAG chunks and embeddings have different lengths.")
+        # Questions must be embedded the same way as the index (see llm.embed_query)
+        self.embedder = (self.manifest or {}).get("text_embedding_model") or "local-hash"
 
     def search(self, query_embedding, raw_query: str = "", k: int = 5) -> list[dict]:
         fetch_k = min(k * 15, len(self.chunks))
@@ -75,7 +77,8 @@ def get_store_status() -> dict:
             "schema_version": store.manifest.get("schema_version") if store.manifest else 1,
             "page_count": store.manifest.get("page_count", 0) if store.manifest else 0,
             "file_count": store.manifest.get("file_count", 0) if store.manifest else 0,
+            "embedder": store.embedder,
             "error": None,
         }
     except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
-        return {"ready": False, "chunk_count": 0, "embedding_count": 0, "schema_version": None, "page_count": 0, "file_count": 0, "error": str(exc)}
+        return {"ready": False, "chunk_count": 0, "embedding_count": 0, "schema_version": None, "page_count": 0, "file_count": 0, "embedder": None, "error": str(exc)}

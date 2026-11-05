@@ -175,6 +175,25 @@ def _context_score(
     return score
 
 
+def _cutoff_list_priority(record: dict, normalized_query: str) -> int:
+    """Among the many cutoff-rank PDFs, prefer the round asked for, and regular B.Tech
+    counselling unless the question names lateral entry or M.Tech."""
+    source = str(record.get("source_file") or record.get("source", "")).lower()
+    if "cut" not in source:
+        return 0
+    score = 0
+    asked = re.search(r"round\s*(\d|one|two|three)", normalized_query)
+    listed = re.search(r"round[\s_]*(\d)", source)
+    if asked and listed:
+        number = {"one": "1", "two": "2", "three": "3"}.get(asked.group(1), asked.group(1))
+        score += 2 if number == listed.group(1) else -2
+    if "lateral" in source and "lateral" not in normalized_query:
+        score -= 2
+    if ("mtech" in source or "m.tech" in source) and not re.search(r"\bm\.?\s?tech|\bme\b", normalized_query):
+        score -= 2
+    return score
+
+
 def _record_query_priority(record: dict, query: str) -> int:
     normalized = query.lower()
     score = 0
@@ -182,6 +201,7 @@ def _record_query_priority(record: dict, query: str) -> int:
         month for name, month in MONTH_NUMBERS.items() if name in normalized
     }
     requested_years = {int(value) for value in re.findall(r"\b20\d{2}\b", normalized)}
+    score += _cutoff_list_priority(record, normalized)
     if record.get("calendar_month") and int(record["calendar_month"]) in requested_months:
         score += 2
     if record.get("calendar_year") and int(record["calendar_year"]) in requested_years:
@@ -214,8 +234,9 @@ def hybrid_search(
     search_query = _expanded_query(f"{_positive_query(query)} {context}".strip())
     result_lists: list[tuple[str, list[dict]]] = []
     try:
-        dense = get_store().search(
-            embed_query(search_query),
+        store = get_store()
+        dense = store.search(
+            embed_query(search_query, getattr(store, "embedder", None)),
             raw_query=search_query,
             k=RAG_TOP_K_TEXT,
         )

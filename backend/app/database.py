@@ -40,24 +40,55 @@ def get_db():
         db.close()
 
 
-# Columns added after the first release. create_all only creates missing tables, so
-# existing databases (e.g. Supabase in production) get these added here.
-_ADDED_COLUMNS = {"users": {"clubs": "TEXT", "projects": "TEXT"}}
+def _sync_columns() -> list[str]:
+    """Add columns the models have but an existing database lacks.
 
-
-def _add_missing_columns():
+    create_all only creates missing tables, so a database made by an earlier version
+    (e.g. Supabase in production) would miss columns added since. They're added as
+    nullable, which existing rows need; the models supply defaults for new rows.
+    Returns "table.column" for each one added.
+    """
     from sqlalchemy import inspect, text
 
+    added = []
     inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
     with engine.begin() as conn:
-        for table, columns in _ADDED_COLUMNS.items():
-            existing = {c["name"] for c in inspector.get_columns(table)}
-            for name, sql_type in columns.items():
-                if name not in existing:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+        for table in Base.metadata.sorted_tables:
+            if table.name not in tables:
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                sql_type = column.type.compile(dialect=engine.dialect)
+                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{column.name}" {sql_type}'))
+                added.append(f"{table.name}.{column.name}")
+    return added
+
+
+def schema_status() -> dict:
+    """Tables or columns the models expect but the database doesn't have (for /api/health)."""
+    from sqlalchemy import inspect
+
+    try:
+        inspector = inspect(engine)
+        tables = set(inspector.get_table_names())
+        missing = []
+        for table in Base.metadata.sorted_tables:
+            if table.name not in tables:
+                missing.append(table.name)
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            missing.extend(f"{table.name}.{c.name}" for c in table.columns if c.name not in existing)
+        return {"ok": not missing, "dialect": engine.dialect.name, "tables": len(tables), "missing": missing}
+    except Exception as exc:
+        return {"ok": False, "dialect": engine.dialect.name, "error": str(exc)}
 
 
 def init_db():
     from app import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
-    _add_missing_columns()
+    added = _sync_columns()
+    if added:
+        print(f"Database: added columns {', '.join(added)}")

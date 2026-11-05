@@ -350,7 +350,7 @@ def test_hybrid_search_survives_all_retriever_failures(monkeypatch):
     monkeypatch.setattr(hybrid, "get_store", lambda: broken)
     monkeypatch.setattr(hybrid, "get_keyword_store", lambda: broken)
     monkeypatch.setattr(hybrid, "get_visual_store", lambda: broken)
-    monkeypatch.setattr(hybrid, "embed_query", lambda query: [0.0])
+    monkeypatch.setattr(hybrid, "embed_query", lambda query, embedder=None: [0.0])
     monkeypatch.setattr(hybrid, "VISUAL_RAG_ENABLED", True)
 
     assert hybrid.hybrid_search("attendance") == []
@@ -363,7 +363,7 @@ def test_hybrid_search_fuses_duplicate_hits_and_reports_methods(monkeypatch):
     store = SimpleNamespace(search=lambda *args, **kwargs: [hit])
     monkeypatch.setattr(hybrid, "get_store", lambda: store)
     monkeypatch.setattr(hybrid, "get_keyword_store", lambda: store)
-    monkeypatch.setattr(hybrid, "embed_query", lambda query: [0.0])
+    monkeypatch.setattr(hybrid, "embed_query", lambda query, embedder=None: [0.0])
     monkeypatch.setattr(hybrid, "VISUAL_RAG_ENABLED", False)
 
     result = hybrid.hybrid_search("attendance", final_k=4)

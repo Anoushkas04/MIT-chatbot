@@ -200,6 +200,15 @@ def merge_evidence(
     return merged[:limit]
 
 
+def _safely(lookup, query: str):
+    """A structured lookup is an extra; if it fails, answer from document search instead."""
+    try:
+        return lookup(query)
+    except Exception as exc:
+        print(f"{lookup.__name__} failed: {exc}")
+        return None
+
+
 def _citation(index: int, m: dict, src: str, faculty_lookup: dict | None) -> CitationDetail:
     """One citation per evidence item ([E<index>]), with where clicking it should go."""
     text = m.get("text", "")
@@ -250,8 +259,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         query = search_query(req.message, language)
         intent = classify_intent(query)
         query_type = detect_query_type(query)
-        faculty_lookup = lookup_faculty(query)
-        structured = [] if faculty_lookup else calendar_evidence(query) + club_evidence(query)
+        faculty_lookup = _safely(lookup_faculty, query)
+        structured = [] if faculty_lookup else (_safely(calendar_evidence, query) or []) + (_safely(club_evidence, query) or [])
 
         # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
         if faculty_lookup:

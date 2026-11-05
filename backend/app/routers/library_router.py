@@ -34,7 +34,8 @@ def search(q: str = Query(..., min_length=2, max_length=200), me: models.User = 
     from app.rag.store import get_store
 
     try:
-        hits = get_store().search(embed_query(q), raw_query=q, k=20)
+        store = get_store()
+        hits = store.search(embed_query(q, store.embedder), raw_query=q, k=20)
     except Exception:
         return {"results": [], "indexed": False}
     best: dict = {}  # one result per document file, keeping its best-matching chunk

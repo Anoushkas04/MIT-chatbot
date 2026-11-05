@@ -38,6 +38,8 @@ def get_client() -> genai.Client:
 HASH_EMBED_DIM = 768
 # v2: stopwords removed and light stemming (app/rag/text_norm.py); v1 indexes need a rebuild
 LOCAL_EMBEDDER = "local-hash-v2"
+# A question's embedding is on the chat's critical path; don't let it hang a reply
+QUERY_EMBED_TIMEOUT_MS = 10_000
 
 
 def active_embedder() -> str:
@@ -119,7 +121,8 @@ def _embed_batch_with_retry(client, batch, max_retries=6):
             )
             return [e.values for e in response.embeddings]
         except errors.ClientError as e:
-            if e.code == 429 and attempt < max_retries - 1:
+            # A used-up daily quota won't recover in minutes: give up so the build falls back now
+            if e.code == 429 and "PerDay" not in str(e) and attempt < max_retries - 1:
                 wait = 40
                 print(f"  rate limited, waiting {wait}s (attempt {attempt + 1}/{max_retries})...")
                 time.sleep(wait)
@@ -127,8 +130,27 @@ def _embed_batch_with_retry(client, batch, max_retries=6):
             raise
 
 
-def embed_query(text: str) -> list[float]:
-    return embed_texts([text])[0]
+def embed_query(text: str, index_embedder: str | None = None) -> list[float]:
+    """Embed a question with the embedder the index was built with (its manifest label).
+
+    A question embedded by one model can't be compared with an index built by another, so a
+    local-hash index always gets local vectors (no API call) and a Gemini index gets one quick
+    Gemini call with no retries; if that fails the caller skips vector search for this question.
+    """
+    if not index_embedder or index_embedder.startswith("local-hash"):
+        return _hash_embed(text)
+    if not is_valid_key(GEMINI_API_KEY):
+        raise RuntimeError("The index uses Gemini embeddings but no Gemini key is configured.")
+    client = genai.Client(
+        api_key=GEMINI_API_KEY.strip(),
+        http_options=types.HttpOptions(timeout=QUERY_EMBED_TIMEOUT_MS),
+    )
+    response = client.models.embed_content(
+        model=index_embedder.split(":", 1)[-1],
+        contents=[text],
+        config=types.EmbedContentConfig(output_dimensionality=768),
+    )
+    return response.embeddings[0].values
 
 
 def synthesize_local_concise_answer(message: str, kb_part: str) -> str:
