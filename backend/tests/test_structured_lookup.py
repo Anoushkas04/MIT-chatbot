@@ -45,3 +45,17 @@ def test_citations_say_where_to_go():
     assert doc.kind == "document" and doc.title == "Regulations 2026 B.Tech" and doc.page_number == 4
     faculty = _citation(1, {"text": "x"}, "merged_faculty.csv", {"kind": "person", "records": [{"name": "Dr. A B", "dept": "X"}]})
     assert faculty.source_url == "/utilities?section=professors&q=Dr.%20A%20B"
+
+
+def test_faculty_lists_understand_common_school_names():
+    from app.faculty_directory import lookup_faculty
+
+    expected = {
+        "Can you give me the list of all the professors in school of computing": "School of Computer Engineering",
+        "list all maths faculty": "School of Basic Sciences, Humanities & Management",
+        "show biotech professors": "School of Civil & Chemical Engineering",
+    }
+    for question, school in expected.items():
+        result = lookup_faculty(question)
+        assert result and result["kind"] == "department_list", question
+        assert {r["dept"] for r in result["records"]} == {school}

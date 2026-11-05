@@ -8,7 +8,8 @@ from app.config import DOCS_DIR
 
 DEPARTMENT_ALIASES = {
     "School of Computer Engineering": (
-        "school of computer engineering", "computer engineering", "computer science",
+        "school of computer engineering", "school of computing", "computing",
+        "computer engineering", "computer science",
         "information technology", "data science", "artificial intelligence",
         "machine learning", "cse", "sce", "it", "dse", "aiml",
     ),
@@ -27,12 +28,12 @@ DEPARTMENT_ALIASES = {
     "School of Civil & Chemical Engineering": (
         "school of civil and chemical engineering", "school of civil & chemical engineering",
         "civil engineering", "chemical engineering", "biotechnology", "civil", "chemical",
-        "civil and chemical", "civil & chemical", "bt",
+        "civil and chemical", "civil & chemical", "biotech", "bt",
     ),
     "School of Basic Sciences, Humanities & Management": (
         "school of basic sciences humanities and management",
         "school of basic sciences, humanities & management", "basic sciences",
-        "humanities and management", "humanities", "management", "mathematics",
+        "humanities and management", "humanities", "management", "mathematics", "maths", "math",
         "physics", "chemistry", "bs hm", "bshm",
     ),
 }
@@ -46,7 +47,7 @@ PERSON_QUERY_STOPWORDS = HONORIFIC_TOKENS | {
     "please", "room", "tell", "the", "what", "where", "which", "who", "you", "s",
     "their",
 }
-LIST_SIGNALS = {"list", "show", "names", "members", "professor", "professors", "faculty", "teachers"}
+LIST_SIGNALS = {"list", "show", "names", "members", "professor", "professors", "faculty", "teachers", "lecturers"}
 
 
 def _tokens(value: str) -> list[str]:
