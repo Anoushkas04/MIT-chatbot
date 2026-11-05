@@ -38,6 +38,9 @@ def get_client() -> genai.Client:
 HASH_EMBED_DIM = 768
 # v2: stopwords removed and light stemming (app/rag/text_norm.py); v1 indexes need a rebuild
 LOCAL_EMBEDDER = "local-hash-v2"
+# Texts per embedding request at build time. Fewer, larger requests stay further under the
+# free tier's 100 requests a minute and 1,000 a day.
+EMBED_BATCH_SIZE = 100
 # A question's embedding is on the chat's critical path; don't let it hang a reply
 QUERY_EMBED_TIMEOUT_MS = 10_000
 
@@ -97,18 +100,35 @@ def embed_texts_labelled(texts: list[str]) -> tuple[list[list[float]], str]:
     if not GEMINI_EMBEDDINGS_ENABLED or not is_valid_key(GEMINI_API_KEY):
         print("Using local hash embeddings. Set GEMINI_EMBEDDINGS_ENABLED=true and rebuild the index to use Gemini embeddings.")
         return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
+    from app.rag import embedding_cache
+
+    # Reuse what earlier builds embedded; only new or changed chunks spend the daily quota
+    cached = embedding_cache.load(EMBEDDING_MODEL, texts)
+    missing = [t for t in dict.fromkeys(texts) if embedding_cache.key_for(EMBEDDING_MODEL, t) not in cached]
+    print(f"Gemini embeddings: {len(texts) - len(missing)} chunks from the cache, {len(missing)} to embed.")
     try:
         client = get_client()
-        vectors = []
-        batch_size = 20  # ponytail: free-tier embed quota is 100 req/min; small batches + retry below stay under it
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            vectors.extend(_embed_batch_with_retry(client, batch))
-        return vectors, f"gemini:{EMBEDDING_MODEL}"
+        for i in range(0, len(missing), EMBED_BATCH_SIZE):
+            batch = missing[i : i + EMBED_BATCH_SIZE]
+            vectors = _embed_batch(client, batch)
+            embedding_cache.save(EMBEDDING_MODEL, batch, vectors)  # kept even if a later batch fails
+            cached.update({embedding_cache.key_for(EMBEDDING_MODEL, t): v for t, v in zip(batch, vectors)})
+        return [cached[embedding_cache.key_for(EMBEDDING_MODEL, t)] for t in texts], f"gemini:{EMBEDDING_MODEL}"
     except Exception as err:
         print(f"Gemini embedding notice: {err}. Using local feature hash embeddings.")
-        # Every text is re-embedded locally, so an index is never a mix of the two.
+        # Every text is re-embedded locally, so an index is never a mix of the two. The batches
+        # that did succeed stay in the cache, so the next build only embeds the rest.
         return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
+
+
+def _embed_batch(client, batch: list[str]) -> list[list[float]]:
+    """One request for the batch; if the API rejects its size, retry in smaller pieces."""
+    try:
+        return _embed_batch_with_retry(client, batch)
+    except errors.ClientError as e:
+        if e.code == 400 and len(batch) > 20:
+            return [v for i in range(0, len(batch), 20) for v in _embed_batch_with_retry(client, batch[i : i + 20])]
+        raise
 
 
 def _embed_batch_with_retry(client, batch, max_retries=6):

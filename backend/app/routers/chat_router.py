@@ -200,6 +200,17 @@ def merge_evidence(
     return merged[:limit]
 
 
+# Who the answer is written for (prompts.ROLE_PERSONAS). Any student can ask on behalf of a
+# parent or a prospective student; the faculty persona is for faculty accounts.
+OPEN_PERSONAS = {"student", "parent", "prospective"}
+
+
+def _persona(requested: str, me: models.User) -> str:
+    if requested in OPEN_PERSONAS or (requested == "faculty" and me.role == "faculty"):
+        return requested
+    return "student"
+
+
 def _safely(lookup, query: str):
     """A structured lookup is an extra; if it fails, answer from document search instead."""
     try:
@@ -256,6 +267,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         # Documents are in English: Hindi/Kannada questions are searched in translation
         language = answer_language(req.language, req.message)
+        persona = _persona(req.role, me)
         query = search_query(req.message, language)
         intent = classify_intent(query)
         query_type = detect_query_type(query)
@@ -380,7 +392,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         print("==================================================")
 
         system_prompt = build_system_prompt(
-            role=req.role,
+            role=persona,
             language=language,
             context_chunks=all_matches,
             department=req.department,
@@ -434,7 +446,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         try:
             session_rec = db.query(models.ChatSession).filter(models.ChatSession.id == req.session_id).first()
             if not session_rec:
-                session_rec = models.ChatSession(id=req.session_id, user_id=me.id, role=req.role, title=req.message[:40])
+                session_rec = models.ChatSession(id=req.session_id, user_id=me.id, role=persona, title=req.message[:40])
                 db.add(session_rec)
             elif session_rec.user_id is None:
                 session_rec.user_id = me.id

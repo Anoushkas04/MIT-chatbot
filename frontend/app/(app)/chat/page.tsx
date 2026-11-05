@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarDays, ExternalLink, FileText, MessagesSquare, Paperclip, Plus, Send, Sparkles, Users } from 'lucide-react'
-import { askMitra, libraryApi, type ChatCitation, type ChatLanguage } from '@/lib/api'
+import { askMitra, libraryApi, type ChatCitation, type ChatLanguage, type ChatPersona } from '@/lib/api'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
@@ -19,6 +19,13 @@ const languages: { value: ChatLanguage; label: string; placeholder: string }[] =
   { value: 'en', label: 'English', placeholder: 'Ask about campus, academics, or anything else...' },
   { value: 'hi', label: 'हिन्दी', placeholder: 'कैंपस, पढ़ाई या किसी भी चीज़ के बारे में पूछें...' },
   { value: 'kn', label: 'ಕನ್ನಡ', placeholder: 'ಕ್ಯಾಂಪಸ್, ಓದು ಅಥವಾ ಯಾವುದರ ಬಗ್ಗೆಯೂ ಕೇಳಿ...' },
+]
+
+// Who the answer is written for: changes what MITra emphasises (prompts.ROLE_PERSONAS)
+const personas: { value: ChatPersona; label: string }[] = [
+  { value: 'student', label: 'Me (student)' },
+  { value: 'parent', label: 'A parent' },
+  { value: 'prospective', label: 'A prospective student' },
 ]
 
 const kindIcon: Record<ChatCitation['kind'], typeof FileText> = {
@@ -70,6 +77,7 @@ function ChatInner() {
   const [openError, setOpenError] = useState<string | null>(null)
   // Answers come back in this language; questions can be typed in any of the three
   const [language, setLanguage] = useLocalState<ChatLanguage>('mitra_chat_language', 'en')
+  const [persona, setPersona] = useLocalState<ChatPersona>('mitra_chat_persona', 'student')
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages)
   const [draft, setDraft] = useState('')
@@ -96,6 +104,7 @@ function ChatInner() {
         message: trimmed,
         session_id: conversation,
         language,
+        role: persona,
         department: profile.branch || null,
         semester: profile.semester || null,
       })
@@ -163,6 +172,16 @@ function ChatInner() {
           <h1>Ask MITra</h1>
         </div>
         <div className="chat-head-actions">
+          <label className="chat-persona">
+            Answer for
+            <select value={persona} onChange={(e) => setPersona(e.target.value as ChatPersona)}>
+              {personas.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="chat-language" role="group" aria-label="Answer language">
             {languages.map((l) => (
               <button key={l.value} className={language === l.value ? 'active' : ''} onClick={() => setLanguage(l.value)} lang={l.value}>

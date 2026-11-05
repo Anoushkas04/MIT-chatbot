@@ -25,8 +25,7 @@ def selected_provider_name() -> str:
 
 
 @lru_cache
-def get_provider() -> Provider:
-    name = selected_provider_name()
+def _build(name: str) -> Provider:
     if name == "openai":
         from app.providers.openai_provider import OpenAIProvider
         return OpenAIProvider()
@@ -40,31 +39,49 @@ def get_provider() -> Provider:
     return LocalProvider()
 
 
+def get_provider() -> Provider:
+    return _build(selected_provider_name())
+
+
+def fallback_names() -> list[str]:
+    """Other models with keys, tried in order when the selected one fails (quota, outage)."""
+    available = _available()
+    first = selected_provider_name()
+    return [n for n in ("gemini", "openai", "anthropic") if available[n] and n != first]
+
+
+def _chain() -> list[Provider]:
+    # The selected provider first, then any other configured model; local mode is the last resort
+    return [get_provider(), *(_build(n) for n in fallback_names())]
+
+
 def generate_answer(request: GenerationRequest) -> GenerationResult:
-    provider = get_provider()
-    try:
-        result = provider.generate(request)
-        if not result.text:
-            raise RuntimeError("The selected provider returned an empty answer.")
-        return result
-    except Exception as exc:
+    for provider in _chain():
         if provider.name == "local":
-            raise
-        print(f"{provider.name} generation failed; using evidence-only fallback: {exc}")
-        from app.providers.local_provider import LocalProvider
-        return LocalProvider().generate(request)
+            break
+        try:
+            result = provider.generate(request)
+            if not result.text:
+                raise RuntimeError("returned an empty answer")
+            return result
+        except Exception as exc:
+            print(f"{provider.name} generation failed; trying the next model: {exc}")
+    from app.providers.local_provider import LocalProvider
+    return LocalProvider().generate(request)
 
 
 def complete_text(system: str, prompt: str) -> str | None:
-    """A plain completion from the selected provider, or None when only local mode is available or it fails."""
-    try:
-        provider = get_provider()
+    """A plain completion from the first model that answers, or None in local mode or if all fail."""
+    for provider in _chain():
         if provider.name == "local":
             return None
-        return provider.complete(system, prompt) or None
-    except Exception as exc:
-        print(f"Completion failed: {exc}")
-        return None
+        try:
+            text = provider.complete(system, prompt)
+            if text:
+                return text
+        except Exception as exc:
+            print(f"{provider.name} completion failed; trying the next model: {exc}")
+    return None
 
 
 def get_provider_status() -> dict:
@@ -74,4 +91,9 @@ def get_provider_status() -> dict:
     except RuntimeError as exc:
         selected = None
         error = str(exc)
-    return {"configured": _available(), "selected": selected, "error": error}
+    return {
+        "configured": _available(),
+        "selected": selected,
+        "fallbacks": (fallback_names() if selected else []) + ["local"],
+        "error": error,
+    }

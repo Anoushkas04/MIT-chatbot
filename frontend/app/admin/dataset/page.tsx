@@ -2,9 +2,72 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Database, FileText, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
-import { opsApi, type DatasetFile, type DatasetInfo } from '@/lib/api'
+import { AlertTriangle, CheckCircle2, Database, FileText, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
+import { opsApi, type ChatbotEvaluation, type DatasetFile, type DatasetInfo } from '@/lib/api'
 import { useAdminError } from '@/lib/use-admin-error'
+
+function pct(n: number) {
+  return `${Math.round(n * 100)}%`
+}
+
+/** Runs the fixed chatbot test sets against the live index, so a rebuild can be checked. */
+function QualityCheck() {
+  const [result, setResult] = useState<ChatbotEvaluation | null>(null)
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setRunning(true)
+    setError(null)
+    try {
+      setResult(await opsApi.evaluate())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The quality check failed.')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <section className="deadline-card quality-check">
+      <div className="quality-head">
+        <div>
+          <p className="section-kicker">CHATBOT QUALITY CHECK</p>
+          <p className="view-sub">Runs the fixed test questions against the current index. Takes a few seconds.</p>
+        </div>
+        <button className="network-action connected" onClick={run} disabled={running}>
+          <CheckCircle2 /> {running ? 'Running…' : 'Run quality check'}
+        </button>
+      </div>
+      {error && <p className="community-error">{error}</p>}
+      {result && (
+        <div className="quality-results">
+          <div>
+            <strong>{pct(result.retrieval.recall)}</strong>
+            <span>
+              Right document found · {result.retrieval.passed}/{result.retrieval.cases} questions
+            </span>
+          </div>
+          <div>
+            <strong>{pct(result.answers.pass_rate)}</strong>
+            <span>
+              Answered with the right, cited evidence · {result.answers.passed}/{result.answers.cases}
+            </span>
+          </div>
+          <div>
+            <strong>{result.embedder}</strong>
+            <span>Embeddings in this index</span>
+          </div>
+          {(result.retrieval.failures.length > 0 || result.answers.failures.length > 0) && (
+            <p className="view-sub quality-failures">
+              Failing questions: {[...result.retrieval.failures, ...result.answers.failures].join(', ')}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
 
 export default function AdminDatasetPage() {
   const [info, setInfo] = useState<DatasetInfo | null>(null)
@@ -200,6 +263,8 @@ export default function AdminDatasetPage() {
       {idx?.rebuild.error && !idx.rebuild.running && <p className="community-error">Last rebuild failed: {idx.rebuild.error}</p>}
       {notice && <p className="admin-notice">{notice}</p>}
       {error && <p className="community-error">{error}</p>}
+
+      <QualityCheck />
 
       <div className="dataset-toolbar">
         <div className="large-search community-search">

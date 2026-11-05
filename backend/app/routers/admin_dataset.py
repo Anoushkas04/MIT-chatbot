@@ -225,3 +225,36 @@ def rebuild(admin: models.User = Depends(require_admin_user)):
     finally:
         db.close()
     return {"status": "queued" if already_running else "started"}
+
+
+@router.post("/evaluate", summary="Run the chatbot's retrieval and answer test sets against the current index")
+def evaluate(admin: models.User = Depends(require_admin_user)):
+    """Two fixed question sets (backend/tests/fixtures): retrieval (does the right document come
+    back?) and L2 (right document, evidence contains the answer, cited answer). Answers use the
+    local evidence-only mode, so no answer-model calls; a Gemini-embedded index embeds each question."""
+    from app.rag import evaluate as retrieval_eval, evaluate_l2
+    from app.rag.store import get_store
+
+    if not index.exists():
+        raise HTTPException(status_code=409, detail="The chatbot index hasn't been built yet.")
+    retrieval = retrieval_eval.run_evaluation()
+    answers = evaluate_l2.run_evaluation()
+    return {
+        "embedder": get_store().embedder,
+        "retrieval": {
+            "cases": retrieval["evaluated"],
+            "passed": retrieval["passed"],
+            "recall": retrieval["recall_at_final_k"],
+            "by_type": retrieval["by_modality"],
+            "failures": [f["id"] for f in retrieval["failures"]],
+        },
+        "answers": {
+            "cases": answers["total_cases"],
+            "passed": answers["passed"],
+            "pass_rate": answers["pass_rate"],
+            "retrieval_passed": answers["retrieval_passed"],
+            "evidence_supported": answers["evidence_supported"],
+            "answers_grounded": answers["answers_grounded"],
+            "failures": [f["id"] for f in answers["failures"]],
+        },
+    }

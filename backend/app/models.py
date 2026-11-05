@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, LargeBinary, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -400,4 +400,18 @@ class UserBlock(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     blocker_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     blocked_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class EmbeddingCache(Base):
+    """Document-chunk embeddings from an API model, keyed by sha256(model + text).
+
+    Index rebuilds reuse these, so only new or changed chunks spend the API quota,
+    and a build cut short by the quota picks up where it stopped (app/rag/embedding_cache.py).
+    """
+    __tablename__ = "embedding_cache"
+
+    key = Column(String(64), primary_key=True)
+    model = Column(String, nullable=False)
+    vector = Column(LargeBinary, nullable=False)  # float32 bytes
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

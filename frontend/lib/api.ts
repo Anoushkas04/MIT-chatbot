@@ -132,11 +132,13 @@ export function loginVerifyOtp(identifier: string, otp_code: string) {
 }
 
 export type ChatLanguage = 'en' | 'hi' | 'kn'
+export type ChatPersona = 'student' | 'parent' | 'prospective'
 
 export function askMitra(body: {
   message: string
   session_id: string
   language?: ChatLanguage
+  role?: ChatPersona
   department?: string | null
   semester?: string | null
 }) {
@@ -652,6 +654,13 @@ export type Insights = {
   accounts: { signups: number; signups_per_day: DayValue[] }
 }
 
+// Results of the fixed chatbot test sets (backend/app/rag/evaluate.py and evaluate_l2.py)
+export type ChatbotEvaluation = {
+  embedder: string
+  retrieval: { cases: number; passed: number; recall: number; by_type: Record<string, { evaluated: number; passed: number }>; failures: string[] }
+  answers: { cases: number; passed: number; pass_rate: number; retrieval_passed: number; evidence_supported: number; answers_grounded: number; failures: string[] }
+}
+
 export const opsApi = {
   dataset: () => authed<DatasetInfo>('GET', '/api/admin/dataset'),
   upload: (file: File, replace: boolean) => {
@@ -662,6 +671,7 @@ export const opsApi = {
   },
   remove: (name: string) => authed<{ status: string; chunks_removed: number; indexing: boolean }>('DELETE', `/api/admin/dataset/files/${encodeURIComponent(name)}`),
   rebuild: () => authed<{ status: string }>('POST', '/api/admin/dataset/rebuild'),
+  evaluate: () => authed<ChatbotEvaluation>('POST', '/api/admin/dataset/evaluate'),
   monitoring: () => authed<Monitoring>('GET', '/api/admin/monitoring'),
   toggleDisabled: (userId: string) =>
     authed<{ status: string; new_status: string }>('POST', `/api/admin/users/toggle-status?user_id=${encodeURIComponent(userId)}`),

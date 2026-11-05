@@ -605,3 +605,12 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .chat-language button { padding: 5px 10px; border: 0; border-radius: 6px; background: none; color: #78867d; font-size: 11px; font-family: inherit; cursor: pointer; }
 .chat-language button.active { background: #234f4a; color: #d8ef68; }
 @media (max-width: 520px) { .chat-head { flex-wrap: wrap; } .chat-head-actions { justify-content: flex-start; } }
+.chat-persona { display: inline-flex; align-items: center; gap: 6px; color: #8a948c; font-size: 11px; }
+.chat-persona select { height: 30px; padding: 0 8px; border: 1px solid #e0e4dd; border-radius: 8px; background: #fff; color: #3f5049; font-size: 11px; font-family: inherit; }
+.quality-check { margin: 18px 0; }
+.quality-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.quality-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+.quality-results > div { display: flex; flex-direction: column; gap: 4px; }
+.quality-results strong { color: #234f4a; font-size: 22px; font-weight: 600; word-break: break-all; }
+.quality-results span { color: #8a948c; font-size: 11px; }
+.quality-failures { grid-column: 1 / -1; }
