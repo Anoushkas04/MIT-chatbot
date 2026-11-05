@@ -1,0 +1,20 @@
+{"text":"what time does the library close","label":"Neutral"}
+{"text":"how many credits is the minor specialisation","label":"Neutral"}
+{"text":"show me the holidays in december","label":"Neutral"}
+{"text":"who is the hod of mechanical","label":"Neutral"}
+{"text":"thank you so much, this saved me a trip to the office","label":"Positive"}
+{"text":"love this, the follow-up questions are handy","label":"Positive"}
+{"text":"good answer, exactly what I wanted","label":"Positive"}
+{"text":"the canteen prices are way too high","label":"Negative"}
+{"text":"the new attendance policy is bad for day scholars","label":"Negative"}
+{"text":"this result is incorrect, the date is wrong","label":"Negative"}
+{"text":"I'm tired of emailing the exam cell and getting no response","label":"Frustrated"}
+{"text":"why is the portal down again, this keeps happening","label":"Frustrated"}
+{"text":"honestly so done with this re-registration mess","label":"Frustrated"}
+{"text":"asap please, the scholarship form closes tonight","label":"Urgent"}
+{"text":"my exam is in 30 minutes and I can't find my hall ticket, urgent","label":"Urgent"}
+{"text":"emergency: I'm locked out of SLCM before the deadline","label":"Urgent"}
+{"text":"I'm not sure what an open elective is","label":"Confused"}
+{"text":"confused whether makeup exams cost extra","label":"Confused"}
+{"text":"I don't get how the waitlist deposit works","label":"Confused"}
+{"text":"can someone explain what NS grade means, I don't understand","label":"Confused"}

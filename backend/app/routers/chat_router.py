@@ -96,19 +96,10 @@ def extract_query_features(query: str, intent: str, query_type: str, confidence:
     """Extracts structured features and internal sentiment from interaction telemetry."""
     q = query.lower()
 
-    # Sentiment analysis (internal intelligence layer)
-    if any(w in q for w in ["frustrated", "broken", "nobody is helping", "terrible", "stuck", "3 days", "useless"]):
-        sentiment = "Frustrated"
-    elif any(w in q for w in ["urgent", "emergency", "asap", "deadline today", "immediately"]):
-        sentiment = "Urgent"
-    elif any(w in q for w in ["confused", "don't understand", "unclear", "doubt", "why is it"]):
-        sentiment = "Confused"
-    elif any(w in q for w in ["bad", "worst", "poor", "hate", "unhelpful"]):
-        sentiment = "Negative"
-    elif any(w in q for w in ["thanks", "thank you", "great", "helpful", "good", "awesome"]):
-        sentiment = "Positive"
-    else:
-        sentiment = "Neutral"
+    # Sentiment (VADER polarity plus urgency/confusion/frustration cues, app/sentiment.py)
+    from app.sentiment import classify as classify_sentiment
+
+    sentiment = classify_sentiment(query)
 
     # Topic classification
     if any(w in q for w in ["mess", "food", "hostel", "room", "canteen"]):

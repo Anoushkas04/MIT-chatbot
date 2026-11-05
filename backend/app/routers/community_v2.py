@@ -109,6 +109,15 @@ def _moderate(db, user: models.User, title: str, body: str) -> None:
             status_code=400,
             detail="This can't be published because it breaks the Community Guidelines. Repeated violations may suspend your account.",
         )
+    from app.moderation_engine import model_review
+
+    # A model can be wrong, so what only it flags is held back for editing, without a strike
+    flagged, category = model_review(title, body)
+    if flagged:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This wasn't published because it may break the Community Guidelines ({category}). Please edit it and try again.",
+        )
 
 
 def _vote_maps(db, user_id: str):

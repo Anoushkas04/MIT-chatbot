@@ -90,7 +90,8 @@ export const guidelineSections: GuidelineSection[] = [
     id: 'consequences',
     title: 'What happens if the guidelines are broken',
     points: [
-      'A post that breaks the guidelines is blocked before it is published, and your account gets a strike.',
+      'A post that clearly breaks the guidelines is blocked before it is published, and your account gets a strike.',
+      'Posts our automatic review is unsure about are held back without a strike, so you can edit them and try again.',
       'On the 5th strike, your account is suspended for 7 days.',
       'If 10 different students report an account, it is suspended until the MITra team reviews it.',
       'The MITra team may also remove posts, send a warning, or suspend an account for 1, 3, 7 or 30 days, or until further review.',

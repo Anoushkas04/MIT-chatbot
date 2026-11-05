@@ -1,0 +1,40 @@
+{"text":"when is the end sem exam for cse","label":"Neutral"}
+{"text":"what is the fee for btech aiml","label":"Neutral"}
+{"text":"list the professors in the school of computing","label":"Neutral"}
+{"text":"where is the AB5 canteen","label":"Neutral"}
+{"text":"how is cgpa calculated","label":"Neutral"}
+{"text":"which clubs are there for robotics","label":"Neutral"}
+{"text":"when does revels start this year","label":"Neutral"}
+{"text":"what documents do i need for re-registration","label":"Neutral"}
+{"text":"thanks, that was really helpful!","label":"Positive"}
+{"text":"great, this cleared up my doubt about attendance","label":"Positive"}
+{"text":"awesome, I love how quick this is","label":"Positive"}
+{"text":"perfect, that's exactly the date I needed","label":"Positive"}
+{"text":"nice, the club list is super useful","label":"Positive"}
+{"text":"this answer is wrong and useless","label":"Negative"}
+{"text":"the mess food this week has been really bad","label":"Negative"}
+{"text":"I hate how the portal keeps logging me out","label":"Negative"}
+{"text":"the hostel wifi is terrible","label":"Negative"}
+{"text":"that's not what I asked, poor answer","label":"Negative"}
+{"text":"the placement process seems unfair to us","label":"Negative"}
+{"text":"I've been stuck on this for 3 days and nobody is helping","label":"Frustrated"}
+{"text":"why does SLCM never work, this is so annoying","label":"Frustrated"}
+{"text":"I'm so fed up, I've asked the office five times and still no reply","label":"Frustrated"}
+{"text":"this is ridiculous, my outpass is still pending after a week","label":"Frustrated"}
+{"text":"seriously, nothing on this portal works properly","label":"Frustrated"}
+{"text":"I'm sick of the registration page crashing every time","label":"Frustrated"}
+{"text":"urgent: the fee payment deadline is today and the portal is down","label":"Urgent"}
+{"text":"I need the hall ticket asap, exam is tomorrow","label":"Urgent"}
+{"text":"emergency, I missed the makeup registration, what do I do immediately","label":"Urgent"}
+{"text":"deadline today for re-registration, help quickly","label":"Urgent"}
+{"text":"need this right now, my exam starts in an hour","label":"Urgent"}
+{"text":"I'm confused about how the grade points work","label":"Confused"}
+{"text":"I don't understand the difference between GPA and CGPA","label":"Confused"}
+{"text":"it's unclear whether labs count towards attendance","label":"Confused"}
+{"text":"I have a doubt, is the re-test the same as the makeup exam?","label":"Confused"}
+{"text":"what does detained mean, I'm not sure I get it","label":"Confused"}
+{"text":"im lost, which form do i fill for branch change?","label":"Confused"}
+{"text":"the hostel rules are good but the curfew is too early","label":"Negative"}
+{"text":"not bad, the calendar answer was fine","label":"Positive"}
+{"text":"the attendance rule isn't fair at all","label":"Negative"}
+{"text":"can you tell me the minimum attendance","label":"Neutral"}
