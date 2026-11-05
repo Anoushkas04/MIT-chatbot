@@ -619,3 +619,9 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .chat-followups button { padding: 6px 10px; border: 1px solid #dfe4dc; border-radius: 14px; background: #f9faf7; color: #53766f; font-size: 11px; font-family: inherit; text-align: left; cursor: pointer; }
 .chat-followups button:hover:not(:disabled) { border-color: #234f4a; color: #234f4a; }
 .chat-followups button:disabled { opacity: .5; cursor: default; }
+.similar-questions { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #ebd879; border-radius: 10px; background: #fbf7e6; }
+.similar-questions strong { color: #6b5a12; font-size: 11px; }
+.similar-questions button { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border: 0; border-top: 1px solid #f0e6bb; background: none; color: #234f4a; font-size: 12px; font-family: inherit; text-align: left; cursor: pointer; }
+.similar-questions button span { flex-shrink: 0; color: #8a948c; font-size: 10px; }
+.suggested-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: #8a948c; font-size: 11px; }
+.suggested-tags button { padding: 4px 9px; border: 1px dashed #9fbcb3; border-radius: 14px; background: none; color: #53766f; font-size: 11px; font-family: inherit; cursor: pointer; }

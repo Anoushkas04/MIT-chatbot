@@ -202,6 +202,24 @@ def list_posts(me: models.User = Depends(get_current_user)):
         db.close()
 
 
+class SimilarRequest(BaseModel):
+    title: str = ""
+    body: str = ""
+
+
+@router.post("/similar", summary="Existing questions that look like a draft (shown while writing a post)")
+def similar(req: SimilarRequest, me: models.User = Depends(get_current_user)):
+    from app.community_similar import similar_posts
+
+    if len(req.title.strip()) + len(req.body.strip()) < 10:
+        return {"similar": []}
+    db = SessionLocal()
+    try:
+        return {"similar": similar_posts(db, req.title[:MAX_TITLE], req.body[:MAX_BODY])}
+    finally:
+        db.close()
+
+
 @router.post("/posts", summary="Ask a question")
 def create_post(req: PostCreate, me: models.User = Depends(get_current_user)):
     title = _clean(req.title, MAX_TITLE, "Title")

@@ -347,6 +347,10 @@ export const communityApi = {
   async editPost(id: string, title: string, body: string) {
     return single(await authed<ApiPost>('PUT', `/api/community/posts/${id}`, { title, body }))
   },
+  // Questions already asked that look like a draft (TF-IDF similarity on the server)
+  similar(title: string, body: string) {
+    return authed<{ similar: SimilarQuestion[] }>('POST', '/api/community/similar', { title, body })
+  },
   deletePost(id: string) {
     return authed<{ status: string }>('DELETE', `/api/community/posts/${id}`)
   },
@@ -431,6 +435,8 @@ export type AdminPost = {
   deleted: AdminDeleted
   answers: AdminComment[]
 }
+
+export type SimilarQuestion = { id: string; title: string; score: number; answers: number; verified: boolean }
 
 export type AdminView = 'all' | 'unanswered' | 'popular' | 'verified' | 'dataset' | 'deleted'
 export type ReplyTemplate = { key: string; label: string; text: string }

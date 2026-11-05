@@ -89,6 +89,8 @@ SYNONYMS = {
     "cheating": "malpractice",
     "copying": "malpractice",
     "hall ticket": "admit card hall ticket",
+    "pyq": "previous year question papers",
+    "pyqs": "previous year question papers",
     "handbook": "hand book",
     "undergraduate": "ug",
     "postgraduate": "pg",

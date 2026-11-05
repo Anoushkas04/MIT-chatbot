@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ArrowBigDown, ArrowBigUp, BadgeCheck, MessageSquare, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import type { CommunityComment, CommunityQuestion } from '@/lib/mock-data'
 import { MIN_RELEVANCE, matchTopics, scoreQuestion } from '@/lib/community-search'
-import { communityApi } from '@/lib/api'
+import { communityApi, type SimilarQuestion } from '@/lib/api'
 
 // Past this depth sub-threads stop indenting further so deep chains stay readable.
 const MAX_INDENT_DEPTH = 4
@@ -319,6 +319,32 @@ function CommunityInner() {
   const [newTitle, setNewTitle] = useState('')
   const [newBody, setNewBody] = useState('')
   const [newTags, setNewTags] = useState<string[]>([])
+  const [similar, setSimilar] = useState<SimilarQuestion[]>([])
+
+  // While a question is being written, look for ones already asked (server-side TF-IDF similarity)
+  useEffect(() => {
+    if (!composerOpen || newTitle.trim().length < 12) {
+      setSimilar([])
+      return
+    }
+    let cancelled = false
+    const timer = setTimeout(() => {
+      communityApi
+        .similar(newTitle, newBody)
+        .then((r) => !cancelled && setSimilar(r.similar))
+        .catch(() => !cancelled && setSimilar([]))
+    }, 450)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [composerOpen, newTitle, newBody])
+
+  // Tags whose topic words appear in the draft (the same vocabulary Community search uses)
+  const suggestedTags = useMemo(
+    () => matchTopics(`${newTitle} ${newBody}`, false).filter((t) => tagOptions.includes(t) && !newTags.includes(t)),
+    [newTitle, newBody, newTags],
+  )
 
   const refresh = useCallback(async () => {
     try {
@@ -440,10 +466,34 @@ function CommunityInner() {
             onChange={(e) => setNewBody(e.target.value)}
             placeholder="Add any details that'll help people answer..."
           />
+          {similar.length > 0 && (
+            <div className="similar-questions" role="status">
+              <strong>Already asked? These look similar:</strong>
+              {similar.map((s) => (
+                <button key={s.id} onClick={() => setQuery(s.title)}>
+                  {s.title}
+                  <span>
+                    {s.answers} answer{s.answers === 1 ? '' : 's'}
+                    {s.verified ? ' · verified' : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <p className="guidelines-note">
             Keep it respectful and accurate, and leave out anyone&apos;s personal details.{' '}
             <Link href="/guidelines">Read the guidelines</Link>
           </p>
+          {suggestedTags.length > 0 && (
+            <div className="suggested-tags">
+              <span>Suggested tags:</span>
+              {suggestedTags.map((t) => (
+                <button key={t} onClick={() => setNewTags((prev) => [...prev, t])}>
+                  + {t}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="tag-picker">
             {tagOptions.map((t) => (
               <button
