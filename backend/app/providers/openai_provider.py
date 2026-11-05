@@ -20,3 +20,7 @@ class OpenAIProvider(Provider):
             input=[{"role": "user", "content": content}],
         )
         return GenerationResult(text=response.output_text.strip(), provider=self.name, model=self.model)
+
+    def complete(self, system: str, prompt: str) -> str:
+        response = self.client.responses.create(model=self.model, instructions=system, input=prompt)
+        return response.output_text.strip()

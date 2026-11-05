@@ -131,9 +131,12 @@ export function loginVerifyOtp(identifier: string, otp_code: string) {
   return post<AuthResponse>('/api/auth/login-verify-otp', { identifier, otp_code })
 }
 
+export type ChatLanguage = 'en' | 'hi' | 'kn'
+
 export function askMitra(body: {
   message: string
   session_id: string
+  language?: ChatLanguage
   department?: string | null
   semester?: string | null
 }) {

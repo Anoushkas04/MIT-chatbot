@@ -28,6 +28,10 @@ class Provider:
     def generate(self, request: GenerationRequest) -> GenerationResult:
         raise NotImplementedError
 
+    def complete(self, system: str, prompt: str) -> str:
+        """A short plain-text completion with no evidence (used to translate questions)."""
+        raise NotImplementedError
+
 
 def evidence_text(request: GenerationRequest) -> str:
     blocks = []

@@ -55,6 +55,18 @@ def generate_answer(request: GenerationRequest) -> GenerationResult:
         return LocalProvider().generate(request)
 
 
+def complete_text(system: str, prompt: str) -> str | None:
+    """A plain completion from the selected provider, or None when only local mode is available or it fails."""
+    try:
+        provider = get_provider()
+        if provider.name == "local":
+            return None
+        return provider.complete(system, prompt) or None
+    except Exception as exc:
+        print(f"Completion failed: {exc}")
+        return None
+
+
 def get_provider_status() -> dict:
     try:
         selected = selected_provider_name()

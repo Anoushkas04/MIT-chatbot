@@ -29,3 +29,12 @@ class AnthropicProvider(Provider):
         )
         text = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
         return GenerationResult(text=text.strip(), provider=self.name, model=self.model)
+
+    def complete(self, system: str, prompt: str) -> str:
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=300,
+            system=system,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return "".join(block.text for block in response.content if getattr(block, "type", None) == "text").strip()

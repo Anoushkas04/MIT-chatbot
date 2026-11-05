@@ -598,3 +598,10 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .signup-agree a { color: #e07b64; text-decoration: underline; }
 @media (max-width: 520px) { .guidelines-head h1 { font-size: 27px; } }
 .dm-guidelines { margin: 0 14px 10px; text-align: center; }
+
+/* ---- Chat: answer language ---- */
+.chat-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.chat-language { display: inline-flex; padding: 3px; border: 1px solid #e0e4dd; border-radius: 9px; background: #fff; }
+.chat-language button { padding: 5px 10px; border: 0; border-radius: 6px; background: none; color: #78867d; font-size: 11px; font-family: inherit; cursor: pointer; }
+.chat-language button.active { background: #234f4a; color: #d8ef68; }
+@media (max-width: 520px) { .chat-head { flex-wrap: wrap; } .chat-head-actions { justify-content: flex-start; } }

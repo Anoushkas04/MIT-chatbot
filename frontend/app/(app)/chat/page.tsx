@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarDays, ExternalLink, FileText, MessagesSquare, Paperclip, Plus, Send, Sparkles, Users } from 'lucide-react'
-import { askMitra, libraryApi, type ChatCitation } from '@/lib/api'
+import { askMitra, libraryApi, type ChatCitation, type ChatLanguage } from '@/lib/api'
 import { defaultProfile, type Profile } from '@/lib/mock-data'
 import { useLocalState } from '@/lib/use-local-state'
 
@@ -14,6 +14,12 @@ type ChatMessage = {
   time: string
   citations?: ChatCitation[]
 }
+
+const languages: { value: ChatLanguage; label: string; placeholder: string }[] = [
+  { value: 'en', label: 'English', placeholder: 'Ask about campus, academics, or anything else...' },
+  { value: 'hi', label: 'हिन्दी', placeholder: 'कैंपस, पढ़ाई या किसी भी चीज़ के बारे में पूछें...' },
+  { value: 'kn', label: 'ಕನ್ನಡ', placeholder: 'ಕ್ಯಾಂಪಸ್, ಓದು ಅಥವಾ ಯಾವುದರ ಬಗ್ಗೆಯೂ ಕೇಳಿ...' },
+]
 
 const kindIcon: Record<ChatCitation['kind'], typeof FileText> = {
   document: FileText,
@@ -62,6 +68,8 @@ function ChatInner() {
   const params = useSearchParams()
   const router = useRouter()
   const [openError, setOpenError] = useState<string | null>(null)
+  // Answers come back in this language; questions can be typed in any of the three
+  const [language, setLanguage] = useLocalState<ChatLanguage>('mitra_chat_language', 'en')
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages)
   const [draft, setDraft] = useState('')
@@ -87,6 +95,7 @@ function ChatInner() {
       const answer = await askMitra({
         message: trimmed,
         session_id: conversation,
+        language,
         department: profile.branch || null,
         semester: profile.semester || null,
       })
@@ -153,9 +162,18 @@ function ChatInner() {
           <p className="section-kicker">MITRA ASSISTANT</p>
           <h1>Ask MITra</h1>
         </div>
-        <button className="new-chat" onClick={newConversation}>
-          <Plus /> New conversation
-        </button>
+        <div className="chat-head-actions">
+          <div className="chat-language" role="group" aria-label="Answer language">
+            {languages.map((l) => (
+              <button key={l.value} className={language === l.value ? 'active' : ''} onClick={() => setLanguage(l.value)} lang={l.value}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+          <button className="new-chat" onClick={newConversation}>
+            <Plus /> New conversation
+          </button>
+        </div>
       </div>
       <div className="chat-transcript">
         {messages.map((m) => (
@@ -214,7 +232,7 @@ function ChatInner() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) send()
           }}
-          placeholder="Ask about campus, academics, or anything else..."
+          placeholder={languages.find((l) => l.value === language)?.placeholder}
         />
         <button className="send-button" onClick={send} aria-label="Send message">
           <Send />

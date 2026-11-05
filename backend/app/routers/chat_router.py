@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
+from app.multilingual import LOW_CONFIDENCE, NO_INFO, answer_language, search_query
 from app.structured_lookup import calendar_evidence, club_evidence
 from app.prompts import build_system_prompt
 from app.providers import GenerationRequest, GenerationResult, generate_answer
@@ -244,10 +245,13 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         if owner is not None and owner != me.id:
             raise HTTPException(status_code=403, detail="That conversation belongs to someone else.")
 
-        intent = classify_intent(req.message)
-        query_type = detect_query_type(req.message)
-        faculty_lookup = lookup_faculty(req.message)
-        structured = [] if faculty_lookup else calendar_evidence(req.message) + club_evidence(req.message)
+        # Documents are in English: Hindi/Kannada questions are searched in translation
+        language = answer_language(req.language, req.message)
+        query = search_query(req.message, language)
+        intent = classify_intent(query)
+        query_type = detect_query_type(query)
+        faculty_lookup = lookup_faculty(query)
+        structured = [] if faculty_lookup else calendar_evidence(query) + club_evidence(query)
 
         # 1. Hybrid search over dense, BM25, and optional ColPali-style page vectors.
         if faculty_lookup:
@@ -255,7 +259,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         else:
             try:
                 vector_matches = hybrid_search(
-                    req.message,
+                    query,
                     department=req.department,
                     academic_year=req.academic_year,
                     semester=req.semester,
@@ -267,7 +271,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         # Filter & Rerank Vector Matches
         relevance_query = " ".join(
             value for value in (
-                req.message,
+                query,
                 req.department,
                 req.academic_year,
                 req.semester,
@@ -282,7 +286,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         # 2. Database search for Community Q&A — only admin-verified, high-upvote posts
         # that have actually been promoted into the dataset (app/community_knowledge.py).
-        community_matches = [] if faculty_lookup else search_dataset_posts(req.message, db, limit=4)
+        community_matches = [] if faculty_lookup else search_dataset_posts(query, db, limit=4)
         relevant_community_matches = [cm for cm in community_matches if cm["score"] >= 0.50]
 
         # Calculate live community counts dynamically from DB
@@ -298,7 +302,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         sample_size = response_count
 
         # 3. Intent-Aware Source Prioritization
-        has_community_query_signal = any(w in req.message.lower() for w in ["student", "students", "reddit", "say", "saying", "opinion", "review", "recommend", "advice", "peer", "experience", "best", "quietest", "fastest", "review"])
+        has_community_query_signal = any(w in query.lower() for w in ["student", "students", "reddit", "say", "saying", "opinion", "review", "recommend", "advice", "peer", "experience", "best", "quietest", "fastest", "review"])
         all_matches = merge_evidence(
             relevant_official_matches,
             relevant_community_matches,
@@ -315,7 +319,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         # Feature & Internal Sentiment Extraction (Requirement 10 & 11)
         source_type_primary = all_matches[0].get("source_type", "official") if all_matches else "none"
-        features = extract_query_features(req.message, intent, query_type, confidence, source_type_primary)
+        features = extract_query_features(query, intent, query_type, confidence, source_type_primary)
 
         # Log query features to SQLite analytics table
         try:
@@ -368,7 +372,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
 
         system_prompt = build_system_prompt(
             role=req.role,
-            language=req.language,
+            language=language,
             context_chunks=all_matches,
             department=req.department,
             academic_year=req.academic_year,
@@ -377,7 +381,8 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         )
 
         history = get_history(req.session_id)
-        if faculty_lookup:
+        # The directory's fixed answer is English; other languages go through the model
+        if faculty_lookup and language == "en":
             generation = GenerationResult(
                 text=faculty_lookup["answer"],
                 provider="local",
@@ -385,7 +390,7 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             )
         else:
             generation = generate_answer(GenerationRequest(
-                question=req.message,
+                question=req.message if query == req.message else f"{req.message}\n(English translation used for the search: {query})",
                 system_prompt=system_prompt,
                 evidence=all_matches,
                 history=history,
@@ -405,11 +410,11 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             citations.append(_citation(index, m, src, faculty_lookup))
 
         if not all_matches:
-            reply_text = "I couldn't find reliable information about that in the MIT CampusOS official knowledge base."
+            reply_text = NO_INFO[language]
             citations = []
             sources = []
         elif fallback_suffix:
-            reply_text += fallback_suffix
+            reply_text += LOW_CONFIDENCE[language]
 
         # Follow-up suggestions are intentionally empty until they can be generated
         # and verified against the same evidence set.
