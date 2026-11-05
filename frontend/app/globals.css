@@ -625,3 +625,7 @@ button, input { font: inherit; } button { cursor: pointer; } a { color: inherit;
 .similar-questions button span { flex-shrink: 0; color: #8a948c; font-size: 10px; }
 .suggested-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: #8a948c; font-size: 11px; }
 .suggested-tags button { padding: 4px 9px; border: 1px dashed #9fbcb3; border-radius: 14px; background: none; color: #53766f; font-size: 11px; font-family: inherit; cursor: pointer; }
+.doc-summary { margin: 6px 0 0; color: #5d6b63; font-size: 11px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.doc-keywords { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.doc-keywords button { padding: 3px 8px; border: 0; border-radius: 10px; background: #eff3eb; color: #53766f; font-size: 10px; font-family: inherit; cursor: pointer; }
+.doc-keywords button:hover { background: #dbe9e7; color: #234f4a; }

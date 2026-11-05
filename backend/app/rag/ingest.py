@@ -202,6 +202,12 @@ def run_ingestion(progress_callback=None) -> dict:
         (temp_path / "calendar_events.json").write_text(
             json.dumps(calendar_events, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        # Keywords and summaries for Utilities > Documents (app/rag/doc_insights.py)
+        from app.rag.doc_insights import INSIGHTS_FILE, build_insights
+
+        (temp_path / INSIGHTS_FILE).write_text(
+            json.dumps(build_insights(records), ensure_ascii=False, indent=1), encoding="utf-8"
+        )
         manifest["page_count"] = len(pages)
         manifest["text_chunk_count"] = len(records)
         manifest["scanned_page_count"] = sum(bool(page.get("is_scanned")) for page in pages)
@@ -218,6 +224,7 @@ def run_ingestion(progress_callback=None) -> dict:
             "chunks.json",
             "pages.json",
             "calendar_events.json",
+            "doc_insights.json",
             "manifest.json",
         ):
             (temp_path / name).replace(DATA_DIR / name)

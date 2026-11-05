@@ -66,6 +66,9 @@ def search(q: str = Query(..., min_length=2, max_length=200), me: models.User = 
 
 @router.get("/api/documents", summary="Official documents in the dataset (readable formats only)")
 def list_documents(me: models.User = Depends(get_current_user)):
+    from app.rag.doc_insights import load as load_insights
+
+    insights = load_insights()
     out = []
     if DOCS_DIR.exists():
         for p in sorted(DOCS_DIR.iterdir(), key=lambda x: x.name.lower()):
@@ -81,6 +84,9 @@ def list_documents(me: models.User = Depends(get_current_user)):
                 "type": p.suffix.lstrip(".").upper(),
                 "size": _human(stat.st_size),
                 "updated": datetime.datetime.utcfromtimestamp(stat.st_mtime).strftime("%b %Y"),
+                # Extracted at index build time; empty for documents added since the last build
+                "keywords": insights.get(p.name, {}).get("keywords", []),
+                "summary": insights.get(p.name, {}).get("summary", ""),
             })
     return {"documents": out}
 

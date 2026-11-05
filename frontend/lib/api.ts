@@ -703,7 +703,15 @@ export function logoutEverywhere() {
 // ---- Official documents (the dataset admins manage) ----
 
 export type LibraryHit = { source: string; title: string; type: string; snippet: string; score: number; downloadable: boolean }
-export type LibraryDocument = { name: string; title: string; type: string; size: string; updated: string }
+export type LibraryDocument = {
+  name: string
+  title: string
+  type: string
+  size: string
+  updated: string
+  keywords?: string[] // key phrases extracted at index build time
+  summary?: string // a short extractive summary (prose documents only)
+}
 
 export const libraryApi = {
   search: (q: string) => authed<{ results: LibraryHit[]; indexed: boolean }>('GET', `/api/search?q=${encodeURIComponent(q)}`),

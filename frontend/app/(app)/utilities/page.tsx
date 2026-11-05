@@ -446,7 +446,7 @@ function DocumentsSection() {
 
   // The same official documents the MITra team manages and the chatbot answers from.
   const list = useMemo(
-    () => (docs ?? []).filter((d) => `${d.title} ${d.type}`.toLowerCase().includes(q.toLowerCase())),
+    () => (docs ?? []).filter((d) => `${d.title} ${d.type} ${(d.keywords ?? []).join(' ')} ${d.summary ?? ''}`.toLowerCase().includes(q.toLowerCase())),
     [docs, q],
   )
 
@@ -461,7 +461,7 @@ function DocumentsSection() {
 
   return (
     <section>
-      <SearchFilter value={q} onChange={setQ} placeholder="Search official documents" />
+      <SearchFilter value={q} onChange={setQ} placeholder="Search official documents by name or topic" />
       {error && <p className="community-error">{error}</p>}
       <div className="directory-list">
         {docs === null && !error && <p className="view-sub">Loading documents…</p>}
@@ -476,6 +476,16 @@ function DocumentsSection() {
                 {d.type} · {d.size}
               </span>
               <small>Updated {d.updated}</small>
+              {d.summary && <p className="doc-summary">{d.summary}</p>}
+              {d.keywords && d.keywords.length > 0 && (
+                <div className="doc-keywords">
+                  {d.keywords.map((k) => (
+                    <button key={k} onClick={() => setQ(k)} title={`Find documents about ${k}`}>
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button className="icon-ghost directory-download" onClick={() => download(d.name)} aria-label={`Download ${d.title}`} title="Download">
               <Download />
