@@ -159,10 +159,8 @@ function ChatInner() {
         searchedFor: answer.searched_for,
         followups: answer.followups ?? [],
         messageId: answer.message_id ?? null,
-        // Older servers only send file names; show those as plain documents
-        citations:
-          answer.citations ??
-          answer.sources.map((s, i) => ({ index: i + 1, source: s, title: s, kind: 'document' as const, snippet: '', page_number: null, source_url: null })),
+        // Only the sources the answer relies on; none for small talk or "couldn't find" replies
+        citations: answer.citations ?? [],
       }
     } catch {
       reply = { id: nextId(), from: 'ai', text: "I couldn't reach MITra's server. Please try again.", time: clockTime() }

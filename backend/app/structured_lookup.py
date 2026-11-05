@@ -105,6 +105,9 @@ def calendar_evidence(query: str, limit: int = 12) -> list[dict]:
     months = _requested_months(raw)
     if not (DATE_SIGNALS.intersection(raw) or months):
         return []
+    years = {int(y) for y in re.findall(r"\b(20\d\d)\b", query)}
+    if years and not years & {2026, 2027}:
+        return []  # "the 13 July 2024 placement guidelines" names a document, not a 2026-27 date
     wanted = {t for t in index_tokens(expand_query(query)) if not t.isdigit()} - CALENDAR_GENERIC - set(MONTHS)
     wants_holidays = bool({"holiday", "vacation", "leave", "break"}.intersection(index_tokens(query)))
     lowered = " ".join(raw)

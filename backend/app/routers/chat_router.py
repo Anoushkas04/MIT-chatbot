@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from app.answer_verifier import verify_answer
 from app.community_knowledge import search_dataset_posts
 from app.faculty_directory import lookup_faculty
+from app.citations import select_citations
+from app.conversational import small_talk_reply
 from app.followups import split_model_followups, suggest
 from app.multilingual import LOW_CONFIDENCE, NO_INFO, answer_language, search_query
 from app.rag.entities import extract as extract_entities
@@ -230,6 +232,55 @@ def _stored_history(db, session_id: str) -> list[dict]:
     return restore_history(session_id, turns) if turns else []
 
 
+def _save_exchange(db, me, req, persona, reply_text, confidence, confidence_type, citations) -> int | None:
+    """Store the question and answer; returns the answer's id (sent back with a 👍/👎)."""
+    message_id = None
+    try:
+        session_rec = db.query(models.ChatSession).filter(models.ChatSession.id == req.session_id).first()
+        if not session_rec:
+            session_rec = models.ChatSession(id=req.session_id, user_id=me.id, role=persona, title=req.message[:40])
+            db.add(session_rec)
+        elif session_rec.user_id is None:
+            session_rec.user_id = me.id
+        session_rec.updated_at = datetime.datetime.utcnow()  # drives "active this week" on Monitoring
+        db.commit()
+
+        msg_user = models.ChatMessage(
+            session_id=req.session_id,
+            sender_role="user",
+            text=req.message,
+            timestamp="Just now",
+        )
+        db.add(msg_user)
+        db.commit()
+
+        msg_ai = models.ChatMessage(
+            session_id=req.session_id,
+            sender_role="assistant",
+            text=reply_text,
+            confidence=confidence,
+            confidence_type=confidence_type,
+            timestamp="Just now",
+        )
+        db.add(msg_ai)
+        db.flush()
+        message_id = msg_ai.id
+        for citation in citations:
+            page_suffix = f"#page={citation.page_number}" if citation.page_number else ""
+            db.add(models.MessageCitation(
+                message_id=msg_ai.id,
+                source_name=f"{citation.source}{page_suffix}",
+                snippet=citation.snippet,
+                similarity_score=citation.score,
+            ))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Warning DB chat save error: {e}")
+
+    return message_id
+
+
 def _safely(lookup, query: str):
     """A structured lookup is an extra; if it fails, answer from document search instead."""
     try:
@@ -287,6 +338,21 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         # Documents are in English: Hindi/Kannada questions are searched in translation
         language = answer_language(req.language, req.message)
         persona = _persona(req.role, me)
+
+        # Greetings, thanks and the like need no documents: no retrieval, no sources
+        small_talk = small_talk_reply(req.message, language)
+        if small_talk:
+            add_turn(req.session_id, req.message, small_talk)
+            return ChatResponse(
+                text=small_talk,
+                sources=[],
+                citations=[],
+                confidence="conversational",
+                confidence_type="conversational",
+                provider="local",
+                model="small-talk",
+                message_id=_save_exchange(db, me, req, persona, small_talk, "conversational", "conversational", []),
+            )
         # In-memory history is lost when the server restarts or sleeps; the messages are in the database
         history = get_history(req.session_id) or _stored_history(db, req.session_id)
         query = search_query(req.message, language, history)
@@ -459,14 +525,12 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
         answer_text, model_followups = split_model_followups(generation.text)
         reply_text, verification_warnings = verify_answer(answer_text, all_matches)
 
-        citations = []
-        sources = []
-        for index, m in enumerate(all_matches, start=1):
-            src = (
-                m.get("source_file")
-                or m.get("source")
-                or "Institutional Knowledge Base"
-            )
+        # Only passages the answer actually relies on become sources (app/citations.py):
+        # unsupported or off-topic markers are dropped and the rest renumbered.
+        reply_text, cited = select_citations(reply_text, all_matches, query)
+        citations, sources = [], []
+        for index, m in cited:
+            src = m.get("source_file") or m.get("source") or "Institutional Knowledge Base"
             if src not in sources:
                 sources.append(src)
             citations.append(_citation(index, m, src, faculty_lookup))
@@ -479,53 +543,11 @@ def chat_query(req: ChatRequest, me: models.User = Depends(get_current_user)):
             reply_text += LOW_CONFIDENCE[language]
 
         # Checked against the same evidence, so each one can be answered (app/followups.py)
-        followups = [] if not all_matches else (_safely(lambda q: suggest(q, all_matches, model_followups, faculty_lookup), query) or [])
+        cited_evidence = [m for _, m in cited]
+        followups = [] if not cited_evidence else (_safely(lambda q: suggest(q, cited_evidence, model_followups, faculty_lookup), query) or [])
         add_turn(req.session_id, req.message, reply_text)
-        message_id = None  # set once the answer is saved; the chat page sends it back with a 👍/👎
 
-        # Save session & message to SQLite DB
-        try:
-            session_rec = db.query(models.ChatSession).filter(models.ChatSession.id == req.session_id).first()
-            if not session_rec:
-                session_rec = models.ChatSession(id=req.session_id, user_id=me.id, role=persona, title=req.message[:40])
-                db.add(session_rec)
-            elif session_rec.user_id is None:
-                session_rec.user_id = me.id
-            session_rec.updated_at = datetime.datetime.utcnow()  # drives "active this week" on Monitoring
-            db.commit()
-
-            msg_user = models.ChatMessage(
-                session_id=req.session_id,
-                sender_role="user",
-                text=req.message,
-                timestamp="Just now",
-            )
-            db.add(msg_user)
-            db.commit()
-
-            msg_ai = models.ChatMessage(
-                session_id=req.session_id,
-                sender_role="assistant",
-                text=reply_text,
-                confidence=confidence,
-                confidence_type=confidence_type,
-                timestamp="Just now",
-            )
-            db.add(msg_ai)
-            db.flush()
-            message_id = msg_ai.id
-            for citation in citations:
-                page_suffix = f"#page={citation.page_number}" if citation.page_number else ""
-                db.add(models.MessageCitation(
-                    message_id=msg_ai.id,
-                    source_name=f"{citation.source}{page_suffix}",
-                    snippet=citation.snippet,
-                    similarity_score=citation.score,
-                ))
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            print(f"Warning DB chat save error: {e}")
+        message_id = _save_exchange(db, me, req, persona, reply_text, confidence, confidence_type, citations)
 
         return ChatResponse(
             text=reply_text,

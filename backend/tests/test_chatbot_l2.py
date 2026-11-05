@@ -147,6 +147,17 @@ def test_l2_production_chat_route_answers_one_case_per_source(monkeypatch):
         "generate_answer",
         lambda request: LocalProvider().generate(request),
     )
+    # Sources are only the passages the answer used (app/citations.py), so retrieval and
+    # citation are checked separately: the expected document must reach the answer step, and
+    # every citation must be one of the passages the answer was given.
+    given = {}
+    real_select = chat_router.select_citations
+
+    def recording_select(text, evidence, question):
+        given["sources"] = {str(e.get("source_file") or e.get("source")) for e in evidence}
+        return real_select(text, evidence, question)
+
+    monkeypatch.setattr(chat_router, "select_citations", recording_select)
     representative_cases = {}
     for case in load_cases():
         representative_cases.setdefault(case["source_file"], case)
@@ -159,9 +170,10 @@ def test_l2_production_chat_route_answers_one_case_per_source(monkeypatch):
             session_id=f"l2-{uuid4()}",
         ))
         aliases = SELECTED_CORPUS[source_file]
-        assert aliases.intersection(response.sources), (
-            f"Chat route did not cite {source_file}. Sources: {response.sources}"
+        assert aliases.intersection(given["sources"]), (
+            f"Chat route didn't retrieve {source_file}. Retrieved: {given['sources']}"
         )
+        assert set(response.sources) <= given["sources"], "a citation that wasn't in the evidence"
         assert response.text.strip()
         assert "couldn't find reliable information" not in response.text
         assert response.citations

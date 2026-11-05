@@ -168,7 +168,7 @@ def test_chat_contract_removes_out_of_range_provider_citation(chat_router, monke
     monkeypatch.setattr(
         router,
         "generate_answer",
-        lambda request: GenerationResult("Supported [E1], invented [E9].", "local", "test"),
+        lambda request: GenerationResult("Students require at least 75 percent attendance [E1], invented [E9].", "local", "test"),
     )
     response = router.chat_query(ChatRequest(
         message="What attendance is required?",
