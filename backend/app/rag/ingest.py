@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -35,6 +36,37 @@ from app.rag.visual_store import (
     clear_visual_cache,
 )
 
+
+
+# Answered straight from the file (faculty_directory.py) and found by keyword search, so
+# these aren't worth Gemini embedding tokens; their rows get an empty vector in a Gemini index.
+NOT_API_EMBEDDED = {"merged_faculty.csv"}
+
+
+def _overlap(previous: str, current: str, longest: int = 400) -> int:
+    """Length of the start of `current` that repeats the end of `previous` (chunk overlap)."""
+    for size in range(min(longest, len(previous), len(current)), 20, -1):
+        if previous.endswith(current[:size]):
+            return size
+    return 0
+
+
+def api_embedding_texts(records: list[dict]) -> list[str]:
+    """The shorter text sent to Gemini for each record: the document title instead of the
+    full label, and without the overlap repeated from the previous chunk. Local vectors,
+    keyword search and answers keep the full text; this only saves embedding tokens."""
+    out, previous = [], {}
+    for record in records:
+        source = str(record.get("source_file") or record.get("source") or "")
+        text = str(record.get("text", ""))
+        if source in NOT_API_EMBEDDED:
+            out.append("")
+            continue
+        skip = _overlap(previous.get(source, ""), text)
+        previous[source] = text
+        title = re.sub(r"\.(pdf|docx|csv|md|txt)$", "", source, flags=re.IGNORECASE)
+        out.append(f"{title}\n{text[skip:].strip()}")
+    return out
 
 def _ocr_scanned_pages(
     pages: list[dict],
@@ -178,19 +210,20 @@ def run_ingestion(progress_callback=None) -> dict:
             record["retrieval_text"] = _retrieval_context(record)
 
         progress(35, f"Embedding {len(records)} text chunks")
-        embeddings, embedder_used = embed_texts_labelled([
-            "\n".join(part for part in (
-                record["retrieval_text"],
-                record["text"],
-            ) if part)
-            for record in records
-        ])
+        embeddings, embedder_used = embed_texts_labelled(
+            ["\n".join(part for part in (record["retrieval_text"], record["text"]) if part) for record in records],
+            api_texts=api_embedding_texts(records),
+        )
         embeddings_array = np.asarray(embeddings, dtype=np.float32)
         if len(embeddings_array) != len(records):
             raise RuntimeError("Embedding provider returned an unexpected number of vectors.")
         # Record the embedder actually used (not the configured model name), so the admin
         # pages can tell when a rebuild is needed after switching embedders.
         manifest["text_embedding_model"] = embedder_used
+        from app.llm import last_embedding_progress
+
+        if last_embedding_progress:
+            manifest["gemini_embedding_progress"] = dict(last_embedding_progress)
 
         np.save(temp_path / "embeddings.npy", embeddings_array)
         (temp_path / "chunks.json").write_text(

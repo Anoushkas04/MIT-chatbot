@@ -1,4 +1,5 @@
 import hashlib
+import os
 import re
 import time
 import numpy as np
@@ -38,9 +39,13 @@ def get_client() -> genai.Client:
 HASH_EMBED_DIM = 768
 # v2: stopwords removed and light stemming (app/rag/text_norm.py); v1 indexes need a rebuild
 LOCAL_EMBEDDER = "local-hash-v2"
-# Texts per embedding request at build time. Fewer, larger requests stay further under the
-# free tier's 100 requests a minute and 1,000 a day.
+# Build-time Gemini embedding limits. The free tier allows 30,000 tokens and 100 requests a
+# minute: requests stay small and paced under that, and one build spends at most
+# EMBED_BUILD_SECONDS embedding (the rest continues on the next build, see embedding_cache).
 EMBED_BATCH_SIZE = 100
+EMBED_REQUEST_TOKENS = int(os.environ.get("EMBED_REQUEST_TOKENS", "9000"))
+EMBED_TOKENS_PER_MINUTE = int(os.environ.get("EMBED_TOKENS_PER_MINUTE", "25000"))
+EMBED_BUILD_SECONDS = int(os.environ.get("EMBED_BUILD_SECONDS", "900"))
 # A question's embedding is on the chat's critical path; don't let it hang a reply
 QUERY_EMBED_TIMEOUT_MS = 10_000
 
@@ -93,32 +98,94 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return embed_texts_labelled(texts)[0]
 
 
-def embed_texts_labelled(texts: list[str]) -> tuple[list[list[float]], str]:
+def estimate_tokens(text: str) -> int:
+    """A cautious token count for rate limiting (~3.5 characters a token)."""
+    return max(1, int(len(text) / 3.5) + 1)
+
+
+class _TokenPacer:
+    """Keeps requests under a tokens-per-minute budget by waiting when the last minute is full."""
+
+    def __init__(self, per_minute: int):
+        self.per_minute = per_minute
+        self.sent: list[tuple[float, int]] = []
+
+    def wait_for(self, tokens: int) -> None:
+        while True:
+            now = time.monotonic()
+            self.sent = [(t, n) for t, n in self.sent if now - t < 60]
+            if sum(n for _, n in self.sent) + tokens <= self.per_minute or not self.sent:
+                self.sent.append((now, tokens))
+                return
+            time.sleep(max(0.5, 60 - (now - self.sent[0][0])))
+
+
+def _token_batches(texts: list[str]) -> list[list[str]]:
+    batches, batch, size = [], [], 0
+    for text in texts:
+        tokens = estimate_tokens(text)
+        if batch and (size + tokens > EMBED_REQUEST_TOKENS or len(batch) >= EMBED_BATCH_SIZE):
+            batches.append(batch)
+            batch, size = [], 0
+        batch.append(text)
+        size += tokens
+    if batch:
+        batches.append(batch)
+    return batches
+
+
+# Filled in by embed_texts_labelled for the index manifest (shown in /api/health)
+last_embedding_progress: dict = {}
+
+
+def embed_texts_labelled(texts: list[str], api_texts: list[str] | None = None) -> tuple[list[list[float]], str]:
     """Vectors plus the embedder that actually produced them. Gemini and the local hash
     embedder both return 768 numbers, so the label is the only way an index can record
-    that a failed Gemini call fell back to local vectors."""
+    that a failed Gemini call fell back to local vectors.
+
+    `api_texts` is what's sent to Gemini (a shorter form of each text, "" to skip it: that
+    record gets an empty vector). Gemini's free tier allows 30,000 embedding tokens a
+    minute and the corpus is ~2M tokens, so requests are token-sized and paced, every batch
+    is saved to the cache as it arrives, and a build stops after EMBED_BUILD_SECONDS: until
+    every text is cached the index stays on local vectors, and the next build carries on."""
+    last_embedding_progress.clear()
     if not GEMINI_EMBEDDINGS_ENABLED or not is_valid_key(GEMINI_API_KEY):
         print("Using local hash embeddings. Set GEMINI_EMBEDDINGS_ENABLED=true and rebuild the index to use Gemini embeddings.")
         return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
     from app.rag import embedding_cache
 
-    # Reuse what earlier builds embedded; only new or changed chunks spend the daily quota
-    cached = embedding_cache.load(EMBEDDING_MODEL, texts)
-    missing = [t for t in dict.fromkeys(texts) if embedding_cache.key_for(EMBEDDING_MODEL, t) not in cached]
-    print(f"Gemini embeddings: {len(texts) - len(missing)} chunks from the cache, {len(missing)} to embed.")
+    api_texts = list(api_texts) if api_texts is not None else list(texts)
+    wanted = list(dict.fromkeys(t for t in api_texts if t))
+    cached = embedding_cache.load(EMBEDDING_MODEL, wanted)
+    missing = [t for t in wanted if embedding_cache.key_for(EMBEDDING_MODEL, t) not in cached]
+    total_tokens = sum(estimate_tokens(t) for t in missing)
+    print(f"Gemini embeddings: {len(wanted) - len(missing)} of {len(wanted)} texts already embedded; "
+          f"{len(missing)} to go (~{total_tokens:,} tokens).")
+    started = time.monotonic()
+    pacer = _TokenPacer(EMBED_TOKENS_PER_MINUTE)
+    done = len(wanted) - len(missing)
     try:
         client = get_client()
-        for i in range(0, len(missing), EMBED_BATCH_SIZE):
-            batch = missing[i : i + EMBED_BATCH_SIZE]
+        for batch in _token_batches(missing):
+            pacer.wait_for(sum(estimate_tokens(t) for t in batch))
+            # Checked after waiting for the token budget, so a wait can't run the build over its limit
+            if time.monotonic() - started > EMBED_BUILD_SECONDS:
+                print(f"Gemini embeddings: stopping after {EMBED_BUILD_SECONDS // 60} minutes with "
+                      f"{done} of {len(wanted)} embedded; the next build continues.")
+                break
             vectors = _embed_batch(client, batch)
             embedding_cache.save(EMBEDDING_MODEL, batch, vectors)  # kept even if a later batch fails
             cached.update({embedding_cache.key_for(EMBEDDING_MODEL, t): v for t, v in zip(batch, vectors)})
-        return [cached[embedding_cache.key_for(EMBEDDING_MODEL, t)] for t in texts], f"gemini:{EMBEDDING_MODEL}"
+            done += len(batch)
     except Exception as err:
         print(f"Gemini embedding notice: {err}. Using local feature hash embeddings.")
-        # Every text is re-embedded locally, so an index is never a mix of the two. The batches
-        # that did succeed stay in the cache, so the next build only embeds the rest.
+    last_embedding_progress.update({"embedded": done, "needed": len(wanted)})
+    if done < len(wanted):
+        # Never a mixed index: local vectors until every text has a Gemini vector
         return [_hash_embed(t) for t in texts], LOCAL_EMBEDDER
+    print("Gemini embeddings: complete.")
+    zero = [0.0] * 768
+    return [cached[embedding_cache.key_for(EMBEDDING_MODEL, t)] if t else zero for t in api_texts], f"gemini:{EMBEDDING_MODEL}"
 
 
 def _embed_batch(client, batch: list[str]) -> list[list[float]]:

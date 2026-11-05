@@ -110,6 +110,20 @@ def root():
     }
 
 
+def _embedding_progress() -> dict | None:
+    """How much of the corpus has Gemini embeddings so far (builds continue where the last stopped)."""
+    from app.rag.store import get_store
+
+    try:
+        progress = (get_store().manifest or {}).get("gemini_embedding_progress")
+    except Exception:
+        return None
+    if not progress:
+        return None
+    needed = progress.get("needed") or 0
+    return {**progress, "percent": round(100 * progress.get("embedded", 0) / needed, 1) if needed else None}
+
+
 def _ocr_status() -> dict:
     """What the last index build read from scanned pages (from its manifest)."""
     from app.rag.store import get_store
@@ -141,6 +155,7 @@ def health():
         "rag_chunk_count": rag["chunk_count"],
         "rag_error": rag["error"],
         "rag_embedder": rag.get("embedder"),
+        "gemini_embedding_progress": _embedding_progress(),
         "ocr": _ocr_status(),
         "database": database,
         "visual_rag": visual,
