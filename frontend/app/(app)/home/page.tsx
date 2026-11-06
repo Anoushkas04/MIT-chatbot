@@ -11,14 +11,19 @@ import { useNetworkPeople } from '@/lib/use-network'
 import { countUnseenNotifications } from '@/lib/notifications'
 import { defaultPlannerTasks, defaultProfile, withoutSampleTasks, type PlannerTask, type Profile } from '@/lib/mock-data'
 import { forYou } from '@/lib/discover-data'
+import { classesOn, TIMETABLE_LABEL, type ClassSlot } from '@/lib/timetable'
 
 export default function HomePage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [hasUnseen, setHasUnseen] = useState(false)
 
+  // Today's classes, read on the device so the day is the student's, not the build's
+  const [classes, setClasses] = useState<ClassSlot[] | null>(null)
+
   useEffect(() => {
     setHasUnseen(countUnseenNotifications() > 0)
+    setClasses(classesOn(new Date()))
   }, [])
   const [profile] = useLocalState<Profile>('mitra_profile', defaultProfile)
   const [saved, setSaved] = useLocalState<string[]>('mitra_saved', [])
@@ -111,7 +116,20 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="timeline">
-            {upNext.length === 0 && <p className="view-sub">Nothing on your planner yet.</p>}
+            {classes?.length === 0 && <p className="view-sub">No classes today.</p>}
+            {classes?.map((c, i) => (
+              <div key={`${c.start}-${c.course}`}>
+                <time>{c.start}</time>
+                <span className={`timeline-line ${['blue-line', 'coral-line', 'yellow-line'][i % 3]}`} />
+                <article>
+                  <strong>{c.course}</strong>
+                  <span>
+                    {c.start}–{c.end} · {TIMETABLE_LABEL}
+                  </span>
+                </article>
+              </div>
+            ))}
+            {upNext.length === 0 && classes?.length === 0 && <p className="view-sub">Nothing on your planner yet.</p>}
             {upNext.map((task, i) => (
               <div key={task.id}>
                 <time>
