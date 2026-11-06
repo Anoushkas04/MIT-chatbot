@@ -405,6 +405,8 @@ export const meApi = {
   markRead: (id: string) => authed<{ status: string }>('POST', `/api/me/notifications/${id}/read`),
   markAllRead: () => authed<{ status: string }>('POST', '/api/me/notifications/read-all'),
   updateProfile: (body: { clubs: ProfileEntry[]; projects: ProfileEntry[] }) => authed<PublicProfile>('PUT', '/api/me/profile', body),
+  /** Permanently deletes the account; `confirm` must be the word DELETE. */
+  deleteAccount: (confirm: string) => authed<{ status: string }>('POST', '/api/me/delete-account', { confirm }),
 }
 
 // ---- Admin: community moderation and audit log ----

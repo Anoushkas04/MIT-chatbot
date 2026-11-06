@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ArrowUpRight, Lock } from 'lucide-react'
 import { ProfileEntriesEditor } from '@/components/profile-entries-editor'
 import { currentUser, meApi, type ProfileEntry } from '@/lib/api'
 import { mitClubs } from '@/lib/clubs'
 import { avatarChoices, defaultProfile, interestOptions, type Profile } from '@/lib/mock-data'
+import { forgetStudentOnThisDevice } from '@/lib/session'
 import { useLocalState } from '@/lib/use-local-state'
 
 // Clubs and projects live on the server (other students see them); this is a cached copy.
@@ -36,6 +38,11 @@ export default function SettingsPage() {
   const [customInterest, setCustomInterest] = useState('')
   const [resetMessage, setResetMessage] = useState('')
   const [confirmingReset, setConfirmingReset] = useState(false)
+  const router = useRouter()
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleteWord, setDeleteWord] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [details, setDetails] = useLocalState<PublicDetails>('mitra_public_details', { clubs: [], projects: [] })
   const [draftClubs, setDraftClubs] = useState<ProfileEntry[]>([])
   const [draftProjects, setDraftProjects] = useState<ProfileEntry[]>([])
@@ -86,6 +93,20 @@ export default function SettingsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function deleteAccount() {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await meApi.deleteAccount(deleteWord.trim())
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Couldn't delete your account. Please try again.")
+      setDeleting(false)
+      return
+    }
+    forgetStudentOnThisDevice()
+    router.replace('/')
   }
 
   function resetInterests() {
@@ -316,6 +337,61 @@ export default function SettingsPage() {
               <span>Deadlines, notices and relevant announcements.</span>
             </div>
             <Toggle on={flags.notifications} onClick={() => toggle('notifications')} />
+          </div>
+        </section>
+
+        <section>
+          <h3>Account</h3>
+          <div className={`settings-card ${confirmingDelete ? 'confirming' : ''}`}>
+            <div>
+              <strong>Delete account</strong>
+              <span>Permanently delete your MITra account and your personal data.</span>
+              {confirmingDelete && (
+                <div className="reset-confirm" role="alertdialog" aria-label="Confirm account deletion">
+                  <p>
+                    This permanently deletes your account, chat history, connections, private messages, votes and
+                    notifications. Your Community questions and answers stay in their threads as &ldquo;Former member&rdquo;.
+                    This can&apos;t be undone.
+                  </p>
+                  <label className="delete-confirm-field">
+                    Type <b>DELETE</b> to confirm
+                    <input
+                      value={deleteWord}
+                      onChange={(e) => setDeleteWord(e.target.value)}
+                      autoComplete="off"
+                      autoFocus
+                      disabled={deleting}
+                    />
+                  </label>
+                  {deleteError && <p className="community-error">{deleteError}</p>}
+                  <div className="composer-actions">
+                    <button
+                      className="text-button"
+                      onClick={() => {
+                        setConfirmingDelete(false)
+                        setDeleteWord('')
+                        setDeleteError('')
+                      }}
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="community-ask-btn small danger"
+                      onClick={deleteAccount}
+                      disabled={deleteWord.trim() !== 'DELETE' || deleting}
+                    >
+                      {deleting ? 'Deleting…' : 'Delete my account'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {!confirmingDelete && (
+              <button className="settings-action danger" onClick={() => setConfirmingDelete(true)}>
+                Delete
+              </button>
+            )}
           </div>
         </section>
       </div>

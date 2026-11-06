@@ -49,6 +49,15 @@ export function setSession(session: Session) {
   localStorage.setItem(KEY, JSON.stringify(session))
 }
 
+/** After the account is deleted: signs out and removes everything MITra kept on this device for
+ * students (an admin session on the same browser is left alone). */
+export function forgetStudentOnThisDevice() {
+  try {
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('mitra_') && k !== ADMIN_KEY)
+    keys.forEach((k) => localStorage.removeItem(k))
+  } catch {}
+}
+
 export function clearSession() {
   localStorage.removeItem(KEY)
 }

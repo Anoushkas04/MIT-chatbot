@@ -149,3 +149,56 @@ def submit_plea(req: PleaRequest, me: models.User = Depends(get_current_user)):
         return {"status": "pending"}
     finally:
         db.close()
+
+
+class DeleteAccountRequest(BaseModel):
+    confirm: str = ""
+
+
+DELETE_CONFIRMATION = "DELETE"
+
+
+@router.post("/delete-account", summary="Permanently delete my account and my personal data")
+def delete_account(req: DeleteAccountRequest, me: models.User = Depends(get_current_user)):
+    """Deletes the account, chats, connections, private messages, votes, notifications and
+    moderation records. Community questions and answers stay in their threads for others,
+    shown as "Former member". Admin accounts are managed through the admin allowlist instead."""
+    if (req.confirm or "").strip() != DELETE_CONFIRMATION:
+        raise HTTPException(status_code=400, detail=f'Type {DELETE_CONFIRMATION} to confirm.')
+    if me.role == "admin":
+        raise HTTPException(status_code=403, detail="Admin accounts can't be deleted from Settings.")
+    db = SessionLocal()
+    try:
+        delete_user_data(db, me.id)
+        db.commit()
+        return {"status": "deleted"}
+    finally:
+        db.close()
+
+
+def delete_user_data(db, user_id: str) -> None:
+    from sqlalchemy import or_
+
+    m = models
+    user = db.query(m.User).filter(m.User.id == user_id).first()
+    if not user:
+        return
+    # Their community posts and replies stay for the people in those threads, without a name
+    db.query(m.CommunityPost).filter(m.CommunityPost.author_id == user_id).update({"author_id": None}, synchronize_session=False)
+    db.query(m.CommunityComment).filter(m.CommunityComment.author_id == user_id).update({"author_id": None}, synchronize_session=False)
+    db.query(m.SystemFeedback).filter(m.SystemFeedback.user_id == user_id).update({"user_id": None}, synchronize_session=False)
+    # Reports about them stay for the moderators, unlinked; reports they made are removed
+    db.query(m.UserReport).filter(m.UserReport.reported_user_id == user_id).update({"reported_user_id": None}, synchronize_session=False)
+    db.query(m.UserReport).filter(m.UserReport.reporter_id == user_id).delete(synchronize_session=False)
+    db.query(m.CommunityVote).filter(m.CommunityVote.user_id == user_id).delete(synchronize_session=False)
+    db.query(m.Connection).filter(or_(m.Connection.requester_id == user_id, m.Connection.addressee_id == user_id)).delete(synchronize_session=False)
+    db.query(m.DirectMessage).filter(or_(m.DirectMessage.sender_id == user_id, m.DirectMessage.recipient_id == user_id)).delete(synchronize_session=False)
+    db.query(m.UserBlock).filter(or_(m.UserBlock.blocker_id == user_id, m.UserBlock.blocked_id == user_id)).delete(synchronize_session=False)
+    db.query(m.Plea).filter(m.Plea.user_id == user_id).delete(synchronize_session=False)
+    db.query(m.AccountAppeal).filter(m.AccountAppeal.user_id == user_id).delete(synchronize_session=False)
+    db.query(m.AccountWarning).filter(m.AccountWarning.user_id == user_id).delete(synchronize_session=False)
+    db.query(m.Suspension).filter(m.Suspension.user_id == user_id).delete(synchronize_session=False)
+    if user.learner_id:
+        db.query(m.OTPRecord).filter(m.OTPRecord.learner_id == user.learner_id).delete(synchronize_session=False)
+    # Chat sessions (with their messages and citations), notifications and violations go with the user
+    db.delete(user)
